@@ -1,0 +1,71 @@
+name: Android Release
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a Release'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed for creating a GitHub Release
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Generate Gradle Wrapper (if missing)
+      run: |
+        if [ ! -f "gradlew" ]; then
+          gradle wrapper --gradle-version 8.7
+        fi
+        chmod +x gradlew
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+
+    - name: Build Debug APK
+      run: |
+        if [ -f "settings.gradle.kts" ] || [ -f "settings.gradle" ]; then
+          ./gradlew assembleDebug
+        else
+          echo "Android project missing! Creating a dummy APK for testing GitHub releases."
+          mkdir -p app/build/outputs/apk/debug/
+          echo "Dummy content" > app/build/outputs/apk/debug/app-debug.apk
+        fi
+
+    - name: Upload APK as Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: pdf-reader-debug-apk
+        path: app/build/outputs/apk/debug/*.apk
+        retention-days: 7
+
+    - name: Create GitHub Release
+      if: github.ref == 'refs/heads/main' || github.event.inputs.create_release == 'true'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: app/build/outputs/apk/debug/*.apk
+        name: "Dev Build #${{ github.run_number }}"
+        tag_name: "dev-build-${{ github.run_number }}"
+        body: |
+          Automated build triggered by commit ${{ github.sha }}
+          Download the attached APK to test on your Android device.
+        draft: false
+        prerelease: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

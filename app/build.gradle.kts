@@ -53,4 +53,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    
+    // PDFium integration for fast rendering
+    implementation("com.github.barteksc:pdfium-android:1.9.0")
+    
+    // Coroutines for concurrency
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
