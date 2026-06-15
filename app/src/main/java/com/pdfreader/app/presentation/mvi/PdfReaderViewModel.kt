@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pdfreader.app.domain.repository.PdfEngine
+import com.pdfreader.app.domain.repository.PdfSyncManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +21,8 @@ import kotlinx.coroutines.withContext
  */
 class PdfReaderViewModel(
     application: Application,
-    private val pdfEngine: PdfEngine
+    private val pdfEngine: PdfEngine,
+    private val syncManager: PdfSyncManager
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(PdfReaderState())
@@ -30,12 +32,27 @@ class PdfReaderViewModel(
         when (intent) {
             is PdfReaderIntent.OpenPdf -> openPdf(intent.uri)
             is PdfReaderIntent.ClosePdf -> closePdf()
+            is PdfReaderIntent.SyncPdf -> syncPdf(intent.localFile)
             is PdfReaderIntent.RequestPageRender -> renderPage(
                 intent.pageIndex,
                 intent.width,
                 intent.height,
                 intent.onRendered
             )
+        }
+    }
+
+    private fun syncPdf(localFile: java.io.File) {
+        val uri = _state.value.openedUri ?: return
+        _state.update { it.copy(isSyncing = true, errorMessage = null) }
+        
+        viewModelScope.launch(Dispatchers.IO) {
+            val success = syncManager.syncBackToSource(uri, localFile)
+            if (!success) {
+                _state.update { it.copy(isSyncing = false, errorMessage = "Failed to sync to cloud provider.") }
+            } else {
+                _state.update { it.copy(isSyncing = false) }
+            }
         }
     }
 

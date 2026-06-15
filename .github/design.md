@@ -1,7 +1,7 @@
 # PDF Reader Android App — Design & Architecture
 
 ## System Overview
-A highly optimized, low-latency PDF reading Android app built purely for reading. Focuses on performance with minimal memory allocation, fast rendering, and clean UI. Core capabilities include reading PDFs, customizable high-lighting, pen annotation (embedded into the PDF), Eraser, and an even-toned Read Aloud feature.
+A highly optimized, low-latency PDF reading Android app built purely for Readers. Focuses on performance with minimal memory allocation, fast rendering, and clean UI. Core capabilities include reading PDFs, customizable high-lighting, pen annotation (embedded into the PDF), Eraser, and an even-toned Read Aloud feature.
 
 ---
 

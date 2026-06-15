@@ -7,6 +7,7 @@ import android.net.Uri
  */
 data class PdfReaderState(
     val isLoading: Boolean = false,
+    val isSyncing: Boolean = false,
     val isPdfLoaded: Boolean = false,
     val pageCount: Int = 0,
     val openedUri: Uri? = null,

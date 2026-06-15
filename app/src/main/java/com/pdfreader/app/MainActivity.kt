@@ -13,19 +13,21 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.pdfreader.app.data.pdfium.PdfiumEngine
+import com.pdfreader.app.data.sync.SafPdfSyncManager
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
 import com.pdfreader.app.presentation.ui.PdfReaderScreen
 
 class MainActivity : ComponentActivity() {
 
-    // Quick ViewModelFactory for manual dependency injection of PdfiumEngine
+    // Quick ViewModelFactory for manual dependency injection
     private val viewModelFactory = object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(PdfReaderViewModel::class.java)) {
                 val pdfEngine = PdfiumEngine(applicationContext)
+                val syncManager = SafPdfSyncManager(applicationContext)
                 @Suppress("UNCHECKED_CAST")
-                return PdfReaderViewModel(application, pdfEngine) as T
+                return PdfReaderViewModel(application, pdfEngine, syncManager) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }
@@ -38,6 +40,15 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
+            // Take persistent read/write permission to allow background syncing to Google Drive
+            try {
+                val takeFlags: Int = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                contentResolver.takePersistableUriPermission(it, takeFlags)
+            } catch (e: SecurityException) {
+                e.printStackTrace()
+            }
+            
             viewModel.processIntent(PdfReaderIntent.OpenPdf(it))
         }
     }

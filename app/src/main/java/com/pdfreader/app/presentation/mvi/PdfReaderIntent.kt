@@ -12,6 +12,9 @@ sealed class PdfReaderIntent {
     
     /** Intent to close the currently opened PDF */
     object ClosePdf : PdfReaderIntent()
+
+    /** Intent to sync changes back to the source URI (e.g., Google Drive) */
+    data class SyncPdf(val localFile: java.io.File) : PdfReaderIntent()
     
     /** 
      * Intent to request the rendering of a specific page.
