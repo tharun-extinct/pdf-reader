@@ -54,6 +54,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     
+    // ViewModel Compose
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    
     // PDFium integration for fast rendering
     implementation("com.github.barteksc:pdfium-android:1.9.0")
     
