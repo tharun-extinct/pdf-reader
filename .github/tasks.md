@@ -1,15 +1,14 @@
 
-# Implementation Plan
+# Implementation Plan for PDF Reader
 
-- [✓] 1. Set up project structure and core interfaces
-  - Create directory structure for models, services, attack engines, and UI components
-  - Define base interfaces and abstract classes for forensics operations
-  - Set up configuration management for tool paths and settings
-  - _Requirements: 2.1, 2.2
-
-- [-] 2. Implement core data models and validation
-  - [✓] 2.1 Create AndroidDevice model with validation
-    - Add validation methods for device metadata integrity
+- [X] 1. Set up the Android Project & Clean Architecture (Domain, Data, Presentation layers)
+- [X] 2. Configure GitHub Actions workflows (CI pipeline to build Android APK and GitHub Release)
+- [ ] 3. Implement PDF Rendering Engine (PDFium-Android integration, tiled rendering)
+- [ ] 4. Build Core Reader UI (Jetpack Compose, gestures, paging, zoom)
+- [ ] 5. Implement Highlighting & Annotation Features (Customizable colors, Eraser tools)
+- [ ] 6. Implement PDFBox Integration (Embedding annotations back to the PDF file)
+- [ ] 7. Implement Read Aloud (Parsing PDF text, native Android TTS, playback state)
+- [ ] 8. Refine Performance & Latency (Optimize memory allocations, caching rendered bitmaps)
 
 
 
