@@ -29,6 +29,18 @@ android {
             )
         }
     }
+    
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            // Generate separate APKs for each architecture
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            // Disable universal APK generation to save space
+            isUniversalApk = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
