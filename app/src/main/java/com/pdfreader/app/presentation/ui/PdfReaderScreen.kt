@@ -1,6 +1,7 @@
 package com.pdfreader.app.presentation.ui
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -82,6 +83,7 @@ fun PdfReaderScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PdfPager(
     pageCount: Int,
