@@ -40,6 +40,7 @@ graph TD
 3.  **Data Layer**
     - **PDFium Repository**: Maps domain models to PDFium API calls for fast rendering of pages as bitmaps. Employs tiled rendering for large zoom scales to prevent `OutOfMemoryError`.
     - **PDFBox Repository**: Handles the structural modification of the PDF, saving the paths and coordinates from the Presentation layer directly into the file standard.
+    - **Sync Repository**: Manages persisting edited local PDFs directly back into Google Drive or other content providers via the Android Storage Access Framework (SAF).
 
 ---
 
@@ -48,6 +49,7 @@ graph TD
 - `reader-render`: Integrates PDFium, providing fast Bitmap generation.
 - `reader-editor`: Integrates PDFBox, handles annotation serialization.
 - `reader-tts`: Handles text extraction and interfacing with the Android TTS engine.
+- `reader-sync`: Integrates Android SAF for persistent background syncing to Google Drive.
 - `app`: The Android application module integrating all sub-modules via Compose UI.
 
 ---
@@ -55,7 +57,7 @@ graph TD
 ```
 app/
  ┣ src/main/java/com/pdfreader/app/
- ┃ ┣ data/         # Repositories, PDFium/PDFBox implementations
+ ┃ ┣ data/         # Repositories, PDFium/PDFBox/Sync implementations
  ┃ ┣ domain/       # UseCases, Models
  ┃ ┣ presentation/ # ViewModels, Jetpack Compose UI
 ```
@@ -64,7 +66,6 @@ app/
 
 ## Future Enhancements
 - Local NPU-based voice model for higher quality Read Aloud (e.g., Piper TTS via ONNX/TFLite).
-- Cloud Sync: Directly opening and syncing PDFs from Google Drive.
 - Format Support: ePub and other text-based formats.
 
 
