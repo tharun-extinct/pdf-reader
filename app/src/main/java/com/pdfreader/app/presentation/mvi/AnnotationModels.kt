@@ -32,17 +32,17 @@ data class TextAnnotation(
 )
 
 private val DefaultPenColors = listOf(
-    0xFFE53935,
-    0xFF1E88E5,
-    0xFF43A047,
-    0xFFFDD835
+    0xFFE53935L,
+    0xFF1E88E5L,
+    0xFF43A047L,
+    0xFFFDD835L
 )
 
 private val DefaultHighlighterColors = listOf(
-    0x66FFEB3B,
-    0x668E24AA,
-    0x664CAF50,
-    0x66FB8C00
+    0x66FFEB3BL,
+    0x668E24AAL,
+    0x664CAF50L,
+    0x66FB8C00L
 )
 
 fun defaultPenPalette(): AnnotationPalette = AnnotationPalette(DefaultPenColors)
