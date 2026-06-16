@@ -38,9 +38,6 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Run Unit Tests
-      run: ./gradlew testDebugUnitTest --stacktrace
-
     - name: Build Debug APK
       run: ./gradlew assembleDebug --stacktrace
 

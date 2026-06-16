@@ -16,10 +16,10 @@ Core capabilities:
 - Read Aloud (Android Native TTS)
 - Google Drive Background Sync (Storage Access Framework)
 
-**Development & Testing Workflow:**
+**Development & Build Workflow:**
 - **There is NO local runtime environment.** Do not attempt to run `./gradlew` locally.
 - Everything is built via GitHub Actions pipeline.
-- Testing is performed strictly by downloading the generated APKs from **GitHub Releases** (triggered on the `main` branch).
+- UI Testing is performed strictly by downloading the generated APKs from **GitHub Releases** (triggered on the `main` branch).
 
 Performance, low latency, and a clean modular architecture are non-negotiable.
 
