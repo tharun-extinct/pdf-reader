@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.hypot
 
 /**
  * ViewModel managing the PDF Reader state and processing intents.
@@ -39,6 +40,102 @@ class PdfReaderViewModel(
                 intent.height,
                 intent.onRendered
             )
+            is PdfReaderIntent.SelectTool -> selectTool(intent.tool)
+            is PdfReaderIntent.SelectPenColor -> selectPenColor(intent.index)
+            is PdfReaderIntent.SelectHighlighterColor -> selectHighlighterColor(intent.index)
+            is PdfReaderIntent.ToggleAnnotationSettings -> toggleAnnotationSettings()
+            is PdfReaderIntent.SavePenColors -> savePenColors(intent.colors)
+            is PdfReaderIntent.SaveHighlighterColors -> saveHighlighterColors(intent.colors)
+            is PdfReaderIntent.AddStroke -> addStroke(intent.stroke)
+            is PdfReaderIntent.RemoveStrokeAt -> removeStrokeAt(intent.pageIndex, intent.position)
+            is PdfReaderIntent.AddTextAnnotation -> addTextAnnotation(intent.pageIndex, intent.position)
+            is PdfReaderIntent.UpdateTextAnnotation -> updateTextAnnotation(intent.annotationId, intent.text)
+        }
+    }
+
+    private fun selectTool(tool: AnnotationTool) {
+        _state.update { it.copy(activeTool = tool, isAnnotationSettingsOpen = false) }
+    }
+
+    private fun selectPenColor(index: Int) {
+        _state.update { state ->
+            val safeIndex = index.coerceIn(0, state.penPalette.colors.lastIndex)
+            state.copy(selectedPenColorIndex = safeIndex)
+        }
+    }
+
+    private fun selectHighlighterColor(index: Int) {
+        _state.update { state ->
+            val safeIndex = index.coerceIn(0, state.highlighterPalette.colors.lastIndex)
+            state.copy(selectedHighlighterColorIndex = safeIndex)
+        }
+    }
+
+    private fun toggleAnnotationSettings() {
+        _state.update { it.copy(isAnnotationSettingsOpen = !it.isAnnotationSettingsOpen) }
+    }
+
+    private fun savePenColors(colors: List<Long>) {
+        if (colors.size != 4) return
+        _state.update { state ->
+            state.copy(
+                penPalette = AnnotationPalette(colors),
+                selectedPenColorIndex = state.selectedPenColorIndex.coerceIn(0, colors.lastIndex)
+            )
+        }
+    }
+
+    private fun saveHighlighterColors(colors: List<Long>) {
+        if (colors.size != 4) return
+        _state.update { state ->
+            state.copy(
+                highlighterPalette = AnnotationPalette(colors),
+                selectedHighlighterColorIndex = state.selectedHighlighterColorIndex.coerceIn(0, colors.lastIndex)
+            )
+        }
+    }
+
+    private fun addStroke(stroke: FreehandStroke) {
+        _state.update { state ->
+            val pageStrokes = state.strokesByPage[stroke.pageIndex].orEmpty()
+            state.copy(
+                strokesByPage = state.strokesByPage + (stroke.pageIndex to (pageStrokes + stroke))
+            )
+        }
+    }
+
+    private fun removeStrokeAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
+        _state.update { state ->
+            val pageStrokes = state.strokesByPage[pageIndex].orEmpty()
+            val remaining = pageStrokes.filterNot { stroke ->
+                stroke.points.any { point -> hypot(point.x - position.x, point.y - position.y) <= 0.035f }
+            }
+            state.copy(strokesByPage = state.strokesByPage + (pageIndex to remaining))
+        }
+    }
+
+    private fun addTextAnnotation(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
+        _state.update { state ->
+            val pageAnnotations = state.textAnnotationsByPage[pageIndex].orEmpty()
+            val annotation = TextAnnotation(
+                id = System.currentTimeMillis(),
+                pageIndex = pageIndex,
+                position = position,
+                color = state.penPalette.colors[state.selectedPenColorIndex],
+                text = ""
+            )
+            state.copy(textAnnotationsByPage = state.textAnnotationsByPage + (pageIndex to (pageAnnotations + annotation)))
+        }
+    }
+
+    private fun updateTextAnnotation(annotationId: Long, text: String) {
+        _state.update { state ->
+            val updatedPages = state.textAnnotationsByPage.mapValues { (_, annotations) ->
+                annotations.map { annotation ->
+                    if (annotation.id == annotationId) annotation.copy(text = text) else annotation
+                }
+            }
+            state.copy(textAnnotationsByPage = updatedPages)
         }
     }
 

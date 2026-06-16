@@ -2,6 +2,7 @@ package com.pdfreader.app.presentation.mvi
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.ui.geometry.Offset
 
 /**
  * Represents the user intents/actions for the PDF Reader.
@@ -27,4 +28,24 @@ sealed class PdfReaderIntent {
         val height: Int,
         val onRendered: (Bitmap?) -> Unit
     ) : PdfReaderIntent()
+
+    data class SelectTool(val tool: AnnotationTool) : PdfReaderIntent()
+
+    data class SelectPenColor(val index: Int) : PdfReaderIntent()
+
+    data class SelectHighlighterColor(val index: Int) : PdfReaderIntent()
+
+    object ToggleAnnotationSettings : PdfReaderIntent()
+
+    data class SavePenColors(val colors: List<Long>) : PdfReaderIntent()
+
+    data class SaveHighlighterColors(val colors: List<Long>) : PdfReaderIntent()
+
+    data class AddStroke(val stroke: FreehandStroke) : PdfReaderIntent()
+
+    data class RemoveStrokeAt(val pageIndex: Int, val position: Offset) : PdfReaderIntent()
+
+    data class AddTextAnnotation(val pageIndex: Int, val position: Offset) : PdfReaderIntent()
+
+    data class UpdateTextAnnotation(val annotationId: Long, val text: String) : PdfReaderIntent()
 }

@@ -1,17 +1,25 @@
 ---
 applyTo: "**/*"
-name: Project name
-description: desc
+name: PDF Reader Android App
+description: Instructions for developing the highly optimized Android PDF Reader
 ---
 
 
 ## Project Description:
 
-{short_desc}
+This project is a Compute Intensive Application. A lightweight, highly optimized Android PDF reader focused purely on reading and annotating. 
+Before production deployment, we need to optimize a lot. We must focus on smoother UI / UX and low system resources management.
 
 Core capabilities:
-- {point1}
+- PDF Rendering (PDFium-Android)
+- Highlight, Pen annotation (embedded), and Eraser tools (PDFBox)
+- Read Aloud (Android Native TTS)
+- Google Drive Background Sync (Storage Access Framework)
 
+**Development & Testing Workflow:**
+- **There is NO local runtime environment.** Do not attempt to run `./gradlew` locally.
+- Everything is built via GitHub Actions pipeline.
+- Testing is performed strictly by downloading the generated APKs from **GitHub Releases** (triggered on the `main` branch).
 
 Performance, low latency, and a clean modular architecture are non-negotiable.
 
@@ -33,9 +41,9 @@ Full architecture and design decisions live in `.github/design.md`. **Always con
 ## This is how you should always act:
 
 ### Planning and Approach
-- **Always plan before writing code.** Create a todo list; add "Build and Run" as the final step.
+- **Always plan before writing code.** Create a todo list; add "Commit and Push to remote for CI build" as the final step.
 - Follow **First principles thinking** — breaking down a problem to its most fundamental truths and reasoning up from there 
-- Focus on **performance and low latency** — especially in the service worker (no blocking ops, minimal allocations).
+- Focus on **smoother UI / UX and low system resources management** — avoid memory leaks and unneeded allocations, especially with bitmaps or Jetpack Compose recompositions.
 - **Never assume** on anything tech-stack or feature-related — ask first.
 - **Never implement a feature** until it's explicitly requested.
 
