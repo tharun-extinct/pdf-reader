@@ -23,6 +23,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -32,12 +33,7 @@ android {
     
     splits {
         abi {
-            isEnable = true
-            reset()
-            // Generate separate APKs for each architecture
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-            // Disable universal APK generation to save space
-            isUniversalApk = false
+            isEnable = false
         }
     }
 
