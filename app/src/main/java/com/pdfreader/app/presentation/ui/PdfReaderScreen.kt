@@ -2,6 +2,7 @@ package com.pdfreader.app.presentation.ui
 
 import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
@@ -12,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -53,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -443,15 +446,18 @@ fun PdfPager(
 ) {
     val pagerState = rememberPagerState(pageCount = { state.pageCount })
 
+    // Use Crossfade to animate page changes smoothly.
     HorizontalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize()
     ) { pageIndex ->
-        PdfPage(
-            pageIndex = pageIndex,
-            state = state,
-            onIntent = onIntent
-        )
+        androidx.compose.animation.Crossfade(targetState = pageIndex) { index ->
+            PdfPage(
+                pageIndex = index,
+                state = state,
+                onIntent = onIntent
+            )
+        }
     }
 }
 
@@ -463,6 +469,8 @@ fun PdfPage(
 ) {
     var size by remember { mutableStateOf(IntSize.Zero) }
     var pageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    // Scale state for pinch‑to‑zoom. Starts at 1f (no zoom).
+    var scale by remember { mutableStateOf(1f) }
 
     LaunchedEffect(size) {
         if (size.width > 0 && size.height > 0 && pageBitmap == null) {
@@ -512,7 +520,19 @@ fun PdfPage(
                 Image(
                     bitmap = pageImage.asImageBitmap(),
                     contentDescription = "Page $pageIndex",
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale
+                        )
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, _, zoom, _ ->
+                                // Clamp the scale to a reasonable range.
+                                val newScale = (scale * zoom).coerceIn(0.5f, 5f)
+                                scale = newScale
+                            }
+                        },
                     contentScale = ContentScale.Fit
                 )
 

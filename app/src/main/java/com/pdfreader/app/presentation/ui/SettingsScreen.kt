@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -46,38 +47,25 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Example setting: Dark mode toggle (placeholder, does not actually change theme)
+            // Dark mode toggle (placeholder)
             val darkModeEnabled = remember { mutableStateOf(false) }
-            SettingItem(
-                title = "Dark Mode",
-                checked = darkModeEnabled.value,
-                onCheckedChange = { darkModeEnabled.value = it }
+            ListItem(
+                headlineText = { Text("Dark Mode") },
+                trailingContent = {
+                    Switch(checked = darkModeEnabled.value, onCheckedChange = { darkModeEnabled.value = it })
+                }
             )
 
-            // Example setting: Sync with Google Drive (placeholder)
+            // Sync with Google Drive toggle (placeholder)
             val syncEnabled = remember { mutableStateOf(true) }
-            SettingItem(
-                title = "Sync with Google Drive",
-                checked = syncEnabled.value,
-                onCheckedChange = { syncEnabled.value = it }
+            ListItem(
+                headlineText = { Text("Sync with Google Drive") },
+                trailingContent = {
+                    Switch(checked = syncEnabled.value, onCheckedChange = { syncEnabled.value = it })
+                }
             )
         }
-    }
-}
-
-@Composable
-private fun SettingItem(
-    title: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(text = title, style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
