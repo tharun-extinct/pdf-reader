@@ -29,6 +29,11 @@ sealed class PdfReaderIntent {
         val onRendered: (Bitmap?) -> Unit
     ) : PdfReaderIntent()
 
+    data class RequestPageText(
+        val pageIndex: Int,
+        val onExtracted: (List<PdfTextBox>) -> Unit
+    ) : PdfReaderIntent()
+
     data class SelectTool(val tool: AnnotationTool) : PdfReaderIntent()
 
     data class SelectPenColor(val index: Int) : PdfReaderIntent()
@@ -42,6 +47,8 @@ sealed class PdfReaderIntent {
     data class SaveHighlighterColors(val colors: List<Long>) : PdfReaderIntent()
 
     data class AddStroke(val stroke: FreehandStroke) : PdfReaderIntent()
+
+    data class AddTextHighlight(val highlight: TextHighlight) : PdfReaderIntent()
 
     data class RemoveStrokeAt(val pageIndex: Int, val position: Offset) : PdfReaderIntent()
 

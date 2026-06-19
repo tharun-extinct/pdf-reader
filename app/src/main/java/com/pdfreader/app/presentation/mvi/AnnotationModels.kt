@@ -1,8 +1,10 @@
 package com.pdfreader.app.presentation.mvi
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 
 enum class AnnotationTool {
+    None,
     ReadAloud,
     Pen,
     Highlighter,
@@ -29,6 +31,19 @@ data class TextAnnotation(
     val position: Offset,
     val color: Long,
     val text: String
+)
+
+data class PdfTextBox(
+    val pageIndex: Int,
+    val text: String,
+    val bounds: Rect
+)
+
+data class TextHighlight(
+    val id: Long,
+    val pageIndex: Int,
+    val color: Long,
+    val rects: List<Rect>
 )
 
 private val DefaultPenColors = listOf(

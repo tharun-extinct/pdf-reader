@@ -40,6 +40,7 @@ class PdfReaderViewModel(
                 intent.height,
                 intent.onRendered
             )
+            is PdfReaderIntent.RequestPageText -> extractPageText(intent.pageIndex, intent.onExtracted)
             is PdfReaderIntent.SelectTool -> selectTool(intent.tool)
             is PdfReaderIntent.SelectPenColor -> selectPenColor(intent.index)
             is PdfReaderIntent.SelectHighlighterColor -> selectHighlighterColor(intent.index)
@@ -47,6 +48,7 @@ class PdfReaderViewModel(
             is PdfReaderIntent.SavePenColors -> savePenColors(intent.colors)
             is PdfReaderIntent.SaveHighlighterColors -> saveHighlighterColors(intent.colors)
             is PdfReaderIntent.AddStroke -> addStroke(intent.stroke)
+            is PdfReaderIntent.AddTextHighlight -> addTextHighlight(intent.highlight)
             is PdfReaderIntent.RemoveStrokeAt -> removeStrokeAt(intent.pageIndex, intent.position)
             is PdfReaderIntent.AddTextAnnotation -> addTextAnnotation(intent.pageIndex, intent.position)
             is PdfReaderIntent.UpdateTextAnnotation -> updateTextAnnotation(intent.annotationId, intent.text)
@@ -54,7 +56,14 @@ class PdfReaderViewModel(
     }
 
     private fun selectTool(tool: AnnotationTool) {
-        _state.update { it.copy(activeTool = tool, isAnnotationSettingsOpen = false) }
+        _state.update { state ->
+            val nextTool = if (state.activeTool == tool && (tool == AnnotationTool.Pen || tool == AnnotationTool.Highlighter)) {
+                AnnotationTool.None
+            } else {
+                tool
+            }
+            state.copy(activeTool = nextTool, isAnnotationSettingsOpen = false)
+        }
     }
 
     private fun selectPenColor(index: Int) {
@@ -104,13 +113,29 @@ class PdfReaderViewModel(
         }
     }
 
+    private fun addTextHighlight(highlight: TextHighlight) {
+        _state.update { state ->
+            val pageHighlights = state.highlightsByPage[highlight.pageIndex].orEmpty()
+            state.copy(
+                highlightsByPage = state.highlightsByPage + (highlight.pageIndex to (pageHighlights + highlight))
+            )
+        }
+    }
+
     private fun removeStrokeAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
         _state.update { state ->
             val pageStrokes = state.strokesByPage[pageIndex].orEmpty()
-            val remaining = pageStrokes.filterNot { stroke ->
-                stroke.points.any { point -> hypot(point.x - position.x, point.y - position.y) <= 0.035f }
-            }
-            state.copy(strokesByPage = state.strokesByPage + (pageIndex to remaining))
+                val remainingStrokes = pageStrokes.filterNot { stroke ->
+                    stroke.points.any { point -> hypot(point.x - position.x, point.y - position.y) <= 0.035f }
+                }
+                val pageHighlights = state.highlightsByPage[pageIndex].orEmpty()
+                val remainingHighlights = pageHighlights.filterNot { highlight ->
+                    highlight.rects.any { it.inflate(0.015f).contains(position) }
+                }
+            state.copy(
+                strokesByPage = state.strokesByPage + (pageIndex to remainingStrokes),
+                highlightsByPage = state.highlightsByPage + (pageIndex to remainingHighlights)
+            )
         }
     }
 
@@ -162,7 +187,9 @@ class PdfReaderViewModel(
                 val pfd = context.contentResolver.openFileDescriptor(uri, "r")
                 
                 if (pfd != null) {
-                    pdfEngine.openDocument(pfd)
+                    val pdfBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: throw IllegalStateException("Failed to read PDF bytes.")
+                    pdfEngine.openDocument(pfd, pdfBytes)
                     val pageCount = pdfEngine.getPageCount()
                     
                     _state.update { 
@@ -217,6 +244,31 @@ class PdfReaderViewModel(
         }
     }
 
+    private fun extractPageText(pageIndex: Int, onExtracted: (List<PdfTextBox>) -> Unit) {
+        val cached = _state.value.textBoxesByPage[pageIndex]
+        if (cached != null) {
+            onExtracted(cached)
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val boxes = try {
+                pdfEngine.getTextBoxes(pageIndex)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emptyList()
+            }
+
+            _state.update { state ->
+                state.copy(textBoxesByPage = state.textBoxesByPage + (pageIndex to boxes))
+            }
+
+            withContext(Dispatchers.Main) {
+                onExtracted(boxes)
+            }
+        }
+    }
+
     private fun closePdf() {
         pdfEngine.closeDocument()
         _state.update { PdfReaderState() }
@@ -226,4 +278,13 @@ class PdfReaderViewModel(
         super.onCleared()
         pdfEngine.closeDocument()
     }
+}
+
+private fun androidx.compose.ui.geometry.Rect.inflate(amount: Float): androidx.compose.ui.geometry.Rect {
+    return androidx.compose.ui.geometry.Rect(
+        left = left - amount,
+        top = top - amount,
+        right = right + amount,
+        bottom = bottom + amount
+    )
 }

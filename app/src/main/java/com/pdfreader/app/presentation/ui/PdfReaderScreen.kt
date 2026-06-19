@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,9 +26,9 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,15 +57,22 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pdfreader.app.presentation.mvi.AnnotationTool
 import com.pdfreader.app.presentation.mvi.FreehandStroke
+import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderState
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
 import com.pdfreader.app.presentation.mvi.TextAnnotation
+import com.pdfreader.app.presentation.mvi.TextHighlight
 import com.pdfreader.app.presentation.mvi.formatHexColor
 import com.pdfreader.app.presentation.mvi.parseHexColor
 import kotlin.math.roundToInt
@@ -155,54 +161,54 @@ private fun AnnotationToolbar(
     onIntent: (PdfReaderIntent) -> Unit
 ) {
     Surface(
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp,
+        shadowElevation = 8.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             when (state.activeTool) {
                 AnnotationTool.Pen -> {
                     ToolPaletteRow(
-                        title = "Pen",
+                        label = "Pen",
+                        icon = "✎",
                         colors = state.penPalette.colors,
                         selectedIndex = state.selectedPenColorIndex,
-                        onColorSelected = { onIntent(PdfReaderIntent.SelectPenColor(it)) }
+                        onColorSelected = { onIntent(PdfReaderIntent.SelectPenColor(it)) },
+                        onClose = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.None)) }
                     )
                 }
                 AnnotationTool.Highlighter -> {
                     ToolPaletteRow(
-                        title = "Highlighter",
+                        label = "Highlighter",
+                        icon = "▰",
                         colors = state.highlighterPalette.colors,
                         selectedIndex = state.selectedHighlighterColorIndex,
-                        onColorSelected = { onIntent(PdfReaderIntent.SelectHighlighterColor(it)) }
+                        onColorSelected = { onIntent(PdfReaderIntent.SelectHighlighterColor(it)) },
+                        onClose = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.None)) }
                     )
                 }
                 else -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ToolbarAction("Read aloud", state.activeTool == AnnotationTool.ReadAloud) {
-                            onIntent(PdfReaderIntent.SelectTool(AnnotationTool.ReadAloud))
-                        }
-                        ToolbarAction("Pen", state.activeTool == AnnotationTool.Pen) {
-                            onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Pen))
-                        }
-                        ToolbarAction("Highlighter", state.activeTool == AnnotationTool.Highlighter) {
-                            onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Highlighter))
-                        }
-                        ToolbarAction("Eraser", state.activeTool == AnnotationTool.Eraser) {
-                            onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Eraser))
-                        }
-                        ToolbarAction("Add Text", state.activeTool == AnnotationTool.AddText) {
-                            onIntent(PdfReaderIntent.SelectTool(AnnotationTool.AddText))
-                        }
+                    ToolbarAction("Read aloud", "▶", state.activeTool == AnnotationTool.ReadAloud) {
+                        onIntent(PdfReaderIntent.SelectTool(AnnotationTool.ReadAloud))
+                    }
+                    ToolbarAction("Pen", "✎", state.activeTool == AnnotationTool.Pen) {
+                        onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Pen))
+                    }
+                    ToolbarAction("Highlighter", "▰", state.activeTool == AnnotationTool.Highlighter) {
+                        onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Highlighter))
+                    }
+                    ToolbarAction("Eraser", "⌫", state.activeTool == AnnotationTool.Eraser) {
+                        onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Eraser))
+                    }
+                    ToolbarAction("Add text", "T", state.activeTool == AnnotationTool.AddText) {
+                        onIntent(PdfReaderIntent.SelectTool(AnnotationTool.AddText))
                     }
                 }
             }
@@ -212,21 +218,31 @@ private fun AnnotationToolbar(
 
 @Composable
 private fun ToolPaletteRow(
-    title: String,
+    label: String,
+    icon: String,
     colors: List<Long>,
     selectedIndex: Int,
-    onColorSelected: (Int) -> Unit
+    onColorSelected: (Int) -> Unit,
+    onClose: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        IconButton(
+            onClick = onClose,
+            modifier = Modifier
+                .size(42.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                .semantics { contentDescription = "$label tool" }
+        ) {
+            Text(
+                text = icon,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
 
         colors.forEachIndexed { index, color ->
             val selected = index == selectedIndex
@@ -242,19 +258,44 @@ private fun ToolPaletteRow(
                     .clickable { onColorSelected(index) }
             )
         }
+
+        IconButton(
+            onClick = onClose,
+            modifier = Modifier
+                .size(42.dp)
+                .semantics { contentDescription = "Close tool colors" }
+        ) {
+            Text(
+                text = "×",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }
 
 @Composable
 private fun ToolbarAction(
     label: String,
+    icon: String,
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    TextButton(onClick = onClick) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(48.dp)
+            .background(
+                color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                shape = CircleShape
+            )
+            .semantics { contentDescription = label }
+    ) {
         Text(
-            text = label,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            text = icon,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.titleLarge,
+            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -299,6 +340,8 @@ fun PdfPage(
     }
 
     val pageStrokes = state.strokesByPage[pageIndex].orEmpty()
+    val pageHighlights = state.highlightsByPage[pageIndex].orEmpty()
+    val pageTextBoxes = state.textBoxesByPage[pageIndex].orEmpty()
     val pageTextAnnotations = state.textAnnotationsByPage[pageIndex].orEmpty()
 
     BoxWithConstraints(
@@ -319,6 +362,12 @@ fun PdfPage(
         }
 
         if (pageImage != null) {
+            LaunchedEffect(pageIndex) {
+                if (!state.textBoxesByPage.containsKey(pageIndex)) {
+                    onIntent(PdfReaderIntent.RequestPageText(pageIndex) { })
+                }
+            }
+
             Image(
                 bitmap = pageImage.asImageBitmap(),
                 contentDescription = "Page $pageIndex",
@@ -327,6 +376,19 @@ fun PdfPage(
             )
 
             Canvas(modifier = Modifier.matchParentSize()) {
+                pageHighlights.forEach { highlight ->
+                    highlight.rects.forEach { rect ->
+                        drawRect(
+                            color = Color(highlight.color),
+                            topLeft = rect.topLeft.toDisplayOffset(contentBounds),
+                            size = androidx.compose.ui.geometry.Size(
+                                width = rect.width * contentBounds.width,
+                                height = rect.height * contentBounds.height
+                            )
+                        )
+                    }
+                }
+
                 pageStrokes.forEach { stroke ->
                     if (stroke.points.isEmpty()) {
                         return@forEach
@@ -355,10 +417,18 @@ fun PdfPage(
                 }
             }
 
+            if (state.activeTool == AnnotationTool.None || state.activeTool == AnnotationTool.ReadAloud) {
+                SelectableTextLayer(
+                    textBoxes = pageTextBoxes,
+                    contentBounds = contentBounds
+                )
+            }
+
             AnnotationGestureLayer(
                 pageIndex = pageIndex,
                 state = state,
                 contentBounds = contentBounds,
+                textBoxes = pageTextBoxes,
                 onIntent = onIntent
             )
 
@@ -396,16 +466,52 @@ fun PdfPage(
 }
 
 @Composable
+private fun BoxScope.SelectableTextLayer(
+    textBoxes: List<PdfTextBox>,
+    contentBounds: Rect
+) {
+    if (textBoxes.isEmpty() || contentBounds.width <= 0f || contentBounds.height <= 0f) {
+        return
+    }
+
+    val density = LocalDensity.current
+    SelectionContainer(modifier = Modifier.matchParentSize()) {
+        Box(modifier = Modifier.matchParentSize()) {
+            textBoxes.forEach { textBox ->
+                val displayBounds = textBox.bounds.toDisplayRect(contentBounds)
+                Text(
+                    text = textBox.text,
+                    color = Color.Transparent,
+                    fontSize = 8.sp,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                x = displayBounds.left.roundToInt(),
+                                y = displayBounds.top.roundToInt()
+                            )
+                        }
+                        .width(with(density) { maxOf(displayBounds.width, 1f).toDp() })
+                        .height(with(density) { maxOf(displayBounds.height, 1f).toDp() })
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun BoxScope.AnnotationGestureLayer(
     pageIndex: Int,
     state: PdfReaderState,
     contentBounds: Rect,
+    textBoxes: List<PdfTextBox>,
     onIntent: (PdfReaderIntent) -> Unit
 ) {
     val activeTool = state.activeTool
     val penColor = state.penPalette.colors.getOrNull(state.selectedPenColorIndex) ?: state.penPalette.colors.first()
     val highlighterColor = state.highlighterPalette.colors.getOrNull(state.selectedHighlighterColorIndex) ?: state.highlighterPalette.colors.first()
     var currentStrokePoints = remember { mutableStateListOf<Offset>() }
+    var dragStart by remember { mutableStateOf<Offset?>(null) }
 
     Box(
         modifier = Modifier
@@ -413,10 +519,11 @@ private fun BoxScope.AnnotationGestureLayer(
             .then(
                 when (activeTool) {
                     AnnotationTool.Pen, AnnotationTool.Highlighter -> {
-                        Modifier.pointerInput(activeTool, contentBounds) {
+                        Modifier.pointerInput(activeTool, contentBounds, textBoxes) {
                             detectDragGestures(
                                 onDragStart = { start ->
                                     currentStrokePoints = mutableStateListOf()
+                                    dragStart = toNormalizedIfInside(start, contentBounds)
                                     toNormalizedIfInside(start, contentBounds)?.let { currentStrokePoints.add(it) }
                                 },
                                 onDrag = { change, _ ->
@@ -424,7 +531,33 @@ private fun BoxScope.AnnotationGestureLayer(
                                     toNormalizedIfInside(change.position, contentBounds)?.let { currentStrokePoints.add(it) }
                                 },
                                 onDragEnd = {
-                                    if (currentStrokePoints.size >= 2) {
+                                    val start = dragStart
+                                    val end = currentStrokePoints.lastOrNull()
+                                    val highlightedText = if (activeTool == AnnotationTool.Highlighter && start != null && end != null) {
+                                        val selectionRect = normalizedSelectionRect(start, end).inflate(0.006f)
+                                        val selectedRects = textBoxes
+                                            .filter { it.bounds.intersects(selectionRect) }
+                                            .map { it.bounds }
+                                        if (selectedRects.isNotEmpty()) {
+                                            onIntent(
+                                                PdfReaderIntent.AddTextHighlight(
+                                                    TextHighlight(
+                                                        id = System.currentTimeMillis(),
+                                                        pageIndex = pageIndex,
+                                                        color = highlighterColor,
+                                                        rects = selectedRects
+                                                    )
+                                                )
+                                            )
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    } else {
+                                        false
+                                    }
+
+                                    if (!highlightedText && currentStrokePoints.size >= 2) {
                                         onIntent(
                                             PdfReaderIntent.AddStroke(
                                                 FreehandStroke(
@@ -439,6 +572,7 @@ private fun BoxScope.AnnotationGestureLayer(
                                         )
                                     }
                                     currentStrokePoints = mutableStateListOf()
+                                    dragStart = null
                                 }
                             )
                         }
@@ -487,66 +621,68 @@ private fun AnnotationSettingsDialog(
     }
     var validationError by remember { mutableStateOf<String?>(null) }
 
-    Surface(
+    Box(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0x80000000)
+        contentAlignment = Alignment.BottomCenter
     ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                tonalElevation = 8.dp,
-                shadowElevation = 12.dp,
-                modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .padding(12.dp)
+        Surface(
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            tonalElevation = 6.dp,
+            shadowElevation = 14.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Annotation colors", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Enter four hex colors for each tool. Use #RRGGBB or #AARRGGBB.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    ColorPaletteEditor(
-                        label = "Pen",
-                        values = penInputs
-                    )
-
-                    ColorPaletteEditor(
-                        label = "Highlighter",
-                        values = highlighterInputs
-                    )
-
-                    validationError?.let {
-                        Text(text = it, color = MaterialTheme.colorScheme.error)
+                    Column {
+                        Text("Annotation colors", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "Use #RRGGBB or #AARRGGBB.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        TextButton(onClick = onDismiss) {
-                            Text("Cancel")
-                        }
-                        TextButton(onClick = {
-                            val penColors = penInputs.mapNotNull { parseHexColor(it) }
-                            val highlighterColors = highlighterInputs.mapNotNull { parseHexColor(it) }
-                            if (penColors.size != 4 || highlighterColors.size != 4) {
-                                validationError = "All eight colors must be valid hex values."
-                                return@TextButton
-                            }
-
-                            onSavePenColors(penColors)
-                            onSaveHighlighterColors(highlighterColors)
-                            onDismiss()
-                        }) {
-                            Text("Save")
-                        }
+                    IconButton(onClick = onDismiss) {
+                        Text("×", style = MaterialTheme.typography.titleLarge)
                     }
+                }
+
+                ColorPaletteEditor(
+                    label = "Pen",
+                    values = penInputs
+                )
+
+                ColorPaletteEditor(
+                    label = "Highlighter",
+                    values = highlighterInputs
+                )
+
+                validationError?.let {
+                    Text(text = it, color = MaterialTheme.colorScheme.error)
+                }
+
+                Button(
+                    onClick = {
+                        val penColors = penInputs.mapNotNull { parseHexColor(it) }
+                        val highlighterColors = highlighterInputs.mapNotNull { parseHexColor(it) }
+                        if (penColors.size != 4 || highlighterColors.size != 4) {
+                            validationError = "All eight colors must be valid hex values."
+                            return@Button
+                        }
+
+                        onSavePenColors(penColors)
+                        onSaveHighlighterColors(highlighterColors)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Save colors")
                 }
             }
         }
@@ -561,13 +697,24 @@ private fun ColorPaletteEditor(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(label, style = MaterialTheme.typography.titleMedium)
         values.forEachIndexed { index, value ->
-            OutlinedTextField(
-                value = value,
-                onValueChange = { values[index] = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Color ${index + 1}") }
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(Color(parseHexColor(value) ?: 0x00000000), CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { values[index] = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Color ${index + 1}") }
+                )
+            }
         }
     }
 }
@@ -594,6 +741,42 @@ private fun Offset.toDisplayOffset(bounds: Rect): Offset {
         x = bounds.left + (x * bounds.width),
         y = bounds.top + (y * bounds.height)
     )
+}
+
+private fun Rect.toDisplayRect(bounds: Rect): Rect {
+    val topLeft = topLeft.toDisplayOffset(bounds)
+    val bottomRight = bottomRight.toDisplayOffset(bounds)
+    return Rect(
+        left = topLeft.x,
+        top = topLeft.y,
+        right = bottomRight.x,
+        bottom = bottomRight.y
+    )
+}
+
+private fun normalizedSelectionRect(start: Offset, end: Offset): Rect {
+    return Rect(
+        left = minOf(start.x, end.x),
+        top = minOf(start.y, end.y),
+        right = maxOf(start.x, end.x),
+        bottom = maxOf(start.y, end.y)
+    )
+}
+
+private fun Rect.inflate(amount: Float): Rect {
+    return Rect(
+        left = (left - amount).coerceIn(0f, 1f),
+        top = (top - amount).coerceIn(0f, 1f),
+        right = (right + amount).coerceIn(0f, 1f),
+        bottom = (bottom + amount).coerceIn(0f, 1f)
+    )
+}
+
+private fun Rect.intersects(other: Rect): Boolean {
+    return left < other.right &&
+        right > other.left &&
+        top < other.bottom &&
+        bottom > other.top
 }
 
 private fun toNormalizedIfInside(position: Offset, bounds: Rect): Offset? {

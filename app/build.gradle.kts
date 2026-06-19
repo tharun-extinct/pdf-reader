@@ -67,6 +67,7 @@ dependencies {
     
     // PDFium integration for fast rendering
     implementation("com.github.barteksc:pdfium-android:1.9.0")
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     
     // Coroutines for concurrency
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
