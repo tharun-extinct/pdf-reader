@@ -2,6 +2,9 @@ package com.pdfreader.app.presentation.ui
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -118,7 +121,23 @@ fun PdfReaderScreen(
         ) {
             when {
                 state.isLoading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    // Enhanced loading UI with larger indicator and subtle text
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(64.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Loading PDF…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 state.errorMessage != null -> {
                     Text(
@@ -160,17 +179,19 @@ private fun AnnotationToolbar(
     state: PdfReaderState,
     onIntent: (PdfReaderIntent) -> Unit
 ) {
+    // Use a surface that matches Material3 guidelines and provides elevation for visual separation.
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp,
         shadowElevation = 8.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
+        // Use a Row with consistent spacing and larger touch targets.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {
             when (state.activeTool) {
@@ -195,21 +216,37 @@ private fun AnnotationToolbar(
                     )
                 }
                 else -> {
-                    ToolbarAction("Read aloud", "▶", state.activeTool == AnnotationTool.ReadAloud) {
-                        onIntent(PdfReaderIntent.SelectTool(AnnotationTool.ReadAloud))
-                    }
-                    ToolbarAction("Pen", "✎", state.activeTool == AnnotationTool.Pen) {
-                        onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Pen))
-                    }
-                    ToolbarAction("Highlighter", "▰", state.activeTool == AnnotationTool.Highlighter) {
-                        onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Highlighter))
-                    }
-                    ToolbarAction("Eraser", "⌫", state.activeTool == AnnotationTool.Eraser) {
-                        onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Eraser))
-                    }
-                    ToolbarAction("Add text", "T", state.activeTool == AnnotationTool.AddText) {
-                        onIntent(PdfReaderIntent.SelectTool(AnnotationTool.AddText))
-                    }
+                    // Provide accessible content descriptions and consistent sizing.
+                    ToolbarAction(
+                        label = "Read aloud",
+                        icon = "▶",
+                        selected = state.activeTool == AnnotationTool.ReadAloud,
+                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.ReadAloud)) }
+                    )
+                    ToolbarAction(
+                        label = "Pen",
+                        icon = "✎",
+                        selected = state.activeTool == AnnotationTool.Pen,
+                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Pen)) }
+                    )
+                    ToolbarAction(
+                        label = "Highlighter",
+                        icon = "▰",
+                        selected = state.activeTool == AnnotationTool.Highlighter,
+                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Highlighter)) }
+                    )
+                    ToolbarAction(
+                        label = "Eraser",
+                        icon = "⌫",
+                        selected = state.activeTool == AnnotationTool.Eraser,
+                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Eraser)) }
+                    )
+                    ToolbarAction(
+                        label = "Add text",
+                        icon = "T",
+                        selected = state.activeTool == AnnotationTool.AddText,
+                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.AddText)) }
+                    )
                 }
             }
         }
@@ -368,14 +405,20 @@ fun PdfPage(
                 }
             }
 
-            Image(
-                bitmap = pageImage.asImageBitmap(),
-                contentDescription = "Page $pageIndex",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
+            // Fade‑in the rendered page for a smoother visual experience.
+            AnimatedVisibility(
+                visible = pageImage != null,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Image(
+                    bitmap = pageImage.asImageBitmap(),
+                    contentDescription = "Page $pageIndex",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
 
-            Canvas(modifier = Modifier.matchParentSize()) {
+                Canvas(modifier = Modifier.matchParentSize()) {
                 pageHighlights.forEach { highlight ->
                     highlight.rects.forEach { rect ->
                         drawRect(
