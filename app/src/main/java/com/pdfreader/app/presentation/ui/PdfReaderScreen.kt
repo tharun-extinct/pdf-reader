@@ -1,10 +1,86 @@
 package com.pdfreader.app.presentation.ui
 
 import android.graphics.Bitmap
-import androidx.compose.foundation.Canvas
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.pdfreader.app.presentation.mvi.AnnotationTool
+import com.pdfreader.app.presentation.mvi.FreehandStroke
+import com.pdfreader.app.presentation.mvi.PdfTextBox
+import com.pdfreader.app.presentation.mvi.PdfReaderIntent
+import com.pdfreader.app.presentation.mvi.PdfReaderState
+import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
+import com.pdfreader.app.presentation.mvi.TextAnnotation
+import com.pdfreader.app.presentation.mvi.TextHighlight
+import com.pdfreader.app.presentation.mvi.formatHexColor
+import com.pdfreader.app.presentation.mvi.parseHexColor
+import kotlin.math.roundToInt
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -106,7 +182,7 @@ fun PdfReaderScreen(
         },
         bottomBar = {
             if (state.isPdfLoaded) {
-                AnnotationToolbar(
+                ResponsiveAnnotationToolbar(
                     state = state,
                     onIntent = viewModel::processIntent
                 )
@@ -249,6 +325,28 @@ private fun AnnotationToolbar(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Responsive wrapper for [AnnotationToolbar] that adapts layout based on screen width.
+ * Currently forwards to the original toolbar for all sizes, but provides a breakpoint
+ * for future enhancements.
+ */
+@Composable
+fun ResponsiveAnnotationToolbar(
+    state: PdfReaderState,
+    onIntent: (PdfReaderIntent) -> Unit
+) {
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (maxWidth < 600.dp) {
+            AnnotationToolbar(state = state, onIntent = onIntent)
+        } else {
+            // Placeholder for a different layout on larger screens.
+            AnnotationToolbar(state = state, onIntent = onIntent)
         }
     }
 }

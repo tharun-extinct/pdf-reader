@@ -12,11 +12,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.pdfreader.app.data.pdfium.PdfiumEngine
 import com.pdfreader.app.data.sync.SafPdfSyncManager
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
 import com.pdfreader.app.presentation.ui.PdfReaderScreen
+import com.pdfreader.app.presentation.ui.BookshelfScreen
+import com.pdfreader.app.presentation.ui.SettingsScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -61,13 +67,32 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    PdfReaderScreen(
-                        viewModel = viewModel,
-                        onOpenFilePicker = {
-                            // "application/pdf" filters strictly for PDFs
-                            openDocumentLauncher.launch(arrayOf("application/pdf"))
+                    val navController = rememberNavController()
+                    NavHost(navController = navController, startDestination = "bookshelf") {
+                        composable("bookshelf") {
+                            BookshelfScreen(
+                                viewModel = viewModel,
+                                navController = navController,
+                                onOpenFilePicker = {
+                                    openDocumentLauncher.launch(arrayOf("application/pdf"))
+                                }
+                            )
                         }
-                    )
+                        composable("reader") {
+                            PdfReaderScreen(
+                                viewModel = viewModel,
+                                onOpenFilePicker = {
+                                    openDocumentLauncher.launch(arrayOf("application/pdf"))
+                                }
+                            )
+                        }
+                        composable("settings") {
+                            SettingsScreen(
+                                viewModel = viewModel,
+                                navController = navController
+                            )
+                        }
+                    }
                 }
             }
         }
