@@ -29,7 +29,7 @@ Full architecture and design decisions live in `.github/design.md`. **Always con
 ---
 
 
-- Performance optimization and low latency execution are crucial for providing a seamless user experience. 
+- Low resource usage and low latency execution are crucial for providing a seamless user experience. 
 - Efficient error handling and logging should be implemented to ensure that any issues can be quickly identified and resolved. 
 - The architecture should be clean and modular to facilitate future development and maintenance.
 
@@ -60,22 +60,13 @@ Full architecture and design decisions live in `.github/design.md`. **Always con
 
 
 ### Code Implementation:
-- When providing code suggestions, prioritize:
-- Performance optimization, Low latency execution and scalability
+
 - Always think about edge cases and how to handle them
-- Consider user experience and usability
-- Efficient error handling and logging
-- Clean, modular architecture
 - Write code that are production ready
 
 
 ### Tools instruction
-- For referring latest document and resolving package error use MCP like [`websearch` (Default), `context7`]
+- For referring latest document and resolving package error use MCP [`websearch`, `context7`]
 
-
-
-
-
-- Always consult `.github/design.md` before any structural change.
 
 
