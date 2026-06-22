@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +35,7 @@ import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
  * database for stored books and display thumbnails. For now we provide a static list with a
  * button to open a PDF via the existing file picker.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookshelfScreen(
     viewModel: PdfReaderViewModel,

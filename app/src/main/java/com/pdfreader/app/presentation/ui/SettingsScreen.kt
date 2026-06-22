@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,7 @@ import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
  * For now it contains a few placeholder toggles to demonstrate the layout. Real settings
  * would be persisted via DataStore or SharedPreferences.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: PdfReaderViewModel,

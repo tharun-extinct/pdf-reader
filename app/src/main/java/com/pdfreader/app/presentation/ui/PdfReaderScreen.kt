@@ -84,7 +84,6 @@ import com.pdfreader.app.presentation.mvi.TextHighlight
 import com.pdfreader.app.presentation.mvi.formatHexColor
 import com.pdfreader.app.presentation.mvi.parseHexColor
 import kotlin.math.roundToInt
-// Duplicate import block removed
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -444,7 +443,8 @@ fun PdfPage(
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
-                Image(
+                Box {
+                    Image(
                     bitmap = pageImage.asImageBitmap(),
                     contentDescription = "Page $pageIndex",
                     modifier = Modifier
@@ -502,6 +502,7 @@ fun PdfPage(
                             join = androidx.compose.ui.graphics.StrokeJoin.Round
                         )
                     )
+                }
                 }
             }
 
