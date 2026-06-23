@@ -54,7 +54,7 @@ fun SettingsScreen(
             // Dark mode toggle (placeholder)
             val darkModeEnabled = remember { mutableStateOf(false) }
             ListItem(
-                headlineContent = { Text("Dark Mode") },
+                headlineText = { Text("Dark Mode") },
                 trailingContent = {
                     Switch(checked = darkModeEnabled.value, onCheckedChange = { darkModeEnabled.value = it })
                 }
@@ -63,7 +63,7 @@ fun SettingsScreen(
             // Sync with Google Drive toggle (placeholder)
             val syncEnabled = remember { mutableStateOf(true) }
             ListItem(
-                headlineContent = { Text("Sync with Google Drive") },
+                headlineText = { Text("Sync with Google Drive") },
                 trailingContent = {
                     Switch(checked = syncEnabled.value, onCheckedChange = { syncEnabled.value = it })
                 }
