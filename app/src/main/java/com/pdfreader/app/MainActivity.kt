@@ -24,6 +24,8 @@ import com.pdfreader.app.presentation.ui.PdfReaderScreen
 import com.pdfreader.app.presentation.ui.BookshelfScreen
 import com.pdfreader.app.presentation.ui.SettingsScreen
 
+import com.pdfreader.app.presentation.theme.LibroTheme
+
 class MainActivity : ComponentActivity() {
 
     // Quick ViewModelFactory for manual dependency injection
@@ -62,7 +64,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            LibroTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

@@ -3,4 +3,11 @@ build/
 app/build/
 skills/
 
-.stitch-mcp/**
+.stitch-mcp/
+.stitch/**
+
+
+**/mcp.json
+
+
+.env
