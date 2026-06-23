@@ -34,9 +34,22 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Book
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Brush
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Draw
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FormatColorFill
+import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -45,6 +58,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -62,6 +76,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -83,6 +98,7 @@ import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
 import com.pdfreader.app.presentation.mvi.formatHexColor
 import com.pdfreader.app.presentation.mvi.parseHexColor
+import com.pdfreader.app.presentation.theme.UiSmStyle
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,52 +110,74 @@ fun PdfReaderScreen(
     val state by viewModel.state.collectAsState()
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
+            // ── Minimal Reading Top Bar (Stitch design) ─────────────
             TopAppBar(
-                title = { Text("PDF Reader") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+                navigationIcon = {
+                    IconButton(onClick = { viewModel.processIntent(PdfReaderIntent.ClosePdf) }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Book,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Chapter 4: The Digital Sanctuary",
+                            style = UiSmStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 actions = {
-                    if (state.isPdfLoaded) {
-                        TextButton(onClick = { viewModel.processIntent(PdfReaderIntent.ToggleAnnotationSettings) }) {
-                            Text("Settings")
-                        }
-                        TextButton(onClick = { viewModel.processIntent(PdfReaderIntent.ClosePdf) }) {
-                            Text("Close", color = MaterialTheme.colorScheme.error)
-                        }
+                    IconButton(onClick = { /* bookmark */ }) {
+                        Icon(
+                            imageVector = Icons.Outlined.BookmarkBorder,
+                            contentDescription = "Bookmark",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             )
-        },
-        bottomBar = {
-            if (state.isPdfLoaded) {
-                ResponsiveAnnotationToolbar(
-                    state = state,
-                    onIntent = viewModel::processIntent
-                )
-            }
         }
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFF1C1C1E))
+                .background(MaterialTheme.colorScheme.background)
         ) {
             when {
                 state.isLoading -> {
-                    // Enhanced loading UI with larger indicator and subtle text
                     Column(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(64.dp),
-                            color = MaterialTheme.colorScheme.primary
+                            modifier = Modifier.size(48.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 3.dp
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Loading PDF…",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "Loading…",
+                            style = UiSmStyle,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -160,11 +198,26 @@ fun PdfReaderScreen(
                 else -> {
                     Button(
                         onClick = onOpenFilePicker,
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier = Modifier.align(Alignment.Center),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     ) {
                         Text("Open PDF")
                     }
                 }
+            }
+
+            // ── Floating Bottom Toolbar (Stitch pill design) ────────
+            if (state.isPdfLoaded) {
+                FloatingAnnotationToolbar(
+                    state = state,
+                    onIntent = viewModel::processIntent,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 20.dp)
+                )
             }
 
             if (state.isAnnotationSettingsOpen) {
@@ -179,189 +232,174 @@ fun PdfReaderScreen(
     }
 }
 
+/**
+ * Floating pill-shaped annotation toolbar positioned at the bottom of the reader.
+ * Matches the Stitch "Reading: Great Expectations" screen design.
+ */
 @Composable
-private fun AnnotationToolbar(
+private fun FloatingAnnotationToolbar(
     state: PdfReaderState,
-    onIntent: (PdfReaderIntent) -> Unit
+    onIntent: (PdfReaderIntent) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    // Use a surface that matches Material3 guidelines and provides elevation for visual separation.
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 3.dp,
-        shadowElevation = 8.dp,
-        modifier = Modifier.fillMaxWidth()
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Use a Row with consistent spacing and larger touch targets.
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically
+        // Contextual palette row (shown when pen/highlighter is active)
+        AnimatedVisibility(
+            visible = state.activeTool == AnnotationTool.Pen || state.activeTool == AnnotationTool.Highlighter
         ) {
-            when (state.activeTool) {
-                AnnotationTool.Pen -> {
-                    ToolPaletteRow(
-                        label = "Pen",
-                        icon = "✎",
-                        colors = state.penPalette.colors,
-                        selectedIndex = state.selectedPenColorIndex,
-                        onColorSelected = { onIntent(PdfReaderIntent.SelectPenColor(it)) },
-                        onClose = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.None)) }
+            val colors = if (state.activeTool == AnnotationTool.Pen)
+                state.penPalette.colors else state.highlighterPalette.colors
+            val selectedIdx = if (state.activeTool == AnnotationTool.Pen)
+                state.selectedPenColorIndex else state.selectedHighlighterColorIndex
+
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shadowElevation = 4.dp,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    colors.forEachIndexed { index, color ->
+                        val isSelected = index == selectedIdx
+                        Box(
+                            modifier = Modifier
+                                .size(if (isSelected) 32.dp else 28.dp)
+                                .background(Color(color), CircleShape)
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                    shape = CircleShape
+                                )
+                                .clickable {
+                                    if (state.activeTool == AnnotationTool.Pen)
+                                        onIntent(PdfReaderIntent.SelectPenColor(index))
+                                    else
+                                        onIntent(PdfReaderIntent.SelectHighlighterColor(index))
+                                }
+                        )
+                    }
+                    // Divider
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(20.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     )
+                    // Close
+                    IconButton(
+                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.None)) },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Text(
+                            text = "×",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-                AnnotationTool.Highlighter -> {
-                    ToolPaletteRow(
-                        label = "Highlighter",
-                        icon = "▰",
-                        colors = state.highlighterPalette.colors,
-                        selectedIndex = state.selectedHighlighterColorIndex,
-                        onColorSelected = { onIntent(PdfReaderIntent.SelectHighlighterColor(it)) },
-                        onClose = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.None)) }
-                    )
-                }
-                else -> {
-                    // Provide accessible content descriptions and consistent sizing.
-                    ToolbarAction(
-                        label = "Read aloud",
-                        icon = "▶",
-                        selected = state.activeTool == AnnotationTool.ReadAloud,
-                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.ReadAloud)) }
-                    )
-                    ToolbarAction(
-                        label = "Pen",
-                        icon = "✎",
-                        selected = state.activeTool == AnnotationTool.Pen,
-                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Pen)) }
-                    )
-                    ToolbarAction(
-                        label = "Highlighter",
-                        icon = "▰",
-                        selected = state.activeTool == AnnotationTool.Highlighter,
-                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Highlighter)) }
-                    )
-                    ToolbarAction(
-                        label = "Eraser",
-                        icon = "⌫",
-                        selected = state.activeTool == AnnotationTool.Eraser,
-                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Eraser)) }
-                    )
-                    ToolbarAction(
-                        label = "Add text",
-                        icon = "T",
-                        selected = state.activeTool == AnnotationTool.AddText,
-                        onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.AddText)) }
-                    )
-                }
+            }
+        }
+
+        // Main floating toolbar pill
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 6.dp,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FloatingToolbarIcon(
+                    icon = Icons.Outlined.VolumeUp,
+                    label = "Read aloud",
+                    selected = state.activeTool == AnnotationTool.ReadAloud,
+                    onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.ReadAloud)) }
+                )
+                ToolbarDivider()
+                FloatingToolbarIcon(
+                    icon = Icons.Outlined.Draw,
+                    label = "Pen",
+                    selected = state.activeTool == AnnotationTool.Pen,
+                    onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Pen)) }
+                )
+                FloatingToolbarIcon(
+                    icon = Icons.Outlined.FormatColorFill,
+                    label = "Highlighter",
+                    selected = state.activeTool == AnnotationTool.Highlighter,
+                    onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Highlighter)) }
+                )
+                FloatingToolbarIcon(
+                    icon = Icons.Outlined.Delete,
+                    label = "Eraser",
+                    selected = state.activeTool == AnnotationTool.Eraser,
+                    onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Eraser)) }
+                )
+                FloatingToolbarIcon(
+                    icon = Icons.Outlined.TextFields,
+                    label = "Add text",
+                    selected = state.activeTool == AnnotationTool.AddText,
+                    onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.AddText)) }
+                )
+                ToolbarDivider()
+                FloatingToolbarIcon(
+                    icon = Icons.Outlined.BookmarkBorder,
+                    label = "Bookmark",
+                    selected = false,
+                    onClick = { /* bookmark page */ }
+                )
             }
         }
     }
 }
 
-/**
- * Responsive wrapper for [AnnotationToolbar] that adapts layout based on screen width.
- * Currently forwards to the original toolbar for all sizes, but provides a breakpoint
- * for future enhancements.
- */
 @Composable
-fun ResponsiveAnnotationToolbar(
-    state: PdfReaderState,
-    onIntent: (PdfReaderIntent) -> Unit
-) {
-    BoxWithConstraints(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        if (maxWidth < 600.dp) {
-            AnnotationToolbar(state = state, onIntent = onIntent)
-        } else {
-            // Placeholder for a different layout on larger screens.
-            AnnotationToolbar(state = state, onIntent = onIntent)
-        }
-    }
-}
-
-@Composable
-private fun ToolPaletteRow(
+private fun FloatingToolbarIcon(
+    icon: ImageVector,
     label: String,
-    icon: String,
-    colors: List<Long>,
-    selectedIndex: Int,
-    onColorSelected: (Int) -> Unit,
-    onClose: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier
-                .size(42.dp)
-                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
-                .semantics { contentDescription = "$label tool" }
-        ) {
-            Text(
-                text = icon,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        }
-
-        colors.forEachIndexed { index, color ->
-            val selected = index == selectedIndex
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .background(Color(color), CircleShape)
-                    .border(
-                        width = if (selected) 3.dp else 1.dp,
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        shape = CircleShape
-                    )
-                    .clickable { onColorSelected(index) }
-            )
-        }
-
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier
-                .size(42.dp)
-                .semantics { contentDescription = "Close tool colors" }
-        ) {
-            Text(
-                text = "×",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
-
-@Composable
-private fun ToolbarAction(
-    label: String,
-    icon: String,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(48.dp)
+            .size(44.dp)
             .background(
                 color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                 shape = CircleShape
             )
             .semantics { contentDescription = label }
     ) {
-        Text(
-            text = icon,
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.titleLarge,
-            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                   else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp)
         )
     }
+}
+
+@Composable
+private fun ToolbarDivider() {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 2.dp)
+            .width(1.dp)
+            .height(20.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

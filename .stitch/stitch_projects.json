@@ -1,0 +1,303 @@
+﻿{
+  "projects": [
+    {
+      "createTime": "2026-06-23T18:11:14.932815Z",
+      "designTheme": {
+        "bodyFont": "INTER",
+        "bodyFontFamily": "Inter",
+        "colorMode": "LIGHT",
+        "colorVariant": "FIDELITY",
+        "customColor": "#1a2e44",
+        "designMd": "---\nname: Libro\ncolors:\n  surface: '#faf9f7'\n  surface-dim: '#dadad8'\n  surface-bright: '#faf9f7'\n  surface-container-lowest: '#ffffff'\n  surface-container-low: '#f4f3f1'\n  surface-container: '#efeeec'\n  surface-container-high: '#e9e8e6'\n  surface-container-highest: '#e3e2e0'\n  on-surface: '#1a1c1b'\n  on-surface-variant: '#43474d'\n  inverse-surface: '#2f3130'\n  inverse-on-surface: '#f1f1ef'\n  outline: '#74777d'\n  outline-variant: '#c4c6cd'\n  surface-tint: '#4c6078'\n  primary: '#03192e'\n  on-primary: '#ffffff'\n  primary-container: '#1a2e44'\n  on-primary-container: '#8296b0'\n  inverse-primary: '#b4c8e4'\n  secondary: '#5f5e5b'\n  on-secondary: '#ffffff'\n  secondary-container: '#e1dfda'\n  on-secondary-container: '#63635f'\n  tertiary: '#241500'\n  on-tertiary: '#ffffff'\n  tertiary-container: '#3d2907'\n  on-tertiary-container: '#ae8f64'\n  error: '#ba1a1a'\n  on-error: '#ffffff'\n  error-container: '#ffdad6'\n  on-error-container: '#93000a'\n  primary-fixed: '#d1e4ff'\n  primary-fixed-dim: '#b4c8e4'\n  on-primary-fixed: '#061d32'\n  on-primary-fixed-variant: '#35485f'\n  secondary-fixed: '#e4e2dd'\n  secondary-fixed-dim: '#c8c6c2'\n  on-secondary-fixed: '#1b1c19'\n  on-secondary-fixed-variant: '#474743'\n  tertiary-fixed: '#ffddb0'\n  tertiary-fixed-dim: '#e3c193'\n  on-tertiary-fixed: '#281800'\n  on-tertiary-fixed-variant: '#5a431f'\n  background: '#faf9f7'\n  on-background: '#1a1c1b'\n  surface-variant: '#e3e2e0'\ntypography:\n  display-title:\n    fontFamily: Source Serif 4\n    fontSize: 40px\n    fontWeight: '700'\n    lineHeight: '1.2'\n    letterSpacing: -0.02em\n  headline-lg:\n    fontFamily: Source Serif 4\n    fontSize: 32px\n    fontWeight: '600'\n    lineHeight: '1.3'\n  headline-lg-mobile:\n    fontFamily: Source Serif 4\n    fontSize: 24px\n    fontWeight: '600'\n    lineHeight: '1.3'\n  body-reading:\n    fontFamily: Source Serif 4\n    fontSize: 18px\n    fontWeight: '400'\n    lineHeight: '1.7'\n  ui-main:\n    fontFamily: Inter\n    fontSize: 16px\n    fontWeight: '500'\n    lineHeight: 24px\n  ui-sm:\n    fontFamily: Inter\n    fontSize: 14px\n    fontWeight: '400'\n    lineHeight: 20px\n  label-caps:\n    fontFamily: Inter\n    fontSize: 12px\n    fontWeight: '600'\n    lineHeight: 16px\n    letterSpacing: 0.05em\nrounded:\n  sm: 0.125rem\n  DEFAULT: 0.25rem\n  md: 0.375rem\n  lg: 0.5rem\n  xl: 0.75rem\n  full: 9999px\nspacing:\n  base: 8px\n  margin-mobile: 20px\n  margin-desktop: 64px\n  gutter: 24px\n  reading-max-width: 720px\n---\n\n## Brand & Style\nThe design system is centered on the concept of \"Digital Sanctuary.\" It prioritizes deep focus, intellectual clarity, and long-form reading comfort. The target audience includes researchers, students, and bibliophiles who require a tool that disappears into the background to let the content lead.\n\nThe visual style is **Minimalist-Modern with a Literary lean**. It leverages generous whitespace (breathable margins), subtle tonal layering instead of harsh shadows, and a sophisticated interplay between authoritative serifs and functional sans-serifs. The goal is to evoke the tactile quality of high-end stationery and the quiet atmosphere of a physical library.\n\n## Colors\nThe palette is anchored by a \"Scholar Blue\" (#1A2E44), used sparingly for primary actions and brand presence. The primary background is a soft, warm off-white (#F9F8F6) designed specifically to reduce the blue-light glare common in pure white interfaces.\n\nFor annotations, the system provides four muted, semi-transparent highlight tokens (Yellow, Green, Blue, Rose) that sit beneath the text to maintain legibility.\n\n**Reading Mode (Light):** Soft parchment backgrounds with high-contrast slate text.\n**Night Mode (Dark):** Deep charcoal backgrounds with desaturated light-gray text to prevent \"halation\" (glowing effect) during late-night sessions.\n\n## Typography\nThe typographic system uses a dual-axis approach. **Source Serif 4** is the \"Content Voice\"ΓÇöused for book titles, chapter headings, and the reading experience itself. Its generous x-height and traditional proportions ensure comfort during extended use.\n\n**Inter** serves as the \"System Voice\"ΓÇöused for navigation, toolbars, metadata, and settings. This distinction helps users mentally separate the *tool* from the *text*. Line heights for reading blocks are intentionally set to 1.7x to prevent line-skipping and eye fatigue.\n\n## Layout & Spacing\nThis design system utilizes a **Fixed-Width Content Model** for the reading experience and a **Fluid UI Model** for the library management.\n\nThe reading view enforces a maximum width of 720px for the text block, ensuring optimal characters-per-line (65-75) for comprehension. Margins are dynamic: on mobile, they compress to 20px; on desktop, they expand to create a centered, focused pillar of content. Vertical rhythm is strictly based on an 8px grid to maintain a disciplined, professional structure.\n\n## Elevation & Depth\nTo maintain the \"flat paper\" aesthetic, this design system avoids heavy drop shadows. Depth is communicated through:\n1.  **Tonal Stepping:** The main reading surface is the lowest level. Toolbars and sidebars use a slightly darker (in light mode) or lighter (in dark mode) tint to appear visually \"above.\"\n2.  **Stroke Boundaries:** Instead of shadows, use 1px hairlines in a subtle neutral tone (#E8E6E1) to define container edges.\n3.  **Active Focus:** When a modal or pop-over is active (e.g., dictionary lookup), a soft 10% black overlay is applied to the background to recede the content, keeping the focus on the utility.\n\n## Shapes\nShapes are disciplined and \"Soft\" (0.25rem). This subtle rounding prevents the interface from feeling aggressive or overly technical while maintaining a classic, structured look. \n\nBook covers within the library view should feature a unique `rounded-sm` corner (2px) to mimic the slight wear of a physical book spine, while UI buttons use the standard `rounded-md` (4px).\n\n## Components\n-   **Primary Buttons:** Solid \"Scholar Blue\" with white Inter Medium text. High padding on the X-axis (24px) to create a spacious, premium feel.\n-   **Secondary/Ghost Buttons:** 1px hairline border in primary color, no fill.\n-   **The Progress Bar:** A thin, 4px track. The \"filled\" portion uses the primary color, while the \"unfilled\" portion uses a 10% opacity version of the primary color.\n-   **Annotation Chips:** Small, pill-shaped tags that appear in the margin. The color of the chip matches the user's highlight color, with a small icon indicating a text note.\n-   **The Library Card:** A vertical layout featuring the book cover (dominant), followed by Title (Source Serif) and Author (Inter). No borders; use whitespace to separate items in the grid.\n-   **Contextual Menu:** Appears on text selection. Minimalist horizontal bar with icons for Highlight, Note, Copy, and Search.",
+        "font": "SOURCE_SERIF_4",
+        "headlineFont": "SOURCE_SERIF_4",
+        "headlineFontFamily": "Source Serif 4",
+        "labelFont": "INTER",
+        "labelFontFamily": "Inter",
+        "namedColors": {
+          "background": "#faf9f7",
+          "error": "#ba1a1a",
+          "error_container": "#ffdad6",
+          "inverse_on_surface": "#f1f1ef",
+          "inverse_primary": "#b4c8e4",
+          "inverse_surface": "#2f3130",
+          "on_background": "#1a1c1b",
+          "on_error": "#ffffff",
+          "on_error_container": "#93000a",
+          "on_primary": "#ffffff",
+          "on_primary_container": "#8296b0",
+          "on_primary_fixed": "#061d32",
+          "on_primary_fixed_variant": "#35485f",
+          "on_secondary": "#ffffff",
+          "on_secondary_container": "#63635f",
+          "on_secondary_fixed": "#1b1c19",
+          "on_secondary_fixed_variant": "#474743",
+          "on_surface": "#1a1c1b",
+          "on_surface_variant": "#43474d",
+          "on_tertiary": "#ffffff",
+          "on_tertiary_container": "#ae8f64",
+          "on_tertiary_fixed": "#281800",
+          "on_tertiary_fixed_variant": "#5a431f",
+          "outline": "#74777d",
+          "outline_variant": "#c4c6cd",
+          "primary": "#03192e",
+          "primary_container": "#1a2e44",
+          "primary_fixed": "#d1e4ff",
+          "primary_fixed_dim": "#b4c8e4",
+          "secondary": "#5f5e5b",
+          "secondary_container": "#e1dfda",
+          "secondary_fixed": "#e4e2dd",
+          "secondary_fixed_dim": "#c8c6c2",
+          "surface": "#faf9f7",
+          "surface_bright": "#faf9f7",
+          "surface_container": "#efeeec",
+          "surface_container_high": "#e9e8e6",
+          "surface_container_highest": "#e3e2e0",
+          "surface_container_low": "#f4f3f1",
+          "surface_container_lowest": "#ffffff",
+          "surface_dim": "#dadad8",
+          "surface_tint": "#4c6078",
+          "surface_variant": "#e3e2e0",
+          "tertiary": "#241500",
+          "tertiary_container": "#3d2907",
+          "tertiary_fixed": "#ffddb0",
+          "tertiary_fixed_dim": "#e3c193"
+        },
+        "overrideNeutralColor": "#f9f8f6",
+        "overridePrimaryColor": "#1a2e44",
+        "overrideSecondaryColor": "#e8e6e1",
+        "roundness": "ROUND_FOUR",
+        "spacing": {
+          "base": "8px",
+          "gutter": "24px",
+          "margin-desktop": "64px",
+          "margin-mobile": "20px",
+          "reading-max-width": "720px"
+        },
+        "spacingScale": 2,
+        "typography": {
+          "body-reading": {
+            "fontFamily": "Source Serif 4",
+            "fontSize": "18px",
+            "fontWeight": "400",
+            "lineHeight": "1.7"
+          },
+          "display-title": {
+            "fontFamily": "Source Serif 4",
+            "fontSize": "40px",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "lineHeight": "1.2"
+          },
+          "headline-lg": {
+            "fontFamily": "Source Serif 4",
+            "fontSize": "32px",
+            "fontWeight": "600",
+            "lineHeight": "1.3"
+          },
+          "headline-lg-mobile": {
+            "fontFamily": "Source Serif 4",
+            "fontSize": "24px",
+            "fontWeight": "600",
+            "lineHeight": "1.3"
+          },
+          "label-caps": {
+            "fontFamily": "Inter",
+            "fontSize": "12px",
+            "fontWeight": "600",
+            "letterSpacing": "0.05em",
+            "lineHeight": "16px"
+          },
+          "ui-main": {
+            "fontFamily": "Inter",
+            "fontSize": "16px",
+            "fontWeight": "500",
+            "lineHeight": "24px"
+          },
+          "ui-sm": {
+            "fontFamily": "Inter",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "20px"
+          }
+        }
+      },
+      "deviceType": "MOBILE",
+      "metadata": {
+        "userRole": "OWNER"
+      },
+      "name": "projects/6349643411786464155",
+      "origin": "STITCH",
+      "projectType": "TEXT_TO_UI_PRO",
+      "screenInstances": [
+        {
+          "height": 1530,
+          "id": "3f04acb1c3924544981b46866b516573",
+          "sourceScreen": "projects/6349643411786464155/screens/3f04acb1c3924544981b46866b516573",
+          "width": 390,
+          "x": 1932
+        },
+        {
+          "height": 2330,
+          "id": "5eb1b00e7e05446aa52ef8a1a175ef90",
+          "sourceScreen": "projects/6349643411786464155/screens/5eb1b00e7e05446aa52ef8a1a175ef90",
+          "width": 390,
+          "x": 1024
+        },
+        {
+          "height": 1423,
+          "id": "95063810ad33461ab017afcb3cea2cac",
+          "sourceScreen": "projects/6349643411786464155/screens/95063810ad33461ab017afcb3cea2cac",
+          "width": 390,
+          "x": 1478
+        },
+        {
+          "height": 540,
+          "id": "assets_d713ffb9ffb14e99b423f6829f948488",
+          "sourceAsset": "assets/d713ffb9ffb14e99b423f6829f948488",
+          "type": "DESIGN_SYSTEM_INSTANCE",
+          "width": 960
+        }
+      ],
+      "thumbnailScreenshot": {
+        "downloadUrl": "https://lh3.googleusercontent.com/aida/AP1WRLtik1S8bSIxySIdjpBTreFuo50HsjG39yMaU9afJHN8QLQs4kshUGDE3Q1ms1v7uJsfV-CpG0RYLSL02HuoFOnfoktEHYU2WxAHpFHxt7fc4eTCLyH-tZ9oWWrcyxNPthMUYRwl8OYgum1O8ZGfhVF4rZfNJWwIlwOSW_k5_q3yLDZyMezhCAKkyXkHosck7zfijRvjb2a5rzsPZxGJ8RYafBpxpKstSpty9zvKByhpm9CTKObg4Mjc",
+        "name": "projects/6349643411786464155/files/dd22fa7b7e844094ab94c89a09132f31"
+      },
+      "title": "Cloud PDF Book Reader",
+      "updateTime": "2026-06-23T18:22:26.210147Z",
+      "visibility": "PRIVATE"
+    },
+    {
+      "createTime": "2026-03-21T09:25:59.153174Z",
+      "designTheme": {
+        "bodyFont": "INTER",
+        "colorMode": "DARK",
+        "colorVariant": "VIBRANT",
+        "customColor": "#00FF41",
+        "designMd": "# Design System Specification: Kinetic Precision\n\n## 1. Overview & Creative North Star\nThe Creative North Star for this design system is **\"The Kinetic Engine.\"** \n\nThis is not a \"gamer\" aesthetic in the traditional, neon-saturated sense; it is a high-performance industrial interface designed for professional-grade optimization. We move beyond the \"template\" look by embracing **Precision Brutalism**. The layout prioritizes density and technical clarity, utilizing intentional asymmetry to guide the eye toward critical performance metrics. By pairing razor-sharp edges (0px radius) with sophisticated glassmorphism, we create a \"Cyber-professional\" atmosphere that feels both rugged and etherealΓÇölike a high-end racing telemetry dashboard.\n\n## 2. Colors\nOur palette is rooted in the depth of `surface_dim` (#0e0e0e), providing a void-like canvas where performance data can shine with surgical clarity.\n\n### The \"No-Line\" Rule\nTo achieve a high-end editorial feel, **prohibit the use of 1px solid borders for sectioning.** Boundaries must be defined through tonal shifts. A `surface_container_low` section should sit directly against a `surface` background to create a visual break. This forces the designer to rely on color-blocking and spatial grouping rather than crude lines, resulting in a cleaner, more integrated UI.\n\n### Surface Hierarchy & Nesting\nTreat the UI as a physical assembly of carbon-fiber plates.\n- **Level 0 (Background):** `surface` (#0e0e0e)\n- **Level 1 (Main Modules):** `surface_container_low` (#131313)\n- **Level 2 (Active Cards):** `surface_container` (#1a1a1a)\n- **Level 3 (Interactive Elements):** `surface_container_highest` (#262626)\n\n### The Glass & Gradient Rule\nFor floating telemetry or modal overlays, use **Glassmorphism**. Apply `surface_variant` (#262626) at 60% opacity with a `backdrop-filter: blur(12px)`. To provide \"visual soul,\" use a subtle linear gradient on primary CTAs transitioning from `primary` (#9cff93) to `primary_container` (#00fc40) at a 135-degree angle.\n\n## 3. Typography\nThe typographic system utilizes a \"Technical Editorial\" approach, balancing the raw character of **Space Grotesk** with the invisible efficiency of **Inter**.\n\n- **Display & Headlines (Space Grotesk):** These are your \"Brand Statements.\" Use `display-lg` for critical system status (e.g., \"OPTIMIZED\") and `headline-sm` for module titles. Space GroteskΓÇÖs geometric quirks provide the \"Cyber\" edge.\n- **Body & Data (Inter):** All functional UI, labels, and descriptions use Inter. For data-heavy sections, use `label-md` with increased tracking (+5%) to mimic a technical, monospaced feel without sacrificing the legibility of a sans-serif.\n- **Hierarchy through Contrast:** Use `primary` color for critical data points within body text to draw immediate attention.\n\n## 4. Elevation & Depth\nIn a world of 0px border-radii, depth is our only tool for softening the interface.\n\n- **Tonal Layering:** Hierarchy is achieved by stacking. Place a `surface_container_lowest` card on a `surface_container_low` background to create \"in-set\" depth, making the UI feel machined out of a single block.\n- **Ambient Glow:** Instead of traditional shadows, use \"Ambient Glows.\" For active states, apply a `box-shadow` with a 20px blur using the `primary` color at 8% opacity. This mimics the light emitted from a high-end LED indicator.\n- **The \"Ghost Border\" Fallback:** When a container requires a boundary (e.g., a text input), use a **Ghost Border**. Apply the `outline_variant` token at 20% opacity. 100% opaque borders are strictly forbidden.\n- **Micro-interactions:** When a user hovers over a module, shift the background from `surface_container` to `surface_bright` to provide immediate, tactile feedback.\n\n## 5. Components\n\n### Buttons\n- **Primary:** `primary` background, `on_primary` text. Sharp 0px edges. High-contrast.\n- **Secondary (Performance Orange):** Used for \"Danger Zone\" or \"Overclock\" actions. `secondary` background, `on_secondary` text.\n- **Tertiary:** No background. `ghost border` active only on hover.\n\n### Chips (System Tags)\nModular and small. Use `surface_container_high` with `label-sm` text. Use a 2px vertical accent bar on the left edge in `primary` or `secondary` to denote status.\n\n### Input Fields\nStrictly rectangular. Use `surface_container_low` as the base. Upon focus, the bottom edge gains a 2px `primary` highlight and a subtle `primary` ambient glow.\n\n### Tooltips\nHigh-contrast `inverse_surface` with `inverse_on_surface` text. No rounded corners. Use `display-sm` for large numerical values inside tooltips to emphasize the \"Data-First\" philosophy.\n\n### Modular Cards\nForbid divider lines. Use `spacing-6` (1.3rem) of vertical white space to separate content chunks. Use `surface_container_highest` for header areas within cards to create internal structure.\n\n### App-Specific: The \"Performance Gauge\"\nA custom component utilizing a semi-circle stroke. Use `surface_variant` for the track and a gradient of `primary` to `tertiary` for the progress. No rounded caps on the stroke; maintain the sharp, industrial finish.\n\n## 6. Do's and Don'ts\n\n### Do\n- **Do** lean into the 0px radius. Every element must feel like it was cut from sheet metal.\n- **Do** use asymmetrical spacing. For example, a wider left-margin in a module to house technical metadata.\n- **Do** use `secondary` (#ff734c) sparingly for high-alert items like \"CPU Thermal Throttling.\"\n\n### Don't\n- **Don't** use any border-radius. Even 2px is too \"soft\" for this system.\n- **Don't** use standard grey shadows. Shadows must always be tinted by the `on_surface` or `primary` color at very low opacities.\n- **Don't** use icons without a technical, \"wireframe\" style. Avoid filled, \"bubbly\" iconography. \n- **Don't** use 100% white for body text. Use `on_surface_variant` (#adaaaa) to reduce eye strain in this high-contrast dark environment.",
+        "font": "SPACE_GROTESK",
+        "headlineFont": "SPACE_GROTESK",
+        "labelFont": "INTER",
+        "namedColors": {
+          "background": "#0e0e0e",
+          "error": "#ff7351",
+          "error_container": "#b92902",
+          "error_dim": "#d53d18",
+          "inverse_on_surface": "#565555",
+          "inverse_primary": "#006f16",
+          "inverse_surface": "#fcf9f8",
+          "on_background": "#ffffff",
+          "on_error": "#450900",
+          "on_error_container": "#ffd2c8",
+          "on_primary": "#006413",
+          "on_primary_container": "#005a10",
+          "on_primary_fixed": "#00440a",
+          "on_primary_fixed_variant": "#006513",
+          "on_secondary": "#430b00",
+          "on_secondary_container": "#fff6f4",
+          "on_secondary_fixed": "#671600",
+          "on_secondary_fixed_variant": "#992600",
+          "on_surface": "#ffffff",
+          "on_surface_variant": "#adaaaa",
+          "on_tertiary": "#005b63",
+          "on_tertiary_container": "#005159",
+          "on_tertiary_fixed": "#003d42",
+          "on_tertiary_fixed_variant": "#005c64",
+          "outline": "#767575",
+          "outline_variant": "#484847",
+          "primary": "#9cff93",
+          "primary_container": "#00fc40",
+          "primary_dim": "#00ec3b",
+          "primary_fixed": "#00fc40",
+          "primary_fixed_dim": "#00ec3b",
+          "secondary": "#ff734c",
+          "secondary_container": "#b12d00",
+          "secondary_dim": "#ff734c",
+          "secondary_fixed": "#ffc4b4",
+          "secondary_fixed_dim": "#ffb19b",
+          "surface": "#0e0e0e",
+          "surface_bright": "#2c2c2c",
+          "surface_container": "#1a1a1a",
+          "surface_container_high": "#20201f",
+          "surface_container_highest": "#262626",
+          "surface_container_low": "#131313",
+          "surface_container_lowest": "#000000",
+          "surface_dim": "#0e0e0e",
+          "surface_tint": "#9cff93",
+          "surface_variant": "#262626",
+          "tertiary": "#8af2ff",
+          "tertiary_container": "#0eeafd",
+          "tertiary_dim": "#00dbec",
+          "tertiary_fixed": "#0eeafd",
+          "tertiary_fixed_dim": "#00dbec"
+        },
+        "overrideNeutralColor": "#121212",
+        "overridePrimaryColor": "#00FF41",
+        "overrideSecondaryColor": "#FF4500",
+        "spacingScale": 1
+      },
+      "deviceType": "DESKTOP",
+      "metadata": {
+        "userRole": "OWNER"
+      },
+      "name": "projects/15518968080669022848",
+      "origin": "STITCH",
+      "projectType": "TEXT_TO_UI_PRO",
+      "screenInstances": [
+        {
+          "height": 1024,
+          "id": "08e00884dccf475d98dbc568f4571749",
+          "sourceScreen": "projects/15518968080669022848/screens/08e00884dccf475d98dbc568f4571749",
+          "width": 1280,
+          "x": 5084,
+          "y": -1309
+        },
+        {
+          "height": 1024,
+          "id": "0d58980c3ba94be89f38d6c40ade7141",
+          "sourceScreen": "projects/15518968080669022848/screens/0d58980c3ba94be89f38d6c40ade7141",
+          "width": 1280,
+          "x": 3818
+        },
+        {
+          "height": 1024,
+          "id": "a6e2ea711d1045ee964595edc77f9546",
+          "sourceScreen": "projects/15518968080669022848/screens/a6e2ea711d1045ee964595edc77f9546",
+          "width": 1280,
+          "x": 2379,
+          "y": 16
+        },
+        {
+          "height": 1101,
+          "id": "c4545653427344bea39bac0a966f83cc",
+          "sourceScreen": "projects/15518968080669022848/screens/c4545653427344bea39bac0a966f83cc",
+          "width": 1280,
+          "x": 971
+        },
+        {
+          "height": 1024,
+          "id": "cdb2ecdaef1545c296f25916f6bb8814",
+          "sourceScreen": "projects/15518968080669022848/screens/cdb2ecdaef1545c296f25916f6bb8814",
+          "width": 1280,
+          "x": 5246,
+          "y": 16
+        },
+        {
+          "height": 1024,
+          "id": "f34a880e5b614548a490a23f3cc5c7d0",
+          "sourceScreen": "projects/15518968080669022848/screens/f34a880e5b614548a490a23f3cc5c7d0",
+          "width": 1280,
+          "x": 2384,
+          "y": 1523
+        }
+      ],
+      "thumbnailScreenshot": {
+        "downloadUrl": "https://lh3.googleusercontent.com/aida/AP1WRLuXSMArFa7nscOnJ3_3-pfPT9OxK7OosxRpu9esSZnh1-gNBulHuQYN8tGg-4KxOEHPsoLrdDAGSxoVqV1b4r1lF69P1k0avtmDFWioOWpE-nm4kkF95HIocesQ_TH8AEMuV0qm7O0FhYdYdY4RJOX7909o3TsDz1_1MY75LqTwTh7tfCBgAMF6b2VNVbLlIYxtYkYhK99CEBXaK5n7gxJiIW93aIRSw2XuErvxz-4zXbcLMPQ6bXr_AUI",
+        "name": "projects/15518968080669022848/files/d1c1941f25244a5a97093e6182cf5557"
+      },
+      "title": "EDGE OPTIMIZER",
+      "updateTime": "2026-03-21T12:43:38.169083Z",
+      "visibility": "PRIVATE"
+    }
+  ]
+}
