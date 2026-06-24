@@ -10,17 +10,26 @@ import com.pdfreader.app.R
 
 // ── Font Families ─────────────────────────────────────────────────────
 
-val InterFontFamily = FontFamily(
-    Font(R.font.inter_regular, FontWeight.Normal),
-    Font(R.font.inter_medium, FontWeight.Medium),
-    Font(R.font.inter_semibold, FontWeight.SemiBold),
-)
+val InterFontFamily = try {
+    FontFamily(
+        Font(R.font.inter_regular, FontWeight.Normal),
+        Font(R.font.inter_medium, FontWeight.Medium),
+        Font(R.font.inter_semibold, FontWeight.SemiBold),
+    )
+} catch (_: Exception) {
+    FontFamily.SansSerif
+}
 
-val SourceSerif4FontFamily = FontFamily(
-    Font(R.font.sourceserif4_regular, FontWeight.Normal),
-    Font(R.font.sourceserif4_semibold, FontWeight.SemiBold),
-    Font(R.font.sourceserif4_bold, FontWeight.Bold),
-)
+val SourceSerif4FontFamily = try {
+    FontFamily(
+        Font(R.font.sourceserif4_regular, FontWeight.Normal),
+        Font(R.font.sourceserif4_semibold, FontWeight.SemiBold),
+        Font(R.font.sourceserif4_bold, FontWeight.Bold),
+    )
+} catch (_: Exception) {
+    FontFamily.Serif
+}
+
 
 // ── Stitch Typography Tokens ──────────────────────────────────────────
 

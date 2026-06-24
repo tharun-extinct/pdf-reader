@@ -7,3 +7,28 @@
 
 # Keep PDFBox Android classes to prevent reflection/resource loading issues
 -keep class com.tom_roush.pdfbox.** { *; }
+
+# Keep Google Fonts Provider / Downloadable Fonts infrastructure
+-keep class androidx.core.provider.** { *; }
+
+# Keep Compose runtime — R8 can accidentally strip @Composable metadata
+-keep class androidx.compose.runtime.** { *; }
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable <methods>;
+}
+
+# Keep Kotlin coroutines internals used by Compose
+-dontwarn kotlinx.coroutines.**
+-keep class kotlinx.coroutines.** { *; }
+
+# Keep data / model classes that may be reflected or serialized
+-keep class com.pdfreader.app.presentation.mvi.** { *; }
+-keep class com.pdfreader.app.domain.** { *; }
+-keep class com.pdfreader.app.data.** { *; }
+
+# Keep the ViewModel factory from being stripped
+-keep class com.pdfreader.app.MainActivity$* { *; }
+
+# Keep R class references for font resources
+-keep class com.pdfreader.app.R$font { *; }
+-keep class com.pdfreader.app.R$array { *; }
