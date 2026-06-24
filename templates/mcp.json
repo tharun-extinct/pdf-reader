@@ -1,0 +1,18 @@
+// Copy MCP snippet and paste in VS code mcp.json file and replace YOUR_API_KEY_HERE with your Stitch API key to enable the Stitch proxy server in VS Code.
+
+{
+  "servers": {
+    "stitch": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@_davideast/stitch-mcp@latest",
+        "proxy"
+      ],
+      "env": {
+        "STITCH_API_KEY": "YOUR_API_KEY_HERE"
+      }
+    }
+  }
+}
+

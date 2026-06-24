@@ -1,18 +1,33 @@
+# Gradle
 .gradle/
 build/
 app/build/
-skills/
+gradle/wrapper/gradle-wrapper.jar
 
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Android
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Stitch tool calling
 .stitch-mcp/
-.stitch/**
 
-
-**/mcp.json
-
-
+# Environment & local config
+skills/
 .env
-local.properties
 gradle-wrapper.properties
-gradle.bat
 gradlew
 gradlew.bat
+local.properties
+
+
+# OS files
+.DS_Store
+Thumbs.db

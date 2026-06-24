@@ -11,9 +11,9 @@ A lightweight, high-performance Android PDF reader focused purely on **reading a
 ## Tech Stack (do not change without asking)
 - **Language / UI**: Kotlin + Jetpack Compose
 - **Architecture**: MVI + Clean Architecture; Coroutines + Flow for concurrency
-- **PDF Rendering**: PDFium-Android (tiled, low-latency)
+- **PDF Rendering**: PDFium-Android
 - **Annotation / Editing**: Apache PDFBox — highlight, embedded pen, eraser
-- **Read Aloud**: Android native TextToSpeech (TTS)
+- **Read Aloud**: Uses Android System default TextToSpeech (TTS) Engine
 - **Sync**: Google Drive background sync via Storage Access Framework (SAF)
 
 ## Non-Negotiable Constraints
