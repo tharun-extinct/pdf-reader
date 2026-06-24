@@ -12,27 +12,15 @@
 -keepattributes Signature,InnerClasses,EnclosingMethod,RuntimeVisibleAnnotations,AnnotationDefault
 -keepclassmembers class com.tom_roush.pdfbox.** { *; }
 
-# Keep Google Fonts Provider / Downloadable Fonts infrastructure
--keep class androidx.core.provider.** { *; }
+# Keep all AndroidX libraries (including Compose, Navigation, etc.) to prevent stripping issues
+-keep class androidx.** { *; }
 
-# Keep Compose runtime — R8 can accidentally strip @Composable metadata
--keep class androidx.compose.runtime.** { *; }
--keep class androidx.compose.material.icons.** { *; }
--keepclassmembers class * {
-    @androidx.compose.runtime.Composable <methods>;
-}
-
-# Keep Kotlin coroutines internals used by Compose
--dontwarn kotlinx.coroutines.**
--keep class kotlinx.coroutines.** { *; }
+# Keep Kotlin stdlib and coroutines
+-keep class kotlin.** { *; }
+-keep class kotlinx.** { *; }
 
 # Keep data / model classes that may be reflected or serialized
--keep class com.pdfreader.app.presentation.mvi.** { *; }
--keep class com.pdfreader.app.domain.** { *; }
--keep class com.pdfreader.app.data.** { *; }
-
-# Keep the ViewModel factory from being stripped
--keep class com.pdfreader.app.MainActivity$* { *; }
+-keep class com.pdfreader.app.** { *; }
 
 # Keep R class references for font resources
 -keep class com.pdfreader.app.R$font { *; }

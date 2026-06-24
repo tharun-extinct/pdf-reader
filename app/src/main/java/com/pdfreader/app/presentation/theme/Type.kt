@@ -16,7 +16,7 @@ val InterFontFamily = try {
         Font(R.font.inter_medium, FontWeight.Medium),
         Font(R.font.inter_semibold, FontWeight.SemiBold),
     )
-} catch (_: Exception) {
+} catch (_: Throwable) {
     FontFamily.SansSerif
 }
 
@@ -26,7 +26,7 @@ val SourceSerif4FontFamily = try {
         Font(R.font.sourceserif4_semibold, FontWeight.SemiBold),
         Font(R.font.sourceserif4_bold, FontWeight.Bold),
     )
-} catch (_: Exception) {
+} catch (_: Throwable) {
     FontFamily.Serif
 }
 

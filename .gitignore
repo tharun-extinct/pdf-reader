@@ -11,3 +11,8 @@ skills/
 
 
 .env
+local.properties
+gradle-wrapper.properties
+gradle.bat
+gradlew
+gradlew.bat
