@@ -7,6 +7,7 @@
 
 # Keep PDFBox Android classes to prevent reflection/resource loading issues
 -keep class com.tom_roush.pdfbox.** { *; }
+-keep class com.tom_roush.fontbox.** { *; }
 -keep class org.apache.pdfbox.** { *; }
 -keep class org.apache.fontbox.** { *; }
 -keep class org.apache.xmpbox.** { *; }
