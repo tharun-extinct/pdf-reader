@@ -8,11 +8,16 @@
 # Keep PDFBox Android classes to prevent reflection/resource loading issues
 -keep class com.tom_roush.pdfbox.** { *; }
 
+# Keep resource files and required metadata
+-keepattributes Signature,InnerClasses,EnclosingMethod,RuntimeVisibleAnnotations,AnnotationDefault
+-keepclassmembers class com.tom_roush.pdfbox.** { *; }
+
 # Keep Google Fonts Provider / Downloadable Fonts infrastructure
 -keep class androidx.core.provider.** { *; }
 
 # Keep Compose runtime — R8 can accidentally strip @Composable metadata
 -keep class androidx.compose.runtime.** { *; }
+-keep class androidx.compose.material.icons.** { *; }
 -keepclassmembers class * {
     @androidx.compose.runtime.Composable <methods>;
 }
