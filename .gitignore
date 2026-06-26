@@ -2,7 +2,6 @@
 .gradle/
 build/
 app/build/
-gradle/wrapper/gradle-wrapper.jar
 
 # IDE
 .idea/
@@ -22,8 +21,6 @@ gradle/wrapper/gradle-wrapper.jar
 # Environment & local config
 skills/
 .env
-gradle-wrapper.properties
-gradlew
 gradlew.bat
 local.properties
 
