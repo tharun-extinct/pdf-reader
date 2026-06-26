@@ -62,7 +62,12 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    
+
+    // Material Components (provides the Theme.Material3.* XML window themes
+    // referenced by AndroidManifest -> @style/Theme.Libro). Required even for a
+    // pure-Compose app because ComponentActivity needs a valid XML window theme.
+    implementation("com.google.android.material:material:1.11.0")
+
     // ViewModel Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     
