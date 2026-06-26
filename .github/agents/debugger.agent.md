@@ -5,6 +5,7 @@ description: Android Kotlin code review and bug-fixing agent. Performs industry-
 user-invocable: false
 
 model: Anthropic: Claude Sonnet 4.6 (openrouter)
+
 tools: [vscode/memory, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/toolSearch, execute/getTerminalOutput, execute/killTerminal, execute/sendToTerminal, execute/runTask, execute/createAndRunTask, execute/runInTerminal, execute/testFailure, read/problems, read/readFile, read/viewImage, read/terminalSelection, read/terminalLastCommand, read/getTaskOutput, agent, edit/createDirectory, edit/createFile, edit/editFiles, edit/rename, search, web, 'context7/*', ms-vscode.vscode-websearchforcopilot/websearch, todo]
 agents: ['Explore']
 ---
