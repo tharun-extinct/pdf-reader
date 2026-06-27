@@ -107,7 +107,7 @@ import com.pdfreader.app.presentation.mvi.parseHexColor
 import com.pdfreader.app.presentation.theme.UiSmStyle
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PdfReaderScreen(
     viewModel: PdfReaderViewModel,
