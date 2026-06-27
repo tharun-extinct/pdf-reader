@@ -9,9 +9,13 @@
         android:label="NoxReader"
         android:supportsRtl="true"
         android:theme="@style/Theme.NoxReader">
-        <meta-data
-            android:name="preloaded_fonts"
-            android:resource="@array/preloaded_fonts" />
+        <!--
+            NOTE: `preloaded_fonts` meta-data intentionally removed.
+            The XML font files reference Google Play Services as a Downloadable
+            Font provider; preloading them at app start crashes on any device
+            without (or with broken) Play Services. Fonts are now resolved
+            lazily at render time in Type.kt with safe system-font fallbacks.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true">

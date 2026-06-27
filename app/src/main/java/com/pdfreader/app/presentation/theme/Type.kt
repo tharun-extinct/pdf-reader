@@ -2,33 +2,25 @@ package com.pdfreader.app.presentation.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.pdfreader.app.R
 
 // ── Font Families ─────────────────────────────────────────────────────
+//
+// The font XML resources in res/font/ are Downloadable-Font definitions that
+// rely on Google Play Services as the font provider. Resolving them at render
+// time can crash on devices without (or with broken) Play Services. To keep
+// launch bullet-proof we use Compose's built-in generic families which map to
+// the platform's default high-quality serif (Noto Serif / Source Serif on AOSP)
+// and sans-serif (Roboto) fonts. These ship with every Android device.
+//
+// When we later bundle Source Serif 4 / Inter as real .ttf assets, we can swap
+// these constants to `FontFamily(Font(R.font.xxx_ttf, weight))` without any
+// other code change.
 
-val InterFontFamily = try {
-    FontFamily(
-        Font(R.font.inter_regular, FontWeight.Normal),
-        Font(R.font.inter_medium, FontWeight.Medium),
-        Font(R.font.inter_semibold, FontWeight.SemiBold),
-    )
-} catch (_: Throwable) {
-    FontFamily.SansSerif
-}
-
-val SourceSerif4FontFamily = try {
-    FontFamily(
-        Font(R.font.sourceserif4_regular, FontWeight.Normal),
-        Font(R.font.sourceserif4_semibold, FontWeight.SemiBold),
-        Font(R.font.sourceserif4_bold, FontWeight.Bold),
-    )
-} catch (_: Throwable) {
-    FontFamily.Serif
-}
+val InterFontFamily: FontFamily = FontFamily.SansSerif
+val SourceSerif4FontFamily: FontFamily = FontFamily.Serif
 
 
 // ── Stitch Typography Tokens ──────────────────────────────────────────
