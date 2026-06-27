@@ -114,6 +114,7 @@ fun PdfReaderScreen(
     onOpenFilePicker: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { state.pageCount })
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -200,6 +201,7 @@ fun PdfReaderScreen(
                 state.isPdfLoaded -> {
                     PdfPager(
                         state = state,
+                        pagerState = pagerState,
                         onIntent = viewModel::processIntent
                     )
                 }
@@ -231,17 +233,14 @@ fun PdfReaderScreen(
                             ttsState = state.ttsState,
                             onPlay = { 
                                 // We need to get the text from the current page.
-                                // For simplicity, we'll just request it if not available.
-                                // A more robust solution would track the current visible page.
-                                val pageIndex = 0 // TODO: Get actual visible page
+                                val pageIndex = pagerState.currentPage
+                                
                                 val textBoxes = state.textBoxesByPage[pageIndex]
                                 if (textBoxes != null && textBoxes.isNotEmpty()) {
-                                    val text = textBoxes.joinToString(" ") { it.text }
-                                    viewModel.processIntent(PdfReaderIntent.PlayTts(text))
+                                    viewModel.processIntent(PdfReaderIntent.PlayTts(pageIndex, textBoxes))
                                 } else {
                                     viewModel.processIntent(PdfReaderIntent.RequestPageText(pageIndex) { boxes ->
-                                        val text = boxes.joinToString(" ") { it.text }
-                                        viewModel.processIntent(PdfReaderIntent.PlayTts(text))
+                                        viewModel.processIntent(PdfReaderIntent.PlayTts(pageIndex, boxes))
                                     })
                                 }
                             },
@@ -491,10 +490,9 @@ private fun ToolbarDivider() {
 @Composable
 fun PdfPager(
     state: PdfReaderState,
+    pagerState: androidx.compose.foundation.pager.PagerState,
     onIntent: (PdfReaderIntent) -> Unit
 ) {
-    val pagerState = rememberPagerState(pageCount = { state.pageCount })
-
     // Use Crossfade to animate page changes smoothly.
     HorizontalPager(
         state = pagerState,
@@ -632,10 +630,15 @@ fun PdfPage(
 
             if (state.activeTool == AnnotationTool.None || state.activeTool == AnnotationTool.ReadAloud) {
                 val ttsState = state.ttsState
+                val highlightRects = when {
+                    state.activeTool == AnnotationTool.ReadAloud && ttsState is TtsState.Playing && ttsState.pageIndex == pageIndex -> ttsState.highlightRects
+                    state.activeTool == AnnotationTool.ReadAloud && ttsState is TtsState.Paused && ttsState.pageIndex == pageIndex -> ttsState.highlightRects
+                    else -> emptyList()
+                }
                 SelectableTextLayer(
                     textBoxes = pageTextBoxes,
                     contentBounds = contentBounds,
-                    highlightedParagraphIndex = if (state.activeTool == AnnotationTool.ReadAloud && ttsState is TtsState.Playing) ttsState.paragraphIndex else null
+                    highlightRects = highlightRects
                 )
             }
 
@@ -684,7 +687,7 @@ fun PdfPage(
 private fun BoxScope.SelectableTextLayer(
     textBoxes: List<PdfTextBox>,
     contentBounds: Rect,
-    highlightedParagraphIndex: Int? = null
+    highlightRects: List<Rect> = emptyList()
 ) {
     if (textBoxes.isEmpty() || contentBounds.width <= 0f || contentBounds.height <= 0f) {
         return
@@ -693,46 +696,20 @@ private fun BoxScope.SelectableTextLayer(
     val density = LocalDensity.current
     
     // Draw highlights for TTS
-    if (highlightedParagraphIndex != null) {
+    if (highlightRects.isNotEmpty()) {
         Canvas(modifier = Modifier.matchParentSize()) {
-            // Group text boxes into paragraphs (simplified heuristic based on vertical spacing)
-            val paragraphs = mutableListOf<List<PdfTextBox>>()
-            var currentParagraph = mutableListOf<PdfTextBox>()
-            
-            textBoxes.sortedBy { it.bounds.top }.forEach { box ->
-                if (currentParagraph.isEmpty()) {
-                    currentParagraph.add(box)
-                } else {
-                    val lastBox = currentParagraph.last()
-                    // If vertical gap is large, start new paragraph
-                    if (box.bounds.top - lastBox.bounds.bottom > 0.02f) {
-                        paragraphs.add(currentParagraph)
-                        currentParagraph = mutableListOf(box)
-                    } else {
-                        currentParagraph.add(box)
-                    }
-                }
-            }
-            if (currentParagraph.isNotEmpty()) {
-                paragraphs.add(currentParagraph)
-            }
-
-            if (highlightedParagraphIndex < paragraphs.size) {
-                val paragraphBoxes = paragraphs[highlightedParagraphIndex]
-                paragraphBoxes.forEach { box ->
-                    val rect = box.bounds
-                    drawRect(
-                        color = Color.Yellow.copy(alpha = 0.3f),
-                        topLeft = androidx.compose.ui.geometry.Offset(
-                            x = rect.left * contentBounds.width,
-                            y = rect.top * contentBounds.height
-                        ),
-                        size = androidx.compose.ui.geometry.Size(
-                            width = rect.width * contentBounds.width,
-                            height = rect.height * contentBounds.height
-                        )
+            highlightRects.forEach { rect ->
+                drawRect(
+                    color = Color(0xFF64B5F6).copy(alpha = 0.5f), // Nice light blue highlight
+                    topLeft = androidx.compose.ui.geometry.Offset(
+                        x = rect.left * contentBounds.width,
+                        y = rect.top * contentBounds.height
+                    ),
+                    size = androidx.compose.ui.geometry.Size(
+                        width = rect.width * contentBounds.width,
+                        height = rect.height * contentBounds.height
                     )
-                }
+                )
             }
         }
     }

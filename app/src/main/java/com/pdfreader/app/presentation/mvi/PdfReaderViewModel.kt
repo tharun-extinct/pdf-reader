@@ -64,15 +64,15 @@ class PdfReaderViewModel(
             is PdfReaderIntent.RemoveStrokeAt -> removeStrokeAt(intent.pageIndex, intent.position)
             is PdfReaderIntent.AddTextAnnotation -> addTextAnnotation(intent.pageIndex, intent.position)
             is PdfReaderIntent.UpdateTextAnnotation -> updateTextAnnotation(intent.annotationId, intent.text)
-            is PdfReaderIntent.PlayTts -> playTts(intent.text)
+            is PdfReaderIntent.PlayTts -> playTts(intent.pageIndex, intent.textBoxes)
             is PdfReaderIntent.PauseTts -> ttsManager.pause()
             is PdfReaderIntent.ResumeTts -> ttsManager.resume()
             is PdfReaderIntent.StopTts -> ttsManager.stop()
         }
     }
 
-    private fun playTts(text: String) {
-        ttsManager.play(text)
+    private fun playTts(pageIndex: Int, textBoxes: List<com.pdfreader.app.presentation.mvi.PdfTextBox>) {
+        ttsManager.play(pageIndex, textBoxes)
     }
 
     private fun selectTool(tool: AnnotationTool) {
