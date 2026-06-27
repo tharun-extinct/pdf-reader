@@ -55,4 +55,9 @@ sealed class PdfReaderIntent {
     data class AddTextAnnotation(val pageIndex: Int, val position: Offset) : PdfReaderIntent()
 
     data class UpdateTextAnnotation(val annotationId: Long, val text: String) : PdfReaderIntent()
+
+    data class PlayTts(val text: String) : PdfReaderIntent()
+    object PauseTts : PdfReaderIntent()
+    object ResumeTts : PdfReaderIntent()
+    object StopTts : PdfReaderIntent()
 }

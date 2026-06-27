@@ -237,23 +237,23 @@ fun PdfReaderScreen(
                                 val textBoxes = state.textBoxesByPage[pageIndex]
                                 if (textBoxes != null && textBoxes.isNotEmpty()) {
                                     val text = textBoxes.joinToString(" ") { it.text }
-                                    onIntent(PdfReaderIntent.PlayTts(text))
+                                    viewModel.processIntent(PdfReaderIntent.PlayTts(text))
                                 } else {
-                                    onIntent(PdfReaderIntent.RequestPageText(pageIndex) { boxes ->
+                                    viewModel.processIntent(PdfReaderIntent.RequestPageText(pageIndex) { boxes ->
                                         val text = boxes.joinToString(" ") { it.text }
-                                        onIntent(PdfReaderIntent.PlayTts(text))
+                                        viewModel.processIntent(PdfReaderIntent.PlayTts(text))
                                     })
                                 }
                             },
-                            onPause = { onIntent(PdfReaderIntent.PauseTts) },
-                            onResume = { onIntent(PdfReaderIntent.ResumeTts) },
-                            onStop = { onIntent(PdfReaderIntent.StopTts) }
+                            onPause = { viewModel.processIntent(PdfReaderIntent.PauseTts) },
+                            onResume = { viewModel.processIntent(PdfReaderIntent.ResumeTts) },
+                            onStop = { viewModel.processIntent(PdfReaderIntent.StopTts) }
                         )
                     }
                     
                     FloatingAnnotationToolbar(
                         state = state,
-                        onIntent = onIntent
+                        onIntent = viewModel::processIntent
                     )
                 }
             }
@@ -631,10 +631,11 @@ fun PdfPage(
             } // Close AnimatedVisibility
 
             if (state.activeTool == AnnotationTool.None || state.activeTool == AnnotationTool.ReadAloud) {
+                val ttsState = state.ttsState
                 SelectableTextLayer(
                     textBoxes = pageTextBoxes,
                     contentBounds = contentBounds,
-                    highlightedParagraphIndex = if (state.activeTool == AnnotationTool.ReadAloud && state.ttsState is TtsState.Playing) state.ttsState.paragraphIndex else null
+                    highlightedParagraphIndex = if (state.activeTool == AnnotationTool.ReadAloud && ttsState is TtsState.Playing) ttsState.paragraphIndex else null
                 )
             }
 
