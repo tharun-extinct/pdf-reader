@@ -46,6 +46,9 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FormatColorFill
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -97,6 +100,7 @@ import com.pdfreader.app.presentation.mvi.PdfReaderState
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
+import com.pdfreader.app.domain.tts.TtsState
 import androidx.compose.ui.text.style.TextOverflow
 import com.pdfreader.app.presentation.mvi.formatHexColor
 import com.pdfreader.app.presentation.mvi.parseHexColor
@@ -215,13 +219,43 @@ fun PdfReaderScreen(
 
             // ── Floating Bottom Toolbar (Stitch pill design) ────────
             if (state.isPdfLoaded) {
-                FloatingAnnotationToolbar(
-                    state = state,
-                    onIntent = viewModel::processIntent,
+                Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 20.dp)
-                )
+                        .padding(bottom = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (state.activeTool == AnnotationTool.ReadAloud) {
+                        TtsControlsOverlay(
+                            ttsState = state.ttsState,
+                            onPlay = { 
+                                // We need to get the text from the current page.
+                                // For simplicity, we'll just request it if not available.
+                                // A more robust solution would track the current visible page.
+                                val pageIndex = 0 // TODO: Get actual visible page
+                                val textBoxes = state.textBoxesByPage[pageIndex]
+                                if (textBoxes != null && textBoxes.isNotEmpty()) {
+                                    val text = textBoxes.joinToString(" ") { it.text }
+                                    onIntent(PdfReaderIntent.PlayTts(text))
+                                } else {
+                                    onIntent(PdfReaderIntent.RequestPageText(pageIndex) { boxes ->
+                                        val text = boxes.joinToString(" ") { it.text }
+                                        onIntent(PdfReaderIntent.PlayTts(text))
+                                    })
+                                }
+                            },
+                            onPause = { onIntent(PdfReaderIntent.PauseTts) },
+                            onResume = { onIntent(PdfReaderIntent.ResumeTts) },
+                            onStop = { onIntent(PdfReaderIntent.StopTts) }
+                        )
+                    }
+                    
+                    FloatingAnnotationToolbar(
+                        state = state,
+                        onIntent = onIntent
+                    )
+                }
             }
 
             if (state.isAnnotationSettingsOpen) {
@@ -231,6 +265,53 @@ fun PdfReaderScreen(
                     onSavePenColors = { viewModel.processIntent(PdfReaderIntent.SavePenColors(it)) },
                     onSaveHighlighterColors = { viewModel.processIntent(PdfReaderIntent.SaveHighlighterColors(it)) }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun TtsControlsOverlay(
+    ttsState: TtsState,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            when (ttsState) {
+                is TtsState.Idle, is TtsState.Error -> {
+                    IconButton(onClick = onPlay) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Play")
+                    }
+                }
+                is TtsState.Playing -> {
+                    IconButton(onClick = onPause) {
+                        Icon(Icons.Default.Pause, contentDescription = "Pause")
+                    }
+                    IconButton(onClick = onStop) {
+                        Icon(Icons.Default.Stop, contentDescription = "Stop")
+                    }
+                }
+                is TtsState.Paused -> {
+                    IconButton(onClick = onResume) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
+                    }
+                    IconButton(onClick = onStop) {
+                        Icon(Icons.Default.Stop, contentDescription = "Stop")
+                    }
+                }
             }
         }
     }
@@ -552,7 +633,8 @@ fun PdfPage(
             if (state.activeTool == AnnotationTool.None || state.activeTool == AnnotationTool.ReadAloud) {
                 SelectableTextLayer(
                     textBoxes = pageTextBoxes,
-                    contentBounds = contentBounds
+                    contentBounds = contentBounds,
+                    highlightedParagraphIndex = if (state.activeTool == AnnotationTool.ReadAloud && state.ttsState is TtsState.Playing) state.ttsState.paragraphIndex else null
                 )
             }
 
@@ -600,13 +682,60 @@ fun PdfPage(
 @Composable
 private fun BoxScope.SelectableTextLayer(
     textBoxes: List<PdfTextBox>,
-    contentBounds: Rect
+    contentBounds: Rect,
+    highlightedParagraphIndex: Int? = null
 ) {
     if (textBoxes.isEmpty() || contentBounds.width <= 0f || contentBounds.height <= 0f) {
         return
     }
 
     val density = LocalDensity.current
+    
+    // Draw highlights for TTS
+    if (highlightedParagraphIndex != null) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            // Group text boxes into paragraphs (simplified heuristic based on vertical spacing)
+            val paragraphs = mutableListOf<List<PdfTextBox>>()
+            var currentParagraph = mutableListOf<PdfTextBox>()
+            
+            textBoxes.sortedBy { it.bounds.top }.forEach { box ->
+                if (currentParagraph.isEmpty()) {
+                    currentParagraph.add(box)
+                } else {
+                    val lastBox = currentParagraph.last()
+                    // If vertical gap is large, start new paragraph
+                    if (box.bounds.top - lastBox.bounds.bottom > 0.02f) {
+                        paragraphs.add(currentParagraph)
+                        currentParagraph = mutableListOf(box)
+                    } else {
+                        currentParagraph.add(box)
+                    }
+                }
+            }
+            if (currentParagraph.isNotEmpty()) {
+                paragraphs.add(currentParagraph)
+            }
+
+            if (highlightedParagraphIndex < paragraphs.size) {
+                val paragraphBoxes = paragraphs[highlightedParagraphIndex]
+                paragraphBoxes.forEach { box ->
+                    val rect = box.bounds
+                    drawRect(
+                        color = Color.Yellow.copy(alpha = 0.3f),
+                        topLeft = androidx.compose.ui.geometry.Offset(
+                            x = rect.left * contentBounds.width,
+                            y = rect.top * contentBounds.height
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            width = rect.width * contentBounds.width,
+                            height = rect.height * contentBounds.height
+                        )
+                    )
+                }
+            }
+        }
+    }
+
     SelectionContainer(modifier = Modifier.matchParentSize()) {
         Box(modifier = Modifier.matchParentSize()) {
             textBoxes.forEach { textBox ->

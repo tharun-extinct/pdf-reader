@@ -7,6 +7,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pdfreader.app.domain.repository.PdfEngine
 import com.pdfreader.app.domain.repository.PdfSyncManager
+import com.pdfreader.app.domain.tts.TtsManager
+import com.pdfreader.app.domain.tts.TtsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,8 +28,18 @@ class PdfReaderViewModel(
     private val syncManager: PdfSyncManager
 ) : AndroidViewModel(application) {
 
+    private val ttsManager = TtsManager(application)
+
     private val _state = MutableStateFlow(PdfReaderState())
     val state: StateFlow<PdfReaderState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            ttsManager.ttsState.collect { ttsState ->
+                _state.update { it.copy(ttsState = ttsState) }
+            }
+        }
+    }
 
     fun processIntent(intent: PdfReaderIntent) {
         when (intent) {
@@ -52,7 +64,15 @@ class PdfReaderViewModel(
             is PdfReaderIntent.RemoveStrokeAt -> removeStrokeAt(intent.pageIndex, intent.position)
             is PdfReaderIntent.AddTextAnnotation -> addTextAnnotation(intent.pageIndex, intent.position)
             is PdfReaderIntent.UpdateTextAnnotation -> updateTextAnnotation(intent.annotationId, intent.text)
+            is PdfReaderIntent.PlayTts -> playTts(intent.text)
+            is PdfReaderIntent.PauseTts -> ttsManager.pause()
+            is PdfReaderIntent.ResumeTts -> ttsManager.resume()
+            is PdfReaderIntent.StopTts -> ttsManager.stop()
         }
+    }
+
+    private fun playTts(text: String) {
+        ttsManager.play(text)
     }
 
     private fun selectTool(tool: AnnotationTool) {
@@ -290,6 +310,7 @@ class PdfReaderViewModel(
     override fun onCleared() {
         super.onCleared()
         pdfEngine.closeDocument()
+        ttsManager.shutdown()
     }
 }
 
