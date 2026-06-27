@@ -12,7 +12,19 @@
       "env": {
         "STITCH_API_KEY": "YOUR_API_KEY_HERE"
       }
+    }, 
+
+    "android-mcp": {
+      "command": "uvx",
+      "args": [
+        "--python", "3.13", "android-mcp"
+      ],
+
+      // The following environment variables are optional. If you want to connect to a specific Android device, you can set the ANDROID_MCP_CONNECTION and ANDROID_MCP_HOST environment variables.
+      "env": {
+        "ANDROID_MCP_CONNECTION": "wifi",
+        "ANDROID_MCP_HOST": "192.168.1.3"
+      }
     }
   }
 }
-
