@@ -6,9 +6,9 @@
     <application
         android:allowBackup="true"
         android:extractNativeLibs="true"
-        android:label="Libro"
+        android:label="NoxReader"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Libro">
+        android:theme="@style/Theme.NoxReader">
         <meta-data
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />

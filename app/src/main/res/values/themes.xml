@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-        Libro app theme.
+        NoxReader app theme.
         Parent: Theme.Material3.Light.NoActionBar
           - Compatible with ComponentActivity + Jetpack Compose (no AppCompat clash)
           - Provides all Material3 window/color attributes needed by the Compose
             MaterialTheme bridge in setContent {}
           - NoActionBar removes the XML action bar so Compose owns the full window
     -->
-    <style name="Theme.Libro" parent="Theme.Material3.Light.NoActionBar" />
+    <style name="Theme.NoxReader" parent="Theme.Material3.Light.NoActionBar" />
 </resources>

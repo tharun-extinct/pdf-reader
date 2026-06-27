@@ -93,7 +93,7 @@ val LabelCapsStyle = TextStyle(
 
 // ── Material 3 Typography Mapping ─────────────────────────────────────
 
-val LibroTypography = Typography(
+val NoxReaderTypography = Typography(
     displayLarge = DisplayTitleStyle,
     displayMedium = HeadlineLgStyle,
     displaySmall = HeadlineLgMobileStyle,

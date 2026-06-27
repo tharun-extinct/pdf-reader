@@ -64,10 +64,10 @@ import com.pdfreader.app.presentation.theme.DisplayTitleStyle
 import com.pdfreader.app.presentation.theme.LabelCapsStyle
 import com.pdfreader.app.presentation.theme.UiMainStyle
 import com.pdfreader.app.presentation.theme.UiSmStyle
-import com.pdfreader.app.presentation.theme.LibroTheme
+import com.pdfreader.app.presentation.theme.NoxReaderTheme
 
 /**
- * Settings screen matching the Stitch "Libro Settings" design.
+ * Settings screen matching the Stitch "NoxReader Settings" design.
  *
  * Sectioned layout with:
  * - Reading Preferences (font size, line height, reading font)
@@ -81,7 +81,7 @@ fun SettingsScreen(
     viewModel: PdfReaderViewModel,
     navController: NavController
 ) {
-    val spacing = LibroTheme.spacing
+    val spacing = NoxReaderTheme.spacing
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -278,7 +278,7 @@ fun SettingsScreen(
             SettingsSection(title = "ABOUT") {
                 SettingsRow(
                     icon = Icons.Outlined.Info,
-                    title = "Libro",
+                    title = "NoxReader",
                     subtitle = "Version 1.0 · Cloud PDF Reader"
                 )
             }

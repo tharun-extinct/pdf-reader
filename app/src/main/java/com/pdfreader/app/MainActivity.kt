@@ -24,7 +24,7 @@ import com.pdfreader.app.presentation.ui.PdfReaderScreen
 import com.pdfreader.app.presentation.ui.BookshelfScreen
 import com.pdfreader.app.presentation.ui.SettingsScreen
 
-import com.pdfreader.app.presentation.theme.LibroTheme
+import com.pdfreader.app.presentation.theme.NoxReaderTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            LibroTheme {
+            NoxReaderTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

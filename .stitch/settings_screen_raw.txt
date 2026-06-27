@@ -6,7 +6,7 @@
     '<html class="h-full" lang="en"><head>\n' +
     '<meta charset="utf-8"/>\n' +
     '<meta content="width=device-width, initial-scale=1.0" name="viewport"/>\n' +
-    '<title>Libro Settings</title>\n' +
+    '<title>NoxReader Settings</title>\n' +
     '<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>\n' +
     '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>\n' +
     '<link href="https://fonts.googleapis.com" rel="preconnect"/>\n' +
@@ -146,7 +146,7 @@
     '<button aria-label="Menu" class="flex items-center justify-center p-2 text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200 active:opacity-70 rounded-full">\n' +
     `<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">menu</span>\n` +
     '</button>\n' +
-    '<h1 class="font-display-title text-display-title text-primary">Libro</h1>\n' +
+    '<h1 class="font-display-title text-display-title text-primary">NoxReader</h1>\n' +
     '<button aria-label="Settings" class="flex items-center justify-center p-2 text-primary hover:bg-surface-container-low transition-colors duration-200 active:opacity-70 rounded-full">\n' +
     `<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>\n` +
     '</button>\n' +
@@ -155,7 +155,7 @@
     '<!-- Side Navigation Drawer (Desktop Only - Suppressed for dedicated settings view if treating as separate page, but keeping for library app context) -->\n' +
     '<nav class="hidden md:flex h-full w-72 rounded-r-xl bg-surface-container text-primary font-ui-main bg-surface-container-low shadow-sm flex-col p-4 fixed inset-y-0 left-0 z-[60] border-r border-outline-variant/30">\n' +
     '<div class="mb-8 px-4 mt-4">\n' +
-    '<h2 class="font-display-title text-display-title text-primary">Libro Library</h2>\n' +
+    '<h2 class="font-display-title text-display-title text-primary">NoxReader Library</h2>\n' +
     '</div>\n' +
     '<ul class="space-y-2 flex-grow">\n' +
     '<li>\n' +

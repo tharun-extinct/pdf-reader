@@ -6,7 +6,7 @@
     '<html lang="en"><head>\n' +
     '<meta charset="utf-8"/>\n' +
     '<meta content="width=device-width, initial-scale=1.0" name="viewport"/>\n' +
-    '<title>Libro - Digital Sanctuary Library</title>\n' +
+    '<title>NoxReader - Digital Sanctuary Library</title>\n' +
     '<!-- Google Fonts: Inter & Source Serif 4 -->\n' +
     '<link href="https://fonts.googleapis.com" rel="preconnect"/>\n' +
     '<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>\n' +
@@ -183,7 +183,7 @@
     '<!-- Desktop Navigation Drawer (Hidden on Mobile) -->\n' +
     '<nav class="hidden md:flex flex-col bg-surface-container h-full w-72 rounded-r-xl shadow-sm fixed inset-y-0 left-0 z-[60] p-4 border-r border-outline-variant/30">\n' +
     '<div class="mb-10 px-4 mt-6">\n' +
-    '<h1 class="font-display-title text-display-title text-primary tracking-tight">Libro Library</h1>\n' +
+    '<h1 class="font-display-title text-display-title text-primary tracking-tight">NoxReader Library</h1>\n' +
     '</div>\n' +
     '<ul class="space-y-2 flex-grow">\n' +
     '<li>\n' +
@@ -225,6 +225,6 @@
     '<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200 active:opacity-70 p-2 -ml-2 rounded-full flex items-center justify-center">\n' +
     '<span class="material-symbols-outlined text-[24px]">menu</span>\n' +
     '</button>\n' +
-    '<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary tracking-tight font-bold">Libro</h1>\n' +
+    '<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary tracking-tight font-bold">NoxReader</h1>\n' +
     '<button class="text-on-surface-variant hover:bg-surface-container-low transition-color'... 16973 more characters
 }

@@ -64,7 +64,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     // Material Components (provides the Theme.Material3.* XML window themes
-    // referenced by AndroidManifest -> @style/Theme.Libro). Required even for a
+    // referenced by AndroidManifest -> @style/Theme.NoxReader). Required even for a
     // pure-Compose app because ComponentActivity needs a valid XML window theme.
     implementation("com.google.android.material:material:1.11.0")
 

@@ -63,26 +63,26 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
-import com.pdfreader.app.presentation.theme.LibroTheme
+import com.pdfreader.app.presentation.theme.NoxReaderTheme
 import com.pdfreader.app.presentation.theme.DisplayTitleStyle
 import com.pdfreader.app.presentation.theme.HeadlineLgMobileStyle
 import com.pdfreader.app.presentation.theme.LabelCapsStyle
 import com.pdfreader.app.presentation.theme.UiMainStyle
 import com.pdfreader.app.presentation.theme.UiSmStyle
 import com.pdfreader.app.presentation.theme.SourceSerif4FontFamily
-import com.pdfreader.app.presentation.theme.LibroPrimaryFixed
-import com.pdfreader.app.presentation.theme.LibroOnPrimaryFixed
-import com.pdfreader.app.presentation.theme.LibroTertiaryFixed
-import com.pdfreader.app.presentation.theme.LibroTertiaryFixedDim
-import com.pdfreader.app.presentation.theme.LibroPrimaryContainer
-import com.pdfreader.app.presentation.theme.LibroOnPrimaryContainer
+import com.pdfreader.app.presentation.theme.NoxReaderPrimaryFixed
+import com.pdfreader.app.presentation.theme.NoxReaderOnPrimaryFixed
+import com.pdfreader.app.presentation.theme.NoxReaderTertiaryFixed
+import com.pdfreader.app.presentation.theme.NoxReaderTertiaryFixedDim
+import com.pdfreader.app.presentation.theme.NoxReaderPrimaryContainer
+import com.pdfreader.app.presentation.theme.NoxReaderOnPrimaryContainer
 
 /**
- * Libro Library screen — the app's main landing screen.
+ * NoxReader Library screen — the app's main landing screen.
  *
- * Design sourced from Stitch "Cloud PDF" project, screen "Libro - My Library".
+ * Design sourced from Stitch "Cloud PDF" project, screen "NoxReader - My Library".
  * Features:
- * - Mobile top bar with hamburger, "Libro" title, settings gear
+ * - Mobile top bar with hamburger, "NoxReader" title, settings gear
  * - "Continue Reading" hero card
  * - "My Collection" horizontally scrollable book cards
  * - "Annotations & Notes" recent activity list
@@ -95,7 +95,7 @@ fun BookshelfScreen(
     navController: NavController,
     onOpenFilePicker: () -> Unit
 ) {
-    val spacing = LibroTheme.spacing
+    val spacing = NoxReaderTheme.spacing
     var selectedNavIndex by remember { mutableIntStateOf(0) }
 
     Scaffold(
@@ -117,7 +117,7 @@ fun BookshelfScreen(
                 },
                 title = {
                     Text(
-                        text = "Libro",
+                        text = "NoxReader",
                         style = DisplayTitleStyle.copy(fontSize = 24.sp),
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -135,7 +135,7 @@ fun BookshelfScreen(
         },
         bottomBar = {
             // ── Bottom Navigation Bar ───────────────────────────────
-            LibroBottomNavBar(
+            NoxReaderBottomNavBar(
                 selectedIndex = selectedNavIndex,
                 onItemSelected = { selectedNavIndex = it }
             )
@@ -238,8 +238,8 @@ private fun ContinueReadingCard(modifier: Modifier = Modifier, onTap: () -> Unit
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                LibroPrimaryContainer,
-                                LibroPrimaryFixed
+                                NoxReaderPrimaryContainer,
+                                NoxReaderPrimaryFixed
                             )
                         )
                     ),
@@ -311,7 +311,7 @@ private data class BookItem(
 
 @Composable
 private fun BookCollectionRow(onBookTap: () -> Unit) {
-    val spacing = LibroTheme.spacing
+    val spacing = NoxReaderTheme.spacing
     val books = remember {
         listOf(
             BookItem("Pride & Prejudice", "Jane Austen", 0.78f,
@@ -427,7 +427,7 @@ private fun AnnotationsList(modifier: Modifier = Modifier) {
                         modifier = Modifier
                             .size(28.dp)
                             .background(
-                                LibroTertiaryFixed.copy(alpha = 0.3f),
+                                NoxReaderTertiaryFixed.copy(alpha = 0.3f),
                                 CircleShape
                             ),
                         contentAlignment = Alignment.Center
@@ -480,7 +480,7 @@ private data class NavItem(
 )
 
 @Composable
-private fun LibroBottomNavBar(
+private fun NoxReaderBottomNavBar(
     selectedIndex: Int,
     onItemSelected: (Int) -> Unit
 ) {
@@ -515,9 +515,9 @@ private fun LibroBottomNavBar(
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = LibroOnPrimaryFixed,
+                    selectedIconColor = NoxReaderOnPrimaryFixed,
                     selectedTextColor = MaterialTheme.colorScheme.primary,
-                    indicatorColor = LibroPrimaryFixed,
+                    indicatorColor = NoxReaderPrimaryFixed,
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 // ── Spacing Tokens ────────────────────────────────────────────────────
 
 @Immutable
-data class LibroSpacing(
+data class NoxReaderSpacing(
     val base: Dp = 8.dp,
     val gutter: Dp = 24.dp,
     val marginMobile: Dp = 20.dp,
@@ -21,71 +21,71 @@ data class LibroSpacing(
     val readingMaxWidth: Dp = 720.dp
 )
 
-val LocalLibroSpacing = staticCompositionLocalOf { LibroSpacing() }
+val LocalNoxReaderSpacing = staticCompositionLocalOf { NoxReaderSpacing() }
 
 // ── Light Color Scheme ────────────────────────────────────────────────
 
-private val LibroLightColorScheme = lightColorScheme(
-    primary = LibroPrimary,
-    onPrimary = LibroOnPrimary,
-    primaryContainer = LibroPrimaryContainer,
-    onPrimaryContainer = LibroOnPrimaryContainer,
-    inversePrimary = LibroInversePrimary,
-    secondary = LibroSecondary,
-    onSecondary = LibroOnSecondary,
-    secondaryContainer = LibroSecondaryContainer,
-    onSecondaryContainer = LibroOnSecondaryContainer,
-    tertiary = LibroTertiary,
-    onTertiary = LibroOnTertiary,
-    tertiaryContainer = LibroTertiaryContainer,
-    onTertiaryContainer = LibroOnTertiaryContainer,
-    error = LibroError,
-    onError = LibroOnError,
-    errorContainer = LibroErrorContainer,
-    onErrorContainer = LibroOnErrorContainer,
-    background = LibroBackground,
-    onBackground = LibroOnBackground,
-    surface = LibroSurface,
-    onSurface = LibroOnSurface,
-    surfaceVariant = LibroSurfaceVariant,
-    onSurfaceVariant = LibroOnSurfaceVariant,
-    surfaceTint = LibroSurfaceTint,
-    inverseSurface = LibroInverseSurface,
-    inverseOnSurface = LibroInverseOnSurface,
-    outline = LibroOutline,
-    outlineVariant = LibroOutlineVariant,
-    surfaceBright = LibroSurfaceBright,
-    surfaceDim = LibroSurfaceDim,
-    surfaceContainerLowest = LibroSurfaceContainerLowest,
-    surfaceContainerLow = LibroSurfaceContainerLow,
-    surfaceContainer = LibroSurfaceContainer,
-    surfaceContainerHigh = LibroSurfaceContainerHigh,
-    surfaceContainerHighest = LibroSurfaceContainerHighest,
+private val NoxReaderLightColorScheme = lightColorScheme(
+    primary = NoxReaderPrimary,
+    onPrimary = NoxReaderOnPrimary,
+    primaryContainer = NoxReaderPrimaryContainer,
+    onPrimaryContainer = NoxReaderOnPrimaryContainer,
+    inversePrimary = NoxReaderInversePrimary,
+    secondary = NoxReaderSecondary,
+    onSecondary = NoxReaderOnSecondary,
+    secondaryContainer = NoxReaderSecondaryContainer,
+    onSecondaryContainer = NoxReaderOnSecondaryContainer,
+    tertiary = NoxReaderTertiary,
+    onTertiary = NoxReaderOnTertiary,
+    tertiaryContainer = NoxReaderTertiaryContainer,
+    onTertiaryContainer = NoxReaderOnTertiaryContainer,
+    error = NoxReaderError,
+    onError = NoxReaderOnError,
+    errorContainer = NoxReaderErrorContainer,
+    onErrorContainer = NoxReaderOnErrorContainer,
+    background = NoxReaderBackground,
+    onBackground = NoxReaderOnBackground,
+    surface = NoxReaderSurface,
+    onSurface = NoxReaderOnSurface,
+    surfaceVariant = NoxReaderSurfaceVariant,
+    onSurfaceVariant = NoxReaderOnSurfaceVariant,
+    surfaceTint = NoxReaderSurfaceTint,
+    inverseSurface = NoxReaderInverseSurface,
+    inverseOnSurface = NoxReaderInverseOnSurface,
+    outline = NoxReaderOutline,
+    outlineVariant = NoxReaderOutlineVariant,
+    surfaceBright = NoxReaderSurfaceBright,
+    surfaceDim = NoxReaderSurfaceDim,
+    surfaceContainerLowest = NoxReaderSurfaceContainerLowest,
+    surfaceContainerLow = NoxReaderSurfaceContainerLow,
+    surfaceContainer = NoxReaderSurfaceContainer,
+    surfaceContainerHigh = NoxReaderSurfaceContainerHigh,
+    surfaceContainerHighest = NoxReaderSurfaceContainerHighest,
 )
 
 // ── Theme Composable ──────────────────────────────────────────────────
 
 @Composable
-fun LibroTheme(
+fun NoxReaderTheme(
     content: @Composable () -> Unit
 ) {
     CompositionLocalProvider(
-        LocalLibroSpacing provides LibroSpacing()
+        LocalNoxReaderSpacing provides NoxReaderSpacing()
     ) {
         MaterialTheme(
-            colorScheme = LibroLightColorScheme,
-            typography = LibroTypography,
+            colorScheme = NoxReaderLightColorScheme,
+            typography = NoxReaderTypography,
             content = content
         )
     }
 }
 
 /**
- * Convenience accessor for Libro spacing tokens.
- * Usage: `LibroTheme.spacing.gutter`
+ * Convenience accessor for NoxReader spacing tokens.
+ * Usage: `NoxReaderTheme.spacing.gutter`
  */
-object LibroTheme {
-    val spacing: LibroSpacing
+object NoxReaderTheme {
+    val spacing: NoxReaderSpacing
         @Composable
-        get() = LocalLibroSpacing.current
+        get() = LocalNoxReaderSpacing.current
 }
