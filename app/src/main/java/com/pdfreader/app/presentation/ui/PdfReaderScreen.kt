@@ -97,6 +97,7 @@ import com.pdfreader.app.presentation.mvi.PdfReaderState
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
+import androidx.compose.ui.text.style.TextOverflow
 import com.pdfreader.app.presentation.mvi.formatHexColor
 import com.pdfreader.app.presentation.mvi.parseHexColor
 import com.pdfreader.app.presentation.theme.UiSmStyle
@@ -139,9 +140,11 @@ fun PdfReaderScreen(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = "Chapter 4: The Digital Sanctuary",
+                            text = state.documentTitle ?: "Document",
                             style = UiSmStyle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 },
@@ -298,7 +301,7 @@ private fun FloatingAnnotationToolbar(
                     // Close
                     IconButton(
                         onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.None)) },
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Text(
                             text = "×",
@@ -375,7 +378,7 @@ private fun FloatingToolbarIcon(
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(44.dp)
+            .size(48.dp)
             .background(
                 color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                 shape = CircleShape

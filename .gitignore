@@ -18,6 +18,9 @@ app/build/
 # Stitch tool calling
 .stitch-mcp/
 
+
+uidump/
+
 # Environment & local config
 skills/
 .env

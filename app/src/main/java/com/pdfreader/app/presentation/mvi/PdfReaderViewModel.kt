@@ -192,13 +192,26 @@ class PdfReaderViewModel(
                     pdfEngine.openDocument(pfd, pdfBytes)
                     val pageCount = pdfEngine.getPageCount()
                     
+                    // Extract document title from URI
+                    val cursor = context.contentResolver.query(uri, null, null, null, null)
+                    var title = "Document"
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val displayNameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (displayNameIndex != -1) {
+                                title = it.getString(displayNameIndex)
+                            }
+                        }
+                    }
+                    
                     _state.update { 
                         it.copy(
                             isLoading = false,
                             isPdfLoaded = true,
                             pageCount = pageCount,
-                            openedUri = uri
-                        ) 
+                            openedUri = uri,
+                            documentTitle = title
+                        )
                     }
                 } else {
                     _state.update { 

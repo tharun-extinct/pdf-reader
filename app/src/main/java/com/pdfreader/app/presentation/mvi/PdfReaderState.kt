@@ -12,6 +12,7 @@ data class PdfReaderState(
     val isPdfLoaded: Boolean = false,
     val pageCount: Int = 0,
     val openedUri: Uri? = null,
+    val documentTitle: String? = null,
     val errorMessage: String? = null,
     val activeTool: AnnotationTool = AnnotationTool.None,
     val penPalette: AnnotationPalette = defaultPenPalette(),

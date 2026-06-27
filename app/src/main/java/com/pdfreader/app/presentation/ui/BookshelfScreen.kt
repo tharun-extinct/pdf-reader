@@ -257,7 +257,7 @@ private fun ContinueReadingCard(modifier: Modifier = Modifier, onTap: () -> Unit
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Great Expectations",
+                    text = "No recent document",
                     style = HeadlineLgMobileStyle.copy(fontSize = 18.sp),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -265,7 +265,7 @@ private fun ContinueReadingCard(modifier: Modifier = Modifier, onTap: () -> Unit
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "Charles Dickens",
+                    text = "Open a PDF to start reading",
                     style = UiSmStyle,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -275,7 +275,7 @@ private fun ContinueReadingCard(modifier: Modifier = Modifier, onTap: () -> Unit
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     LinearProgressIndicator(
-                        progress = { 0.42f },
+                        progress = { 0f },
                         modifier = Modifier
                             .weight(1f)
                             .height(4.dp)
@@ -284,14 +284,14 @@ private fun ContinueReadingCard(modifier: Modifier = Modifier, onTap: () -> Unit
                         trackColor = MaterialTheme.colorScheme.outlineVariant,
                     )
                     Text(
-                        text = "42%",
+                        text = "0%",
                         style = UiSmStyle.copy(fontSize = 12.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Chapter 4: The Digital Sanctuary",
+                    text = "No chapter",
                     style = UiSmStyle.copy(fontSize = 12.sp),
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -313,18 +313,7 @@ private data class BookItem(
 private fun BookCollectionRow(onBookTap: () -> Unit) {
     val spacing = NoxReaderTheme.spacing
     val books = remember {
-        listOf(
-            BookItem("Pride & Prejudice", "Jane Austen", 0.78f,
-                listOf(Color(0xFF3D2907), Color(0xFFAE8F64))),
-            BookItem("1984", "George Orwell", 0.15f,
-                listOf(Color(0xFF1A2E44), Color(0xFF4C6078))),
-            BookItem("The Great Gatsby", "F. Scott Fitzgerald", 0.55f,
-                listOf(Color(0xFF35485F), Color(0xFFB4C8E4))),
-            BookItem("Brave New World", "Aldous Huxley", 0.0f,
-                listOf(Color(0xFF5A431F), Color(0xFFE3C193))),
-            BookItem("To Kill a Mockingbird", "Harper Lee", 0.33f,
-                listOf(Color(0xFF03192E), Color(0xFF8296B0)))
-        )
+        emptyList<BookItem>()
     }
 
     Row(
@@ -399,11 +388,7 @@ private fun BookCard(book: BookItem, onClick: () -> Unit) {
 @Composable
 private fun AnnotationsList(modifier: Modifier = Modifier) {
     val annotations = remember {
-        listOf(
-            Triple("\"The margin is where the reader converses with the author.\"", "Great Expectations · Ch. 4", "Nov 12"),
-            Triple("Key theme: invisible design philosophy", "Great Expectations · Ch. 3", "Nov 10"),
-            Triple("Architecture of focus — cognitive necessity", "Great Expectations · Ch. 4", "Nov 12")
-        )
+        emptyList<Triple<String, String, String>>()
     }
 
     Column(
