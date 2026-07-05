@@ -66,7 +66,7 @@ app/
 
 ## Future Enhancements
 - Local NPU-based voice model for higher quality Read Aloud (e.g., Piper TTS via ONNX/TFLite).
-- Format Support: ePub and other text-based formats.
+
 
 
 
