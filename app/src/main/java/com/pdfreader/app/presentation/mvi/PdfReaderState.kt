@@ -2,6 +2,7 @@ package com.pdfreader.app.presentation.mvi
 
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
+import com.pdfreader.app.domain.tts.TtsState
 
 /**
  * Represents the immutable state of the PDF Reader UI.
@@ -12,6 +13,7 @@ data class PdfReaderState(
     val isPdfLoaded: Boolean = false,
     val pageCount: Int = 0,
     val openedUri: Uri? = null,
+    val documentTitle: String? = null,
     val errorMessage: String? = null,
     val activeTool: AnnotationTool = AnnotationTool.None,
     val penPalette: AnnotationPalette = defaultPenPalette(),
@@ -23,5 +25,6 @@ data class PdfReaderState(
     val highlightsByPage: Map<Int, List<TextHighlight>> = emptyMap(),
     val textBoxesByPage: Map<Int, List<PdfTextBox>> = emptyMap(),
     val textAnnotationsByPage: Map<Int, List<TextAnnotation>> = emptyMap(),
-    val selectedTextPositionByPage: Map<Int, Offset> = emptyMap()
+    val selectedTextPositionByPage: Map<Int, Offset> = emptyMap(),
+    val ttsState: TtsState = TtsState.Idle
 )

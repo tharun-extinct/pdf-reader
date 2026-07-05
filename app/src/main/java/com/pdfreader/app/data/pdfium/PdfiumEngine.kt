@@ -24,15 +24,21 @@ import kotlin.math.min
  * Operates at the C++ level underneath, minimizing JVM garbage collection overhead
  * for reading/rendering files.
  */
-class PdfiumEngine(context: Context) : PdfEngine {
-    private val pdfiumCore = PdfiumCore(context)
+class PdfiumEngine(private val context: Context) : PdfEngine {
+    /**
+     * PDFium loads native (.so) libraries on first touch. Initializing it lazily
+     * (instead of in the constructor) keeps app launch crash-free: the native
+     * library is only loaded when a PDF is actually opened, so a missing/incompatible
+     * ABI surfaces as a recoverable error on the reader screen rather than taking
+     * down the whole app at startup (the engine is built during ViewModel creation).
+     */
+    private val pdfiumCore: PdfiumCore by lazy {
+        PDFBoxResourceLoader.init(context)
+        PdfiumCore(context)
+    }
     private var pdfDocument: PdfDocument? = null
     private var textDocument: PDDocument? = null
     private val textBoxCache = mutableMapOf<Int, List<PdfTextBox>>()
-
-    init {
-        PDFBoxResourceLoader.init(context)
-    }
 
     override fun openDocument(pfd: ParcelFileDescriptor, pdfBytes: ByteArray) {
         // Closes previous document if exists

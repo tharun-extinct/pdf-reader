@@ -7,6 +7,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pdfreader.app.domain.repository.PdfEngine
 import com.pdfreader.app.domain.repository.PdfSyncManager
+import com.pdfreader.app.domain.tts.TtsManager
+import com.pdfreader.app.domain.tts.TtsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,8 +28,18 @@ class PdfReaderViewModel(
     private val syncManager: PdfSyncManager
 ) : AndroidViewModel(application) {
 
+    private val ttsManager = TtsManager(application)
+
     private val _state = MutableStateFlow(PdfReaderState())
     val state: StateFlow<PdfReaderState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            ttsManager.ttsState.collect { ttsState ->
+                _state.update { it.copy(ttsState = ttsState) }
+            }
+        }
+    }
 
     fun processIntent(intent: PdfReaderIntent) {
         when (intent) {
@@ -52,7 +64,15 @@ class PdfReaderViewModel(
             is PdfReaderIntent.RemoveStrokeAt -> removeStrokeAt(intent.pageIndex, intent.position)
             is PdfReaderIntent.AddTextAnnotation -> addTextAnnotation(intent.pageIndex, intent.position)
             is PdfReaderIntent.UpdateTextAnnotation -> updateTextAnnotation(intent.annotationId, intent.text)
+            is PdfReaderIntent.PlayTts -> playTts(intent.pageIndex, intent.textBoxes)
+            is PdfReaderIntent.PauseTts -> ttsManager.pause()
+            is PdfReaderIntent.ResumeTts -> ttsManager.resume()
+            is PdfReaderIntent.StopTts -> ttsManager.stop()
         }
+    }
+
+    private fun playTts(pageIndex: Int, textBoxes: List<com.pdfreader.app.presentation.mvi.PdfTextBox>) {
+        ttsManager.play(pageIndex, textBoxes)
     }
 
     private fun selectTool(tool: AnnotationTool) {
@@ -192,13 +212,26 @@ class PdfReaderViewModel(
                     pdfEngine.openDocument(pfd, pdfBytes)
                     val pageCount = pdfEngine.getPageCount()
                     
+                    // Extract document title from URI
+                    val cursor = context.contentResolver.query(uri, null, null, null, null)
+                    var title = "Document"
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val displayNameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (displayNameIndex != -1) {
+                                title = it.getString(displayNameIndex)
+                            }
+                        }
+                    }
+                    
                     _state.update { 
                         it.copy(
                             isLoading = false,
                             isPdfLoaded = true,
                             pageCount = pageCount,
-                            openedUri = uri
-                        ) 
+                            openedUri = uri,
+                            documentTitle = title
+                        )
                     }
                 } else {
                     _state.update { 
@@ -277,6 +310,7 @@ class PdfReaderViewModel(
     override fun onCleared() {
         super.onCleared()
         pdfEngine.closeDocument()
+        ttsManager.shutdown()
     }
 }
 

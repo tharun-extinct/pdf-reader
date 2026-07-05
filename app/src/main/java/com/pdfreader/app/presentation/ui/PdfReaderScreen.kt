@@ -46,6 +46,9 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FormatColorFill
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -97,18 +100,21 @@ import com.pdfreader.app.presentation.mvi.PdfReaderState
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
+import com.pdfreader.app.domain.tts.TtsState
+import androidx.compose.ui.text.style.TextOverflow
 import com.pdfreader.app.presentation.mvi.formatHexColor
 import com.pdfreader.app.presentation.mvi.parseHexColor
 import com.pdfreader.app.presentation.theme.UiSmStyle
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PdfReaderScreen(
     viewModel: PdfReaderViewModel,
     onOpenFilePicker: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { state.pageCount })
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -139,9 +145,11 @@ fun PdfReaderScreen(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = "Chapter 4: The Digital Sanctuary",
+                            text = state.documentTitle ?: "Document",
                             style = UiSmStyle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 },
@@ -193,6 +201,7 @@ fun PdfReaderScreen(
                 state.isPdfLoaded -> {
                     PdfPager(
                         state = state,
+                        pagerState = pagerState,
                         onIntent = viewModel::processIntent
                     )
                 }
@@ -212,13 +221,40 @@ fun PdfReaderScreen(
 
             // ── Floating Bottom Toolbar (Stitch pill design) ────────
             if (state.isPdfLoaded) {
-                FloatingAnnotationToolbar(
-                    state = state,
-                    onIntent = viewModel::processIntent,
+                Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 20.dp)
-                )
+                        .padding(bottom = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (state.activeTool == AnnotationTool.ReadAloud) {
+                        TtsControlsOverlay(
+                            ttsState = state.ttsState,
+                            onPlay = { 
+                                // We need to get the text from the current page.
+                                val pageIndex = pagerState.currentPage
+                                
+                                val textBoxes = state.textBoxesByPage[pageIndex]
+                                if (textBoxes != null && textBoxes.isNotEmpty()) {
+                                    viewModel.processIntent(PdfReaderIntent.PlayTts(pageIndex, textBoxes))
+                                } else {
+                                    viewModel.processIntent(PdfReaderIntent.RequestPageText(pageIndex) { boxes ->
+                                        viewModel.processIntent(PdfReaderIntent.PlayTts(pageIndex, boxes))
+                                    })
+                                }
+                            },
+                            onPause = { viewModel.processIntent(PdfReaderIntent.PauseTts) },
+                            onResume = { viewModel.processIntent(PdfReaderIntent.ResumeTts) },
+                            onStop = { viewModel.processIntent(PdfReaderIntent.StopTts) }
+                        )
+                    }
+                    
+                    FloatingAnnotationToolbar(
+                        state = state,
+                        onIntent = viewModel::processIntent
+                    )
+                }
             }
 
             if (state.isAnnotationSettingsOpen) {
@@ -228,6 +264,53 @@ fun PdfReaderScreen(
                     onSavePenColors = { viewModel.processIntent(PdfReaderIntent.SavePenColors(it)) },
                     onSaveHighlighterColors = { viewModel.processIntent(PdfReaderIntent.SaveHighlighterColors(it)) }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun TtsControlsOverlay(
+    ttsState: TtsState,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            when (ttsState) {
+                is TtsState.Idle, is TtsState.Error -> {
+                    IconButton(onClick = onPlay) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Play")
+                    }
+                }
+                is TtsState.Playing -> {
+                    IconButton(onClick = onPause) {
+                        Icon(Icons.Default.Pause, contentDescription = "Pause")
+                    }
+                    IconButton(onClick = onStop) {
+                        Icon(Icons.Default.Stop, contentDescription = "Stop")
+                    }
+                }
+                is TtsState.Paused -> {
+                    IconButton(onClick = onResume) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
+                    }
+                    IconButton(onClick = onStop) {
+                        Icon(Icons.Default.Stop, contentDescription = "Stop")
+                    }
+                }
             }
         }
     }
@@ -298,7 +381,7 @@ private fun FloatingAnnotationToolbar(
                     // Close
                     IconButton(
                         onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.None)) },
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Text(
                             text = "×",
@@ -375,7 +458,7 @@ private fun FloatingToolbarIcon(
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(44.dp)
+            .size(48.dp)
             .background(
                 color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                 shape = CircleShape
@@ -407,10 +490,9 @@ private fun ToolbarDivider() {
 @Composable
 fun PdfPager(
     state: PdfReaderState,
+    pagerState: androidx.compose.foundation.pager.PagerState,
     onIntent: (PdfReaderIntent) -> Unit
 ) {
-    val pagerState = rememberPagerState(pageCount = { state.pageCount })
-
     // Use Crossfade to animate page changes smoothly.
     HorizontalPager(
         state = pagerState,
@@ -547,9 +629,16 @@ fun PdfPage(
             } // Close AnimatedVisibility
 
             if (state.activeTool == AnnotationTool.None || state.activeTool == AnnotationTool.ReadAloud) {
+                val ttsState = state.ttsState
+                val highlightRects = when {
+                    state.activeTool == AnnotationTool.ReadAloud && ttsState is TtsState.Playing && ttsState.pageIndex == pageIndex -> ttsState.highlightRects
+                    state.activeTool == AnnotationTool.ReadAloud && ttsState is TtsState.Paused && ttsState.pageIndex == pageIndex -> ttsState.highlightRects
+                    else -> emptyList()
+                }
                 SelectableTextLayer(
                     textBoxes = pageTextBoxes,
-                    contentBounds = contentBounds
+                    contentBounds = contentBounds,
+                    highlightRects = highlightRects
                 )
             }
 
@@ -597,13 +686,34 @@ fun PdfPage(
 @Composable
 private fun BoxScope.SelectableTextLayer(
     textBoxes: List<PdfTextBox>,
-    contentBounds: Rect
+    contentBounds: Rect,
+    highlightRects: List<Rect> = emptyList()
 ) {
     if (textBoxes.isEmpty() || contentBounds.width <= 0f || contentBounds.height <= 0f) {
         return
     }
 
     val density = LocalDensity.current
+    
+    // Draw highlights for TTS
+    if (highlightRects.isNotEmpty()) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            highlightRects.forEach { rect ->
+                drawRect(
+                    color = Color(0xFF64B5F6).copy(alpha = 0.5f), // Nice light blue highlight
+                    topLeft = androidx.compose.ui.geometry.Offset(
+                        x = rect.left * contentBounds.width,
+                        y = rect.top * contentBounds.height
+                    ),
+                    size = androidx.compose.ui.geometry.Size(
+                        width = rect.width * contentBounds.width,
+                        height = rect.height * contentBounds.height
+                    )
+                )
+            }
+        }
+    }
+
     SelectionContainer(modifier = Modifier.matchParentSize()) {
         Box(modifier = Modifier.matchParentSize()) {
             textBoxes.forEach { textBox ->

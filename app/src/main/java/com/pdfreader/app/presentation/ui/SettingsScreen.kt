@@ -28,7 +28,7 @@ import androidx.compose.material.icons.outlined.FormatSize
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Storage
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,10 +64,10 @@ import com.pdfreader.app.presentation.theme.DisplayTitleStyle
 import com.pdfreader.app.presentation.theme.LabelCapsStyle
 import com.pdfreader.app.presentation.theme.UiMainStyle
 import com.pdfreader.app.presentation.theme.UiSmStyle
-import com.pdfreader.app.presentation.theme.LibroTheme
+import com.pdfreader.app.presentation.theme.NoxReaderTheme
 
 /**
- * Settings screen matching the Stitch "Libro Settings" design.
+ * Settings screen matching the Stitch "NoxReader Settings" design.
  *
  * Sectioned layout with:
  * - Reading Preferences (font size, line height, reading font)
@@ -81,7 +81,7 @@ fun SettingsScreen(
     viewModel: PdfReaderViewModel,
     navController: NavController
 ) {
-    val spacing = LibroTheme.spacing
+    val spacing = NoxReaderTheme.spacing
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -278,7 +278,7 @@ fun SettingsScreen(
             SettingsSection(title = "ABOUT") {
                 SettingsRow(
                     icon = Icons.Outlined.Info,
-                    title = "Libro",
+                    title = "NoxReader",
                     subtitle = "Version 1.0 · Cloud PDF Reader"
                 )
             }
@@ -410,7 +410,7 @@ private fun SettingsToggleRow(
 
 @Composable
 private fun SettingsDivider() {
-    Divider(
+    HorizontalDivider(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp),

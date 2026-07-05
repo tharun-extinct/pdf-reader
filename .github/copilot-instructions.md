@@ -36,5 +36,5 @@ A lightweight, high-performance Android PDF reader focused purely on **reading a
 5. **Never implement a feature** unless it is **explicitly requested**.
 
 ## Tools
-- For latest docs or resolving package errors, use MCP **`websearch`** and **`context7`**.
+- For latest docs or resolving package errors, use MCP #tool:websearch and #tool:context7/query-docs
 
