@@ -44,6 +44,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Draw
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FormatColorFill
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material.icons.filled.PlayArrow
@@ -154,6 +155,35 @@ fun PdfReaderScreen(
                     }
                 },
                 actions = {
+                    // Save annotations button — only shown when a PDF is loaded
+                    if (state.isPdfLoaded) {
+                        val hasAnnotations = state.strokesByPage.values.any { it.isNotEmpty() } ||
+                            state.highlightsByPage.values.any { it.isNotEmpty() } ||
+                            state.textAnnotationsByPage.values.any { it.isNotEmpty() }
+
+                        IconButton(
+                            onClick = { viewModel.processIntent(PdfReaderIntent.SaveAnnotations) },
+                            enabled = hasAnnotations && !state.isSavingAnnotations
+                        ) {
+                            if (state.isSavingAnnotations) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.Save,
+                                    contentDescription = "Save annotations to PDF",
+                                    tint = if (hasAnnotations)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                )
+                            }
+                        }
+                    }
+
                     IconButton(onClick = { /* bookmark */ }) {
                         Icon(
                             imageVector = Icons.Outlined.BookmarkBorder,
@@ -519,7 +549,15 @@ fun PdfPage(
     // Scale state for pinch‑to‑zoom. Starts at 1f (no zoom).
     var scale by remember { mutableStateOf(1f) }
 
-    LaunchedEffect(size) {
+    // When renderRevision increments (annotations baked into PDF & doc re-opened),
+    // discard the cached bitmap so the next LaunchedEffect issues a fresh render.
+    LaunchedEffect(state.renderRevision) {
+        if (state.renderRevision > 0) {
+            pageBitmap = null
+        }
+    }
+
+    LaunchedEffect(size, state.renderRevision) {
         if (size.width > 0 && size.height > 0 && pageBitmap == null) {
             onIntent(
                 PdfReaderIntent.RequestPageRender(pageIndex, size.width, size.height) { rendered ->

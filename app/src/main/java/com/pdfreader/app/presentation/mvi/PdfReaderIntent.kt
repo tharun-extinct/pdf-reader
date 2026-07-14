@@ -60,4 +60,10 @@ sealed class PdfReaderIntent {
     object PauseTts : PdfReaderIntent()
     object ResumeTts : PdfReaderIntent()
     object StopTts : PdfReaderIntent()
+
+    /**
+     * Bakes all in-memory annotations into the PDF file and syncs it back
+     * to the original source URI via the Storage Access Framework.
+     */
+    object SaveAnnotations : PdfReaderIntent()
 }

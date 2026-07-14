@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pdfreader.app.data.pdfbox.PdfAnnotationWriterImpl
+import com.pdfreader.app.domain.repository.PdfAnnotationSaver
 import com.pdfreader.app.domain.repository.PdfEngine
 import com.pdfreader.app.domain.repository.PdfSyncManager
 import com.pdfreader.app.domain.tts.TtsManager
@@ -25,7 +27,8 @@ import kotlin.math.hypot
 class PdfReaderViewModel(
     application: Application,
     private val pdfEngine: PdfEngine,
-    private val syncManager: PdfSyncManager
+    private val syncManager: PdfSyncManager,
+    private val annotationSaver: PdfAnnotationSaver = PdfAnnotationWriterImpl()
 ) : AndroidViewModel(application) {
 
     private val ttsManager = TtsManager(application)
@@ -68,6 +71,7 @@ class PdfReaderViewModel(
             is PdfReaderIntent.PauseTts -> ttsManager.pause()
             is PdfReaderIntent.ResumeTts -> ttsManager.resume()
             is PdfReaderIntent.StopTts -> ttsManager.stop()
+            is PdfReaderIntent.SaveAnnotations -> saveAnnotations()
         }
     }
 
@@ -194,6 +198,87 @@ class PdfReaderViewModel(
                 _state.update { it.copy(isSyncing = false, errorMessage = "Failed to sync to cloud provider.") }
             } else {
                 _state.update { it.copy(isSyncing = false) }
+            }
+        }
+    }
+
+    /**
+     * Bakes all in-memory annotations into the PDF using PDFBox, writes the result
+     * to a temp file in cacheDir, syncs it back to the source URI via SAF, then
+     * clears the in-memory overlay and re-opens the document so the next render
+     * reflects the now-embedded annotations.
+     */
+    private fun saveAnnotations() {
+        val uri = _state.value.openedUri ?: return
+        val pdfBytes = pdfEngine.getPdfBytes() ?: return
+        val currentState = _state.value
+
+        // Nothing to save
+        val hasAnnotations = currentState.strokesByPage.values.any { it.isNotEmpty() } ||
+            currentState.highlightsByPage.values.any { it.isNotEmpty() } ||
+            currentState.textAnnotationsByPage.values.any { it.isNotEmpty() }
+        if (!hasAnnotations) return
+
+        _state.update { it.copy(isSavingAnnotations = true, errorMessage = null) }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val context = getApplication<Application>().applicationContext
+                val tempFile = java.io.File(context.cacheDir, "annotated_${System.currentTimeMillis()}.pdf")
+
+                // Write annotations into PDF structure
+                annotationSaver.saveAnnotations(
+                    pdfBytes = pdfBytes,
+                    strokesByPage = currentState.strokesByPage,
+                    highlightsByPage = currentState.highlightsByPage,
+                    textAnnotationsByPage = currentState.textAnnotationsByPage,
+                    outputFile = tempFile
+                )
+
+                // Sync annotated file back to the source URI (Google Drive, local, etc.)
+                val success = syncManager.syncBackToSource(uri, tempFile)
+                if (!success) {
+                    _state.update {
+                        it.copy(isSavingAnnotations = false, errorMessage = "Failed to save annotations to source.")
+                    }
+                    return@launch
+                }
+
+                // Clear in-memory annotations (now embedded in the file)
+                _state.update {
+                    it.copy(
+                        strokesByPage = emptyMap(),
+                        highlightsByPage = emptyMap(),
+                        textAnnotationsByPage = emptyMap()
+                    )
+                }
+
+                // Re-open the document so PDFium renders the embedded annotations
+                val pfd = context.contentResolver.openFileDescriptor(uri, "r")
+                if (pfd != null) {
+                    val newBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: throw IllegalStateException("Failed to re-read PDF after saving annotations.")
+                    pdfEngine.openDocument(pfd, newBytes)
+                }
+
+                // Clean up temp file
+                tempFile.delete()
+
+                // Bump renderRevision: PdfPage composables observe this key and will
+                // discard their cached bitmaps, triggering a fresh render that shows
+                // the now-embedded annotations via PDFium.
+                _state.update {
+                    it.copy(
+                        isSavingAnnotations = false,
+                        textBoxesByPage = emptyMap(), // invalidated by document re-open
+                        renderRevision = it.renderRevision + 1
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _state.update {
+                    it.copy(isSavingAnnotations = false, errorMessage = "Save failed: ${e.message}")
+                }
             }
         }
     }

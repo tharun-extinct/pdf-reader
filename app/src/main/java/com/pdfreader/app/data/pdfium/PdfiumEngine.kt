@@ -38,14 +38,18 @@ class PdfiumEngine(private val context: Context) : PdfEngine {
     }
     private var pdfDocument: PdfDocument? = null
     private var textDocument: PDDocument? = null
+    private var rawPdfBytes: ByteArray? = null
     private val textBoxCache = mutableMapOf<Int, List<PdfTextBox>>()
 
     override fun openDocument(pfd: ParcelFileDescriptor, pdfBytes: ByteArray) {
         // Closes previous document if exists
         closeDocument()
+        rawPdfBytes = pdfBytes
         pdfDocument = pdfiumCore.newDocument(pfd)
         textDocument = PDDocument.load(ByteArrayInputStream(pdfBytes))
     }
+
+    override fun getPdfBytes(): ByteArray? = rawPdfBytes
 
     override fun getPageCount(): Int {
         return pdfDocument?.let { pdfiumCore.getPageCount(it) } ?: 0
@@ -94,12 +98,13 @@ class PdfiumEngine(private val context: Context) : PdfEngine {
     }
 
     override fun closeDocument() {
-        pdfDocument?.let { 
-            pdfiumCore.closeDocument(it) 
+        pdfDocument?.let {
+            pdfiumCore.closeDocument(it)
         }
         pdfDocument = null
         textDocument?.close()
         textDocument = null
+        rawPdfBytes = null
         textBoxCache.clear()
     }
 }

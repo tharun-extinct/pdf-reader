@@ -4,6 +4,8 @@ How could we possible
 
 The annotations are stored in a mobile temporary storage and it's over writing onto another pdf. 
 
+- It should directly embed those annotations and highlights directly into the pdf. How do we achieve it?
+
 
 
 Read Aloud: 

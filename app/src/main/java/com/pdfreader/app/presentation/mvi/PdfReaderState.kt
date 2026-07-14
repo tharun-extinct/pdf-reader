@@ -10,6 +10,7 @@ import com.pdfreader.app.domain.tts.TtsState
 data class PdfReaderState(
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
+    val isSavingAnnotations: Boolean = false,
     val isPdfLoaded: Boolean = false,
     val pageCount: Int = 0,
     val openedUri: Uri? = null,
@@ -26,5 +27,11 @@ data class PdfReaderState(
     val textBoxesByPage: Map<Int, List<PdfTextBox>> = emptyMap(),
     val textAnnotationsByPage: Map<Int, List<TextAnnotation>> = emptyMap(),
     val selectedTextPositionByPage: Map<Int, Offset> = emptyMap(),
-    val ttsState: TtsState = TtsState.Idle
+    val ttsState: TtsState = TtsState.Idle,
+    /**
+     * Incremented each time annotations are baked into the PDF and the document is
+     * re-opened. Composable pages observe this to know they must re-render their
+     * bitmaps so the embedded annotations become visible in the rendered output.
+     */
+    val renderRevision: Int = 0
 )

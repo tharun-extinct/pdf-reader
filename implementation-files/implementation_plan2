@@ -1,0 +1,216 @@
+# Embed Annotations & Highlights Directly Into the PDF
+
+## Problem
+
+Currently, all annotations (pen strokes, text highlights, text notes) live exclusively in the ViewModel's in-memory state (`PdfReaderState.strokesByPage`, `highlightsByPage`, `textAnnotationsByPage`). They are rendered as Compose Canvas overlays on top of the PDF bitmap. This means:
+
+1. **Annotations are lost** when the user closes the document or the app is killed.
+2. **Annotations leak across documents** — the state maps are keyed by page index and are never cleared on `OpenPdf`, so opening a second PDF will show annotations from the first.
+3. **The physical PDF file is never modified** — other PDF readers (Adobe, Google Drive viewer, etc.) will never see these annotations.
+
+## Proposed Approach
+
+Use **Apache PDFBox** (already a dependency at `2.0.27.0`) to write standard PDF annotation objects into the file structure before syncing it back via SAF. PDFBox supports:
+
+| Annotation Type | PDFBox Class | PDF Spec Type |
+|---|---|---|
+| Text Highlights | `PDAnnotationTextMarkup` | `/Highlight` |
+| Pen (Freehand Ink) | `PDAnnotationRubberStamp` → actually `PDAnnotationMarkup` subclass — we'll use the ink approach via COS dictionary | `/Ink` |
+| Text Notes | `PDAnnotationText` | `/Text` (sticky note) |
+
+> [!IMPORTANT]
+> **Coordinate System Flip**: The app stores all annotation coordinates as **normalized 0→1 values measured from the top-left**. PDF spec uses points measured from the **bottom-left**. Every coordinate must be converted: `pdfY = pageHeight - (normalizedY × pageHeight)`.
+
+---
+
+## User Review Required
+
+> [!WARNING]
+> **Overwrite Behavior**: When saving, the annotated PDF will be written back to the **same source URI** via SAF. This permanently modifies the original file (including Google Drive copies). If you want a "Save Copy" option instead, let me know and I'll add a separate flow.
+
+> [!IMPORTANT]
+> **No Undo After Save**: Once annotations are baked into the PDF and synced back, they become part of the file. The eraser tool will still work on in-memory annotations before the next save, but previously saved annotations become permanent PDF objects. Do you want a "flatten on close" or an explicit "Save Annotations" button in the toolbar?
+
+---
+
+## Open Questions
+
+1. **Save trigger**: Should annotations be saved automatically (e.g., on document close / app backgrounding), or should we add an explicit "Save" button to the reader toolbar?
+2. **Existing PDF annotations**: When re-opening a PDF that already has embedded annotations from a previous session, should we load those back into the in-memory overlay so the eraser can still remove them? (This is significantly more complex and could be a Phase 2.)
+
+---
+
+## Proposed Changes
+
+### Data Layer — New `PdfAnnotationWriter`
+
+#### [NEW] [PdfAnnotationWriter.kt](file:///x:/AI_and_Automation/pdf-reader/app/src/main/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriter.kt)
+
+A new class in `data/pdfbox/` responsible for writing annotations into a `PDDocument`:
+
+- **`writeHighlights(document, pageIndex, highlights, pageSize)`** — Converts each `TextHighlight.rects` (normalized 0–1, top-left origin) into `PDAnnotationTextMarkup` objects with proper `QuadPoints` and `Rectangle` in PDF coordinate space (bottom-left origin, measured in points).
+- **`writeInkStrokes(document, pageIndex, strokes, pageSize)`** — Converts each `FreehandStroke.points` into a `PDAnnotationInk` with `inkList` (list of `float[]` paths) and a computed bounding `PDRectangle`.
+- **`writeTextAnnotations(document, pageIndex, annotations, pageSize)`** — Converts each `TextAnnotation` into a `PDAnnotationText` (sticky note icon) at the correct position.
+- **`writeAllAnnotations(document, state)`** — Convenience method that iterates all pages and delegates to the above.
+
+Key implementation detail — coordinate conversion:
+```kotlin
+// Normalized (0..1, top-left origin) → PDF points (bottom-left origin)
+fun normalizedToPdf(nx: Float, ny: Float, pageWidth: Float, pageHeight: Float): Pair<Float, Float> {
+    return Pair(nx * pageWidth, pageHeight - (ny * pageHeight))
+}
+```
+
+---
+
+### Domain Layer — New `PdfAnnotationSaver` Interface
+
+#### [NEW] [PdfAnnotationSaver.kt](file:///x:/AI_and_Automation/pdf-reader/app/src/main/java/com/pdfreader/app/domain/repository/PdfAnnotationSaver.kt)
+
+```kotlin
+interface PdfAnnotationSaver {
+    /**
+     * Bakes all in-memory annotations into the PDF file and saves to the given output file.
+     * Returns the output File on success.
+     */
+    suspend fun saveAnnotations(
+        pdfBytes: ByteArray,
+        strokesByPage: Map<Int, List<FreehandStroke>>,
+        highlightsByPage: Map<Int, List<TextHighlight>>,
+        textAnnotationsByPage: Map<Int, List<TextAnnotation>>,
+        outputFile: java.io.File
+    ): java.io.File
+}
+```
+
+---
+
+### Domain Layer — Extend `PdfEngine` to expose page size
+
+#### [MODIFY] [PdfEngine.kt](file:///x:/AI_and_Automation/pdf-reader/app/src/main/java/com/pdfreader/app/domain/repository/PdfEngine.kt)
+
+Add a method to retrieve the original PDF bytes (needed to feed into PDFBox for writing):
+
+```kotlin
+/** Returns the raw PDF bytes that were used to open the current document. */
+fun getPdfBytes(): ByteArray?
+```
+
+#### [MODIFY] [PdfiumEngine.kt](file:///x:/AI_and_Automation/pdf-reader/app/src/main/java/com/pdfreader/app/data/pdfium/PdfiumEngine.kt)
+
+Store the `pdfBytes` passed to `openDocument()` and implement `getPdfBytes()`.
+
+---
+
+### Data Layer — `PdfAnnotationWriterImpl`
+
+#### [NEW] [PdfAnnotationWriterImpl.kt](file:///x:/AI_and_Automation/pdf-reader/app/src/main/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriterImpl.kt)
+
+Implements `PdfAnnotationSaver`. Internally:
+1. Loads a fresh `PDDocument` from the byte array.
+2. For each page with annotations, calls the writer methods from `PdfAnnotationWriter`.
+3. Saves the `PDDocument` to the output file.
+4. Closes the document.
+
+---
+
+### Presentation Layer — New `SaveAnnotations` Intent
+
+#### [MODIFY] [PdfReaderIntent.kt](file:///x:/AI_and_Automation/pdf-reader/app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderIntent.kt)
+
+Add:
+```kotlin
+/** Intent to bake all in-memory annotations into the PDF and sync back. */
+object SaveAnnotations : PdfReaderIntent()
+```
+
+#### [MODIFY] [PdfReaderState.kt](file:///x:/AI_and_Automation/pdf-reader/app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderState.kt)
+
+Add:
+```kotlin
+val isSavingAnnotations: Boolean = false
+```
+
+#### [MODIFY] [PdfReaderViewModel.kt](file:///x:/AI_and_Automation/pdf-reader/app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderViewModel.kt)
+
+- Accept `PdfAnnotationSaver` as a new constructor parameter.
+- Handle `SaveAnnotations` intent:
+  1. Set `isSavingAnnotations = true`.
+  2. Get raw PDF bytes from `pdfEngine.getPdfBytes()`.
+  3. Call `annotationSaver.saveAnnotations(...)` with the current state maps, writing to a temp file in `cacheDir`.
+  4. Call `syncManager.syncBackToSource(openedUri, tempFile)` to push the annotated PDF back to source.
+  5. Clear the in-memory annotation maps (since they're now embedded).
+  6. Re-open the document from the URI so the rendered bitmaps include the embedded annotations.
+  7. Set `isSavingAnnotations = false`.
+
+#### [MODIFY] [PdfReaderScreen.kt](file:///x:/AI_and_Automation/pdf-reader/app/src/main/java/com/pdfreader/app/presentation/ui/PdfReaderScreen.kt)
+
+- Add a "Save" icon button to the reader toolbar that dispatches `PdfReaderIntent.SaveAnnotations`.
+- Show a progress indicator when `state.isSavingAnnotations` is true.
+- Only enable the save button when there are unsaved annotations (any non-empty annotation maps).
+
+#### [MODIFY] [MainActivity.kt](file:///x:/AI_and_Automation/pdf-reader/app/src/main/java/com/pdfreader/app/MainActivity.kt)
+
+- Instantiate `PdfAnnotationWriterImpl` in the `ViewModelFactory` and pass it to the ViewModel.
+
+---
+
+## Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as PdfReaderScreen
+    participant VM as PdfReaderViewModel
+    participant Saver as PdfAnnotationWriterImpl
+    participant Sync as SafPdfSyncManager
+    participant SAF as Source (Drive/Local)
+
+    User->>UI: Taps "Save" button
+    UI->>VM: SaveAnnotations intent
+    VM->>VM: Get pdfBytes from PdfEngine
+    VM->>Saver: saveAnnotations(bytes, strokes, highlights, notes, tempFile)
+    Saver->>Saver: Load PDDocument from bytes
+    Saver->>Saver: Write PDAnnotationTextMarkup (highlights)
+    Saver->>Saver: Write PDAnnotationInk (pen strokes)
+    Saver->>Saver: Write PDAnnotationText (sticky notes)
+    Saver->>Saver: Save PDDocument to tempFile
+    Saver-->>VM: Return tempFile
+    VM->>Sync: syncBackToSource(uri, tempFile)
+    Sync->>SAF: Write via SAF OutputStream
+    SAF-->>Sync: Success
+    Sync-->>VM: true
+    VM->>VM: Clear annotation maps, re-open document
+    VM-->>UI: Updated state (annotations now in bitmap)
+```
+
+---
+
+## File Summary
+
+| File | Action | Purpose |
+|---|---|---|
+| `data/pdfbox/PdfAnnotationWriter.kt` | NEW | Core logic to convert normalized annotations → PDF annotation objects |
+| `data/pdfbox/PdfAnnotationWriterImpl.kt` | NEW | Implements `PdfAnnotationSaver`, orchestrates load→write→save |
+| `domain/repository/PdfAnnotationSaver.kt` | NEW | Domain interface for the annotation saving capability |
+| `domain/repository/PdfEngine.kt` | MODIFY | Add `getPdfBytes()` method |
+| `data/pdfium/PdfiumEngine.kt` | MODIFY | Implement `getPdfBytes()`, store bytes reference |
+| `presentation/mvi/PdfReaderIntent.kt` | MODIFY | Add `SaveAnnotations` intent |
+| `presentation/mvi/PdfReaderState.kt` | MODIFY | Add `isSavingAnnotations` flag |
+| `presentation/mvi/PdfReaderViewModel.kt` | MODIFY | Handle save flow, accept `PdfAnnotationSaver` |
+| `presentation/ui/PdfReaderScreen.kt` | MODIFY | Add save button to toolbar |
+| `MainActivity.kt` | MODIFY | Wire up `PdfAnnotationWriterImpl` in DI |
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Unit test `PdfAnnotationWriter` coordinate conversion logic (normalized → PDF points).
+- Unit test that a round-trip (write annotations → re-read with PDFBox) produces the expected annotation types and coordinates.
+
+### Manual Verification
+1. Open a PDF → draw ink strokes → add highlights → tap Save → close and reopen the same PDF → verify annotations are visible in the rendered bitmap (without the overlay).
+2. Open the saved PDF in Google Drive or Adobe Acrobat → verify annotations render correctly.
+3. Verify that saving to a Google Drive-backed URI correctly syncs the annotated file.
+4. Verify that opening a *different* PDF after saving does not carry over annotations.

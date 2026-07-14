@@ -39,6 +39,13 @@ interface PdfEngine {
     fun getTextBoxes(pageIndex: Int): List<PdfTextBox>
     
     /**
+     * Returns the raw PDF bytes that were passed to [openDocument].
+     * Used by the annotation writer to load a fresh PDDocument for writing.
+     * Returns null if no document is currently open.
+     */
+    fun getPdfBytes(): ByteArray?
+
+    /**
      * Closes the document and frees up memory allocations in the native code.
      */
     fun closeDocument()
