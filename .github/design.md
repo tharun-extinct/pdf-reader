@@ -1,72 +1,64 @@
 # PDF Reader Android App — Design & Architecture
 
-## System Overview
-A highly optimized, low-latency PDF reading Android app built purely for Readers. Focuses on performance with minimal memory allocation, fast rendering, and clean UI. Core capabilities include reading PDFs, customizable highlighting, pen annotation, and an even-toned Read Aloud feature.
+## System overview
 
----
+This is a low-latency Android PDF reader built for reading and annotation. PDFium owns static page rasterization; PDFBox owns text geometry, embedded annotation metadata, and durable PDF changes. Compose owns all interaction and optimistic UI feedback.
 
-## Tech Stack
-- **Language**: Kotlin
-- **UI Framework**: Jetpack Compose
-- **PDF Rendering**: PDFium-Android (for optimal, low-latency rendering)
-- **PDF Text Extraction**: Apache PDFBox (used alongside PDFium for extracting text and bounding boxes for features like TTS and highlighting)
-- **Read Aloud**: Native Android TextToSpeech (TTS) API
-- **Architecture Pattern**: MVI (Model-View-Intent) + Clean Architecture principles
-- **Concurrency**: Kotlin Coroutines and Flows
-- **CI/CD**: GitHub Actions (Builds triggered on `master` & PRs. Releases exclusively generated on `main` branch).
+## Technology and boundaries
 
----
-
-## Architecture
-We use an **MVI + Clean Architecture** approach to separate concerns and achieve a modular, testable application within a single module:
+| Layer | Responsibility | Main components |
+|---|---|---|
+| Presentation | Compose UI, MVI intents/state, gesture handling, overlays | `PdfReaderScreen`, `PdfReaderViewModel`, `PdfReaderState` |
+| Domain | Stable contracts for rendering, saving, and sync | `PdfEngine`, `PdfAnnotationSaver`, `PdfSyncManager` |
+| Data | PDFium/PDFBox/SAF integration | `PdfiumEngine`, `PdfAnnotationWriterImpl`, `SafPdfSyncManager` |
 
 ```mermaid
-graph TD
-    UI[Jetpack Compose UI] -->|PdfReaderIntent| VM[PdfReaderViewModel]
-    VM -->|State/Flow Update| UI
-    VM --> D1[PdfEngine]
-    VM --> D2[TtsManager]
-    VM --> D3[PdfSyncManager]
-    D1 -.->|Implementation| R1[PdfiumEngine]
-    D3 -.->|Implementation| R2[SafPdfSyncManager]
-    R1 -.-> PDFium[PDFium Native Library]
-    R1 -.-> PDFBox[Apache PDFBox]
+flowchart LR
+  UI["Compose base + overlay + selection"] -->|"PdfReaderIntent"| VM["PdfReaderViewModel"]
+  VM --> ENGINE["PdfEngine / PdfiumEngine"]
+  VM --> SAVER["PdfAnnotationSaver / PDFBox"]
+  VM --> SYNC["PdfSyncManager / SAF"]
+  ENGINE --> PDFIUM["PDFium bitmap + embedded highlight cache"]
+  ENGINE --> PDFBOX_READ["PDFBox text/highlight parsing"]
+  SAVER --> PDFBOX_WRITE["Editable or flattened PDF output"]
+  PDFBOX_WRITE --> SYNC
+  SYNC --> ENGINE
 ```
 
-1.  **Presentation Layer (MVI)**
-    - Jetpack Compose components (`BookshelfScreen`, `PdfReaderScreen`, `SettingsScreen`).
-    - ViewModels representing the state (e.g., `PdfReaderState`) and processing intents (e.g., `PdfReaderIntent`).
-    - Focuses entirely on UI performance, ensuring no blocking operations exist here. Navigation is handled via Jetpack Navigation Compose in `MainActivity`.
-2.  **Domain Layer**
-    - Pure Kotlin interfaces and managers (`PdfEngine`, `PdfSyncManager`, `TtsManager`).
-    - Provides a unified API for the Presentation layer, abstracting away the underlying PDF or sync implementations.
-3.  **Data Layer**
-    - **PdfiumEngine**: Implements `PdfEngine`. Maps domain models to PDFium API calls for fast rendering of pages as bitmaps. It also integrates **PDFBox** internally to parse and extract text bounding boxes (`PdfTextBox`) needed for text selection, highlighting, and TTS.
-    - **SafPdfSyncManager**: Implements `PdfSyncManager`. Manages persisting edited local PDFs directly back into Google Drive or other content providers via the Android Storage Access Framework (SAF).
+## Annotation pipeline
 
----
+1. PDFium renders the static page bitmap. Compose draws in-progress pen/highlighter input, session annotations, selection bounds, and menus above it.
+2. UI stores positions as normalized display-space values with a top-left origin.
+3. `PdfCoordinateMapper` maps normalized coordinates to/from PDFBox CropBox coordinates, including right-angle page rotation. All PDFBox annotation creation and embedded-highlight loading use it.
+4. On Save, the ViewModel snapshots pending state and performs PDFBox writing plus SAF sync on `Dispatchers.IO`.
+5. After sync and successful reopen, `renderRevision` invalidates rendered pages and state caches. Only then are session overlays/deletion intents cleared.
 
-## Package Structure
-The app is built as a single Android module (`app`) containing distinct logical layers.
+### Save modes
 
-```text
-app/
- ┣ src/main/java/com/pdfreader/app/
- ┃ ┣ data/
- ┃ ┃ ┣ pdfium/       # PdfiumEngine implementation (Rendering + PDFBox Text Extraction)
- ┃ ┃ ┗ sync/         # SafPdfSyncManager implementation (Storage Access Framework)
- ┃ ┣ domain/
- ┃ ┃ ┣ repository/   # Core Interfaces (PdfEngine, PdfSyncManager)
- ┃ ┃ ┗ tts/          # TtsManager for Read Aloud functionality
- ┃ ┣ presentation/
- ┃ ┃ ┣ mvi/          # State, Intents, and ViewModel (PdfReaderViewModel, Models)
- ┃ ┃ ┣ theme/        # Compose Theme definitions (NoxReaderTheme)
- ┃ ┃ ┗ ui/           # Jetpack Compose Screens (MainActivity, Bookshelf, Reader, Settings)
-```
+- **Editable:** PDFBox keeps `/Annots` entries for highlights, ink, and text notes. New annotations include normal appearances.
+- **Flattened:** PDFBox appends supported new annotation marks to page `/Contents`, then removes only those new annotation entries. Existing annotations remain intact.
 
----
+## Embedded highlight selection
 
-## Future Enhancements
-- Local NPU-based voice model for higher quality Read Aloud (e.g., Piper TTS via ONNX/TFLite).
-- Format Support: ePub and other text-based formats.
-- Persistent Saving of Annotations: Implement serialization of in-memory annotations (highlights, pen strokes) back into the physical PDF file structure.
+When a page becomes visible, `PdfiumEngine.getEmbeddedHighlights()` reads PDFBox highlight quads off the main thread and caches normalized rectangles. `HighlightHitTester` chooses the smallest matching highlight on an idle-tool tap. `SelectedHighlightOverlay` renders a dashed blue union bound and an in-window Delete action. Deletion updates state immediately and is persisted in the next save.
+
+## Performance and lifecycle
+
+- PDF rendering, PDFBox parsing/saving, text/highlight extraction, and SAF I/O run off the main thread.
+- PDFBox document loading uses `MemoryUsageSetting.setupMixed(50 MiB)`.
+- PDF documents and temporary save files are closed/deleted during close, replacement, save completion, and failure paths.
+- The current page renderer is still a full-page bitmap. Tile/viewport rendering, bitmap eviction, and request cancellation are planned work; do not describe them as implemented.
+
+## Verification and delivery
+
+- Coordinate round-trip and overlap hit-testing JVM tests live in `app/src/test`.
+- GitHub Actions is the only build/test environment; do not run local Gradle.
+- `.github/workflows/gh-release.yml` generates releases on `main` and `feature` pushes.
+
+## Feature mapping
+
+| Feature file | Design sections | Current scope |
+|---|---|---|
+| `implementation-files/feature01.md` | Annotation pipeline; Performance and lifecycle | Rendering/coordinate/overlay foundation |
+| `implementation-files/feature02.md` | Annotation pipeline; Save modes | Persistent editable and flattened annotations |
+| `implementation-files/feature03.md` | Embedded highlight selection | Existing-highlight selection and deletion |

@@ -9,19 +9,23 @@ Support two explicit save modes:
 1. **Embedded/editable annotations:** keep `/Annots` entries, with correct `/Rect`, `/QuadPoints` where applicable, color/opacity, and explicit `/AP` normal appearances.
 2. **Flattened/burned-in annotations:** paint each supported annotation appearance into the page content stream, then remove the corresponding `/Annots` entries. Flattening is irreversible and must be a separate user action or option.
 
-## Verified implementation status (2026-07-22)
+## Design mapping
+
+See [`.github/design.md`](../.github/design.md): **Annotation pipeline** and **Save modes**. Feature 02 is the durable-write portion of the shared annotation pipeline.
+
+## Verified implementation status (2026-07-23)
 
 | Area | Status | Evidence / truth |
 |---|---|---|
-| In-memory pen, highlight, and text-note models | Partial | `AnnotationModels.kt`, `PdfReaderViewModel.kt` |
+| In-memory pen, highlight, and text-note models | Implemented | `AnnotationModels.kt`, `PdfReaderState.kt`, `PdfReaderViewModel.kt` |
 | Highlighter selection | Partial | `PdfReaderScreen.kt` selects intersecting **word** boxes from PDFBox text extraction and stores normalized rectangles. It is not character-level or line-segment geometry. |
-| PDFBox `/Highlight` annotations | Implemented, incomplete | `PdfAnnotationWriter.kt` writes `/Rect`, `/QuadPoints`, RGB color, and opacity. It creates no `/AP` appearance stream. |
-| PDFBox `/Ink` annotations | Implemented, incomplete | Writes `/InkList`, rectangle, color, and width metadata; no explicit appearance stream. |
-| PDFBox `/Text` notes | Implemented | Writes note contents, icon rectangle, color, and closed state. |
+| PDFBox `/Highlight` annotations | Implemented, needs viewer validation | Writes `/Rect`, `/QuadPoints`, RGB/opacity, and a normal appearance. |
+| PDFBox `/Ink` annotations | Implemented, needs viewer validation | Writes `/InkList`, rectangle, color/opacity, width metadata, and a normal appearance. |
+| PDFBox `/Text` notes | Implemented, needs viewer validation | Writes note contents, icon rectangle, color, closed state, and a normal appearance. |
 | Save to a new PDF and SAF sync-back | Implemented | `PdfAnnotationWriterImpl.kt` plus `PdfReaderViewModel.saveAnnotations()`. |
-| Reopen and rerender after save | Implemented in intent | ViewModel reopens the source URI and increments `renderRevision`; verify with an actual viewer/device test. |
-| True flattening | **Not implemented** | No code paints annotation appearances into `/Contents` or removes `/Annots`. |
-| Adobe-level cross-viewer fidelity | **Not verified** | No golden PDFs, PDF object assertions, or Acrobat/PDFium/Drive comparison tests are present. |
+| Reopen and rerender after save | Implemented | State clears only after SAF sync and document reopen succeed; `renderRevision` invalidates the page bitmap. |
+| True flattening | Implemented for newly saved supported annotations | Appends paths to page `/Contents` and removes only those newly created `/Annots`; existing annotations are preserved. |
+| Adobe-level cross-viewer fidelity | **Not verified** | No golden PDF object assertions or Acrobat/PDFium/Drive comparison tests are present. |
 
 ## Required engineering rules
 

@@ -27,17 +27,21 @@ Provide low-latency PDF reading and annotation with PDFium for raster rendering 
 - Close/release PDFium documents, file descriptors, PDFBox documents, and temporary files on success, failure, and ViewModel close.
 - Use stable cache keys for document version, page, viewport, zoom, and tile; invalidate after a successful commit.
 
-## Current implementation review (2026-07-22)
+## Design mapping
 
-Implemented: MVI/Clean layer interfaces, PDFium page rendering (including embedded annotations), Compose annotation overlays with live pen/highlighter previews, normalized in-memory strokes/highlights/text notes, PDFBox `/Highlight`, `/Ink`, and `/Text` writing with CropBox/90°-rotation mapping, background save/sync, and document reopen after save.
+See [`.github/design.md`](../.github/design.md): **Annotation pipeline** and **Performance and lifecycle**. Feature 01 defines the rendering/coordinate foundation used by Features 02 and 03.
+
+## Current implementation review (2026-07-23)
+
+Implemented: MVI/Clean layer interfaces; PDFium page rendering with embedded annotations; Compose overlays with live pen/highlighter previews; normalized in-memory annotations; shared `PdfCoordinateMapper` for CropBox/right-angle rotation; background save/sync/reopen; cached embedded highlights; and mapper/hit-test JVM tests. PDFBox loading now uses a 50 MiB mixed-memory threshold.
 
 Not yet compliant with this contract:
 
 - `PdfPage` renders one full page bitmap and applies Compose scaling; there is no tile cache, viewport rendering, bitmap eviction, or cancellation.
 - Edits are not committed at interaction end; only `SaveAnnotations` performs the PDFBox flush.
-- `PdfiumEngine` retains the complete PDF byte array and calls `PDDocument.load(ByteArrayInputStream(...))`; bounded `MemoryUsageSetting` is not used.
+- `PdfiumEngine` still retains the source byte array for the current save API, though PDFBox parsing now uses bounded mixed memory.
 - Text boxes come from PDFBox `PDFTextStripper`, not PDFium `FPDFText_*` APIs.
-- PDFBox annotation writing handles CropBox and page rotation, but PDFium rendering and text-rectangle extraction do not yet share one tested display-transform implementation.
+- PDFBox annotation writing and embedded-highlight parsing share `PdfCoordinateMapper`; text-rectangle extraction has not yet been unified with that transform.
 - The feature blueprint’s “shared-memory buffer” and tile-cache invalidation are not present; the current refresh is a document reopen plus `renderRevision`.
 
 ## Acceptance criteria
