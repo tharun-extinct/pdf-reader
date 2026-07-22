@@ -3,8 +3,9 @@ package com.pdfreader.app.data.pdfbox
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
-import androidx.compose.ui.geometry.Offset
+import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor
@@ -13,6 +14,9 @@ import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotation
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationInk
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationText
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup
+import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAppearanceDictionary
+import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAppearanceStream
+import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 
 /**
  * Pure utility object that converts normalized in-memory annotations
@@ -65,10 +69,10 @@ object PdfAnnotationWriter {
 
             for (rect in highlight.rects) {
                 val corners = listOf(
-                    page.toPdfPoint(Offset(rect.left, rect.top)),
-                    page.toPdfPoint(Offset(rect.right, rect.top)),
-                    page.toPdfPoint(Offset(rect.left, rect.bottom)),
-                    page.toPdfPoint(Offset(rect.right, rect.bottom))
+                    PdfCoordinateMapper.toPdfPoint(page, androidx.compose.ui.geometry.Offset(rect.left, rect.top)),
+                    PdfCoordinateMapper.toPdfPoint(page, androidx.compose.ui.geometry.Offset(rect.right, rect.top)),
+                    PdfCoordinateMapper.toPdfPoint(page, androidx.compose.ui.geometry.Offset(rect.left, rect.bottom)),
+                    PdfCoordinateMapper.toPdfPoint(page, androidx.compose.ui.geometry.Offset(rect.right, rect.bottom))
                 )
 
                 // Preserve the display-space quad order. The page transform accounts for
@@ -89,6 +93,7 @@ object PdfAnnotationWriter {
             annot.color = highlight.color.toRgbPdColor()
             // Transparency: ARGB alpha is stored in the upper 8 bits of the Long
             annot.constantOpacity = ((highlight.color ushr 24) and 0xFF).toFloat() / 255f
+            annot.createRectangleAppearance(document)
 
             annotations.add(annot)
         }
@@ -119,7 +124,7 @@ object PdfAnnotationWriter {
             // Each stroke is a single continuous path — one float[] in the inkList
             val path = FloatArray(stroke.points.size * 2)
             for ((i, point) in stroke.points.withIndex()) {
-                val pdfPoint = page.toPdfPoint(point)
+                val pdfPoint = PdfCoordinateMapper.toPdfPoint(page, point)
                 path[i * 2] = pdfPoint.x
                 path[i * 2 + 1] = pdfPoint.y
                 minX = minOf(minX, pdfPoint.x)
@@ -141,6 +146,7 @@ object PdfAnnotationWriter {
             annot.inkList = listOf(path)
             annot.color = stroke.color.toRgbPdColor()
             annot.constantOpacity = ((stroke.color ushr 24) and 0xFF).toFloat() / 255f
+            annot.createRectangleAppearance(document)
 
             // Store the stroke width in the border style array so viewers honour it
             val bs = com.tom_roush.pdfbox.cos.COSDictionary()
@@ -168,7 +174,7 @@ object PdfAnnotationWriter {
         for (ta in textAnnotations) {
             if (ta.text.isBlank()) continue
 
-            val pdfPoint = page.toPdfPoint(ta.position)
+            val pdfPoint = PdfCoordinateMapper.toPdfPoint(page, ta.position)
 
             // Standard note icon is 16×16 pt
             val iconSize = 16f
@@ -178,6 +184,7 @@ object PdfAnnotationWriter {
             annot.color = ta.color.toRgbPdColor()
             annot.setName(PDAnnotationText.NAME_NOTE)
             annot.setOpen(false)
+            annot.createRectangleAppearance(document)
 
             annotations.add(annot)
         }
@@ -191,14 +198,27 @@ object PdfAnnotationWriter {
         document: PDDocument,
         strokesByPage: Map<Int, List<FreehandStroke>>,
         highlightsByPage: Map<Int, List<TextHighlight>>,
-        textAnnotationsByPage: Map<Int, List<TextAnnotation>>
+        textAnnotationsByPage: Map<Int, List<TextAnnotation>>,
+        deletedEmbeddedHighlightIdsByPage: Map<Int, Set<String>>,
+        saveMode: AnnotationSaveMode
     ) {
-        val allPageIndices = (strokesByPage.keys + highlightsByPage.keys + textAnnotationsByPage.keys).toSet()
+        val allPageIndices = (
+            strokesByPage.keys + highlightsByPage.keys + textAnnotationsByPage.keys +
+                deletedEmbeddedHighlightIdsByPage.keys
+            ).toSet()
         for (pageIndex in allPageIndices) {
             if (pageIndex < 0 || pageIndex >= document.numberOfPages) continue
+            removeDeletedEmbeddedHighlights(document.getPage(pageIndex), pageIndex, deletedEmbeddedHighlightIdsByPage[pageIndex].orEmpty())
+            val annotationCountBeforeWrite = document.getPage(pageIndex).annotations.size
             writeHighlights(document, pageIndex, highlightsByPage[pageIndex].orEmpty())
             writeInkStrokes(document, pageIndex, strokesByPage[pageIndex].orEmpty())
             writeTextAnnotations(document, pageIndex, textAnnotationsByPage[pageIndex].orEmpty())
+            if (saveMode == AnnotationSaveMode.Flattened) {
+                val page = document.getPage(pageIndex)
+                val newAnnotations = page.annotations.drop(annotationCountBeforeWrite)
+                flattenAnnotations(document, page, newAnnotations)
+                page.annotations = page.annotations.dropLast(newAnnotations.size).toMutableList()
+            }
         }
     }
 
@@ -218,22 +238,85 @@ object PdfAnnotationWriter {
         return PDColor(floatArrayOf(r, g, b), PDDeviceRGB.INSTANCE)
     }
 
-    /** Maps normalized, displayed-page coordinates to PDF user space. */
-    private fun PDPage.toPdfPoint(point: Offset): PdfPoint {
-        val box = cropBox
-        val x = point.x.coerceIn(0f, 1f)
-        val y = point.y.coerceIn(0f, 1f)
-        val rotation = ((rotation % 360) + 360) % 360
-
-        val (relativeX, relativeY) = when (rotation) {
-            90 -> y * box.width to x * box.height
-            180 -> (1f - x) * box.width to y * box.height
-            270 -> (1f - y) * box.width to (1f - x) * box.height
-            else -> x * box.width to (1f - y) * box.height
-        }
-
-        return PdfPoint(box.lowerLeftX + relativeX, box.lowerLeftY + relativeY)
+    private fun removeDeletedEmbeddedHighlights(page: PDPage, pageIndex: Int, ids: Set<String>) {
+        if (ids.isEmpty()) return
+        val indexes = ids.mapNotNull { id ->
+            id.removePrefix("embedded:$pageIndex:").toIntOrNull()
+        }.toSet()
+        if (indexes.isEmpty()) return
+        page.annotations = page.annotations.filterIndexed { index, annotation ->
+            index !in indexes || annotation.subtype != PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT
+        }.toMutableList()
     }
 
-    private data class PdfPoint(val x: Float, val y: Float)
+    /** Paints supported annotations into page contents before removing their /Annots entries. */
+    private fun flattenAnnotations(document: PDDocument, page: PDPage, annotations: List<PDAnnotation>) {
+        if (annotations.isEmpty()) return
+        PDPageContentStream(
+            document,
+            page,
+            PDPageContentStream.AppendMode.APPEND,
+            true,
+            true
+        ).use { stream ->
+            annotations.forEach { annotation ->
+                val color = annotation.color ?: return@forEach
+                stream.saveGraphicsState()
+                stream.setGraphicsStateParameters(PDExtendedGraphicsState().apply {
+                    nonStrokingAlphaConstant = annotation.constantOpacity
+                    strokingAlphaConstant = annotation.constantOpacity
+                })
+                when (annotation) {
+                    is PDAnnotationTextMarkup -> {
+                        annotation.quadPoints?.asList()?.chunked(8)?.forEach quadLoop@{ quad ->
+                            if (quad.size != 8) return@quadLoop
+                            stream.setNonStrokingColor(color)
+                            stream.moveTo(quad[0], quad[1])
+                            stream.lineTo(quad[2], quad[3])
+                            stream.lineTo(quad[6], quad[7])
+                            stream.lineTo(quad[4], quad[5])
+                            stream.closePath()
+                            stream.fill()
+                        }
+                    }
+                    is PDAnnotationInk -> {
+                        stream.setStrokingColor(color)
+                        stream.setLineWidth(2f)
+                        annotation.inkList.forEach pathLoop@{ path ->
+                            if (path.size < 4) return@pathLoop
+                            stream.moveTo(path[0], path[1])
+                            path.asList().chunked(2).drop(1).forEach { point ->
+                                if (point.size == 2) stream.lineTo(point[0], point[1])
+                            }
+                            stream.stroke()
+                        }
+                    }
+                    is PDAnnotationText -> {
+                        val rect = annotation.rectangle
+                        stream.setNonStrokingColor(color)
+                        stream.addRect(rect.lowerLeftX, rect.lowerLeftY, rect.width, rect.height)
+                        stream.fill()
+                    }
+                }
+                stream.restoreGraphicsState()
+            }
+        }
+    }
+
+    /** Supplies an explicit normal appearance so viewers need not synthesize one. */
+    private fun PDAnnotation.createRectangleAppearance(document: PDDocument) {
+        val rect = rectangle ?: return
+        val appearanceStream = PDAppearanceStream(document)
+        appearanceStream.bBox = PDRectangle(0f, 0f, rect.width, rect.height)
+        PDPageContentStream(document, appearanceStream).use { stream ->
+            val color = color ?: return@use
+            stream.setNonStrokingColor(color)
+            stream.addRect(0f, 0f, rect.width, rect.height)
+            stream.fill()
+        }
+        val dictionary = PDAppearanceDictionary()
+        dictionary.setNormalAppearance(appearanceStream)
+        setAppearance(dictionary)
+    }
+
 }

@@ -78,6 +78,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -94,6 +95,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pdfreader.app.presentation.mvi.AnnotationTool
+import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
@@ -159,7 +161,21 @@ fun PdfReaderScreen(
                     if (state.isPdfLoaded) {
                         val hasAnnotations = state.strokesByPage.values.any { it.isNotEmpty() } ||
                             state.highlightsByPage.values.any { it.isNotEmpty() } ||
-                            state.textAnnotationsByPage.values.any { it.isNotEmpty() }
+                            state.textAnnotationsByPage.values.any { it.isNotEmpty() } ||
+                            state.deletedEmbeddedHighlightIdsByPage.values.any { it.isNotEmpty() }
+
+                        TextButton(
+                            onClick = {
+                                val mode = if (state.annotationSaveMode == AnnotationSaveMode.Editable) {
+                                    AnnotationSaveMode.Flattened
+                                } else {
+                                    AnnotationSaveMode.Editable
+                                }
+                                viewModel.processIntent(PdfReaderIntent.SetAnnotationSaveMode(mode))
+                            }
+                        ) {
+                            Text(if (state.annotationSaveMode == AnnotationSaveMode.Editable) "Edit" else "Flat")
+                        }
 
                         IconButton(
                             onClick = { viewModel.processIntent(PdfReaderIntent.SaveAnnotations) },
@@ -590,9 +606,12 @@ fun PdfPage(
         }
 
         if (pageImage != null) {
-            LaunchedEffect(pageIndex) {
+            LaunchedEffect(pageIndex, state.renderRevision) {
                 if (!state.textBoxesByPage.containsKey(pageIndex)) {
                     onIntent(PdfReaderIntent.RequestPageText(pageIndex) { })
+                }
+                if (!state.embeddedHighlightsByPage.containsKey(pageIndex)) {
+                    onIntent(PdfReaderIntent.RequestPageHighlights(pageIndex))
                 }
             }
 
@@ -687,6 +706,16 @@ fun PdfPage(
                 textBoxes = pageTextBoxes,
                 onIntent = onIntent
             )
+
+            val selectedHighlight = state.selectedHighlight?.takeIf { it.pageIndex == pageIndex }
+            if (selectedHighlight != null) {
+                SelectedHighlightOverlay(
+                    selected = selectedHighlight,
+                    contentBounds = contentBounds,
+                    containerSize = size,
+                    onDelete = { onIntent(PdfReaderIntent.DeleteSelectedHighlight) }
+                )
+            }
 
             pageTextAnnotations.forEach { annotation ->
                 val position = annotation.position.toDisplayOffset(contentBounds)
@@ -873,9 +902,19 @@ private fun BoxScope.AnnotationGestureLayer(
                             }
                         }
                     }
+                    AnnotationTool.None -> {
+                        Modifier.pointerInput(pageIndex, contentBounds) {
+                            detectTapGestures { tap ->
+                                toNormalizedIfInside(tap, contentBounds)?.let { normalized ->
+                                    onIntent(PdfReaderIntent.SelectHighlightAt(pageIndex, normalized))
+                                } ?: onIntent(PdfReaderIntent.ClearHighlightSelection)
+                            }
+                        }
+                    }
                     else -> Modifier
                 }
             )
+
     ) {
         if (currentStrokePoints.isNotEmpty()) {
             Canvas(modifier = Modifier.matchParentSize()) {
@@ -898,6 +937,53 @@ private fun BoxScope.AnnotationGestureLayer(
                     )
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.SelectedHighlightOverlay(
+    selected: com.pdfreader.app.presentation.mvi.SelectedHighlight,
+    contentBounds: Rect,
+    containerSize: IntSize,
+    onDelete: () -> Unit
+) {
+    if (selected.rects.isEmpty()) return
+    val displayRects = selected.rects.map { it.toDisplayRect(contentBounds) }
+    val bounds = Rect(
+        left = displayRects.minOf { it.left },
+        top = displayRects.minOf { it.top },
+        right = displayRects.maxOf { it.right },
+        bottom = displayRects.maxOf { it.bottom }
+    )
+    Canvas(modifier = Modifier.matchParentSize()) {
+        drawRect(
+            color = Color(0x332196F3),
+            topLeft = bounds.topLeft,
+            size = androidx.compose.ui.geometry.Size(bounds.width, bounds.height)
+        )
+        drawRect(
+            color = Color(0xFF2196F3),
+            topLeft = bounds.topLeft,
+            size = androidx.compose.ui.geometry.Size(bounds.width, bounds.height),
+            style = Stroke(width = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f)))
+        )
+    }
+    val menuWidth = 92.dp.value * androidx.compose.ui.platform.LocalDensity.current.density
+    val menuX = bounds.left.coerceIn(0f, (containerSize.width - menuWidth).coerceAtLeast(0f))
+    val preferredY = bounds.top - 48.dp.value * androidx.compose.ui.platform.LocalDensity.current.density
+    val menuY = (if (preferredY >= 0f) preferredY else bounds.bottom + 8.dp.value * androidx.compose.ui.platform.LocalDensity.current.density)
+        .coerceIn(0f, (containerSize.height - 44.dp.value * androidx.compose.ui.platform.LocalDensity.current.density).coerceAtLeast(0f))
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp,
+        modifier = Modifier.offset { IntOffset(menuX.roundToInt(), menuY.roundToInt()) }
+    ) {
+        TextButton(onClick = onDelete) {
+            Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("Delete")
         }
     }
 }

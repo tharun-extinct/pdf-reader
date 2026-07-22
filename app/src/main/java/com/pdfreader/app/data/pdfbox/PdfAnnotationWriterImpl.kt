@@ -4,7 +4,9 @@ import com.pdfreader.app.domain.repository.PdfAnnotationSaver
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
+import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -26,15 +28,19 @@ class PdfAnnotationWriterImpl : PdfAnnotationSaver {
         strokesByPage: Map<Int, List<FreehandStroke>>,
         highlightsByPage: Map<Int, List<TextHighlight>>,
         textAnnotationsByPage: Map<Int, List<TextAnnotation>>,
+        deletedEmbeddedHighlightIdsByPage: Map<Int, Set<String>>,
+        saveMode: AnnotationSaveMode,
         outputFile: File
     ): File = withContext(Dispatchers.IO) {
-        val document = PDDocument.load(pdfBytes)
+        val document = PDDocument.load(pdfBytes, MemoryUsageSetting.setupMixed(PDFBOX_MEMORY_LIMIT_BYTES))
         try {
             PdfAnnotationWriter.writeAll(
                 document = document,
                 strokesByPage = strokesByPage,
                 highlightsByPage = highlightsByPage,
-                textAnnotationsByPage = textAnnotationsByPage
+                textAnnotationsByPage = textAnnotationsByPage,
+                deletedEmbeddedHighlightIdsByPage = deletedEmbeddedHighlightIdsByPage,
+                saveMode = saveMode
             )
             document.save(outputFile)
         } finally {
@@ -43,3 +49,5 @@ class PdfAnnotationWriterImpl : PdfAnnotationSaver {
         outputFile
     }
 }
+
+private const val PDFBOX_MEMORY_LIMIT_BYTES = 50L * 1024L * 1024L

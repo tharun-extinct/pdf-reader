@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
 import android.util.Size
 import com.pdfreader.app.presentation.mvi.PdfTextBox
+import com.pdfreader.app.presentation.mvi.EmbeddedTextHighlight
 
 /**
  * Domain-level interface for the PDF Rendering Engine.
@@ -37,6 +38,9 @@ interface PdfEngine {
      * Bounds are normalized to the page: left/top/right/bottom are 0f..1f.
      */
     fun getTextBoxes(pageIndex: Int): List<PdfTextBox>
+
+    /** Returns embedded text highlights in normalized display coordinates. */
+    fun getEmbeddedHighlights(pageIndex: Int): List<EmbeddedTextHighlight>
     
     /**
      * Returns the raw PDF bytes that were passed to [openDocument].
