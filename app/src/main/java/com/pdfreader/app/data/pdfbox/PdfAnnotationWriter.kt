@@ -11,7 +11,7 @@ import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotation
-import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationInk
+import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationMarkup
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationText
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAppearanceDictionary
@@ -92,7 +92,7 @@ object PdfAnnotationWriter {
             annot.quadPoints = quadPoints
             annot.color = highlight.color.toRgbPdColor()
             // Transparency: ARGB alpha is stored in the upper 8 bits of the Long
-            annot.constantOpacity = ((highlight.color ushr 24) and 0xFF).toFloat() / 255f
+            annot.setConstantOpacity(((highlight.color ushr 24) and 0xFF).toFloat() / 255f)
             annot.createRectangleAppearance(document)
 
             annotations.add(annot)
@@ -137,21 +137,24 @@ object PdfAnnotationWriter {
             // is fully inside the annotation rectangle
             val margin = (stroke.strokeWidth / 2f).coerceAtLeast(2f)
 
-            val annot = PDAnnotationInk()
+            // PdfBox-Android 2.x represents ink with the generic markup annotation.
+            // The dedicated PDAnnotationInk class was added in newer upstream PDFBox versions.
+            val annot = PDAnnotationMarkup()
+            annot.cosObject.setName(com.tom_roush.pdfbox.cos.COSName.SUBTYPE, PDAnnotationMarkup.SUB_TYPE_INK)
             annot.rectangle = PDRectangle(
                 minX - margin, minY - margin,
                 (maxX - minX) + margin * 2,
                 (maxY - minY) + margin * 2
             )
-            annot.inkList = listOf(path)
+            annot.setInkList(arrayOf(path))
             annot.color = stroke.color.toRgbPdColor()
-            annot.constantOpacity = ((stroke.color ushr 24) and 0xFF).toFloat() / 255f
-            annot.createRectangleAppearance(document)
+            annot.setConstantOpacity(((stroke.color ushr 24) and 0xFF).toFloat() / 255f)
 
             // Store the stroke width in the border style array so viewers honour it
             val bs = com.tom_roush.pdfbox.cos.COSDictionary()
             bs.setInt(com.tom_roush.pdfbox.cos.COSName.W, stroke.strokeWidth.toInt().coerceAtLeast(1))
             annot.cosObject.setItem(com.tom_roush.pdfbox.cos.COSName.BS, bs)
+            annot.constructAppearances(document)
 
             annotations.add(annot)
         }
@@ -229,7 +232,7 @@ object PdfAnnotationWriter {
      * [TextHighlight.color], [TextAnnotation.color]) to a [PDColor] in DeviceRGB space.
      *
      * Note: PDColor only carries RGB — the alpha (opacity) is set separately on the
-     * annotation's CA entry via [PDAnnotation.constantOpacity].
+     * annotation's CA entry via [PDAnnotationMarkup.setConstantOpacity].
      */
     private fun Long.toRgbPdColor(): PDColor {
         val r = ((this ushr 16) and 0xFF).toFloat() / 255f
@@ -261,10 +264,11 @@ object PdfAnnotationWriter {
         ).use { stream ->
             annotations.forEach { annotation ->
                 val color = annotation.color ?: return@forEach
+                val opacity = (annotation as? PDAnnotationMarkup)?.getConstantOpacity() ?: 1f
                 stream.saveGraphicsState()
                 stream.setGraphicsStateParameters(PDExtendedGraphicsState().apply {
-                    nonStrokingAlphaConstant = annotation.constantOpacity
-                    strokingAlphaConstant = annotation.constantOpacity
+                    nonStrokingAlphaConstant = opacity
+                    strokingAlphaConstant = opacity
                 })
                 when (annotation) {
                     is PDAnnotationTextMarkup -> {
@@ -279,10 +283,11 @@ object PdfAnnotationWriter {
                             stream.fill()
                         }
                     }
-                    is PDAnnotationInk -> {
+                    is PDAnnotationMarkup -> {
+                        if (annotation.subtype != PDAnnotationMarkup.SUB_TYPE_INK) return@forEach
                         stream.setStrokingColor(color)
                         stream.setLineWidth(2f)
-                        annotation.inkList.forEach pathLoop@{ path ->
+                        annotation.getInkList().forEach pathLoop@{ path ->
                             if (path.size < 4) return@pathLoop
                             stream.moveTo(path[0], path[1])
                             path.asList().chunked(2).drop(1).forEach { point ->

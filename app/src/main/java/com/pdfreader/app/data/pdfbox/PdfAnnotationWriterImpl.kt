@@ -9,6 +9,7 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 import java.io.File
 
 /**
@@ -32,7 +33,9 @@ class PdfAnnotationWriterImpl : PdfAnnotationSaver {
         saveMode: AnnotationSaveMode,
         outputFile: File
     ): File = withContext(Dispatchers.IO) {
-        val document = PDDocument.load(pdfBytes, MemoryUsageSetting.setupMixed(PDFBOX_MEMORY_LIMIT_BYTES))
+        val document = ByteArrayInputStream(pdfBytes).use { input ->
+            PDDocument.load(input, MemoryUsageSetting.setupMixed(PDFBOX_MEMORY_LIMIT_BYTES))
+        }
         try {
             PdfAnnotationWriter.writeAll(
                 document = document,
