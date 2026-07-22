@@ -1,81 +1,49 @@
 ---
 applyTo: "**/*"
 name: PDF Reader Android App
-description: Instructions for developing the highly optimized Android PDF Reader
+description: Agent context for the Android PDF reader and annotation pipeline
 ---
 
+# PDF Reader — Agent Context
 
-## Project Description:
+## Product and stack
 
-This project is a Compute Intensive Application. A lightweight, highly optimized Android PDF reader focused purely on reading and annotating. 
-Before production deployment, we need to optimize a lot. We must focus on smoother UI / UX and low system resources management.
+Android PDF reader focused on fast reading, pen/highlight/text-note annotation, persistent PDF output, TTS, and SAF sync.
 
-Core capabilities:
-- PDF Rendering (PDFium-Android)
-- Highlight, Pen annotation (embedded), and Eraser tools (PDFBox)
-- Read Aloud (Android Native TTS)
-- Google Drive Background Sync (Storage Access Framework)
+- Kotlin + Jetpack Compose
+- MVI + Clean Architecture; `Presentation → Domain → Data`
+- PDFium-Android for page rasterization; Apache PDFBox Android for text geometry and PDF mutation
+- Coroutines/Flow for background work; Android system TTS; SAF for persistence/sync
 
-**Development & Build Workflow:**
-- **There is NO local runtime environment.** Do not attempt to run `./gradlew` locally.
-- Everything is built via GitHub Actions pipeline.
-- UI Testing is performed strictly by downloading the generated APKs from **GitHub Releases** (triggered on the `main` branch).
+Read `.github/design.md` before structural work. It is the architecture source of truth; `implementation-files/feature01.md`, `feature02.md`, and `feature03.md` are feature-level contracts and status records.
 
-Performance, low latency, and a clean modular architecture are non-negotiable.
+## Current architecture contract
 
-Full architecture and design decisions live in `.github/design.md`. **Always consult it before making structural changes.**
+1. Compose renders a PDFium bitmap as the base layer and draws unsaved annotations/selection UI as overlays.
+2. UI positions are normalized (`0..1`, top-left origin). `data/pdfbox/PdfCoordinateMapper.kt` is the shared PDFBox conversion boundary for CropBox and 90° page rotation.
+3. PDFBox reads text boxes and embedded highlights off the main thread. `PdfiumEngine` caches both per page.
+4. Save snapshots MVI state, writes or flattens annotations on `Dispatchers.IO`, syncs through SAF, reopens the document, increments `renderRevision`, then clears only successfully persisted state.
+5. Existing embedded highlights are cached before pointer hit-testing. Selection is state-driven; selection alone never mutates the PDF.
 
+## Engineering constraints
 
----
+- Never block the main thread with PDF I/O, parsing, rendering, saving, or sync.
+- Keep domain APIs free of PDFBox/PDFium implementation details. Presentation must not query PDFBox inside a pointer callback.
+- Use `PdfCoordinateMapper`; do not add ad-hoc Y flips, DPI formulas, or MediaBox-only mapping.
+- Preserve existing annotations, forms, and signatures unless a selected mutation explicitly changes them.
+- Editable and flattened saves are distinct. Flattening paints new supported annotations into `/Contents` and removes only those newly created `/Annots`; it is irreversible.
+- Keep bitmaps bounded and release documents, descriptors, and temporary files. PDFBox uses a 50 MiB mixed-memory threshold.
+- Do not claim tile/viewport rendering, character-level selection, or cross-viewer fidelity until code and CI/device validation prove it.
 
+## Current feature status
 
-- Performance optimization and low latency execution are crucial for providing a seamless user experience. 
-- Efficient error handling and logging should be implemented to ensure that any issues can be quickly identified and resolved. 
-- The architecture should be clean and modular to facilitate future development and maintenance.
+- **Feature 01:** hybrid overlay/commit pipeline, shared coordinate mapper, mixed PDFBox memory, and mapper tests are implemented. Tile/viewport rendering, bitmap eviction, and PDFium text APIs are still pending.
+- **Feature 02:** editable/flattened save modes, normal appearances, save/sync/reopen, and flattening of newly saved supported annotations are implemented. Appearance fidelity and external-viewer validation remain pending.
+- **Feature 03:** cached embedded highlights, normalized hit-testing, dashed selection bounds, anchored Delete action, and persistence of deletion are implemented. Color/comment actions and device validation remain pending.
 
+## Validation and delivery
 
----
-
-<workflow>
-
-## This is how you should always act:
-
-### Planning and Approach
-- **Always plan before writing code.** Create a todo list; add "Commit and Push to remote for CI build" as the final step.
-- Follow **First principles thinking** — breaking down a problem to its most fundamental truths and reasoning up from there 
-- Focus on **smoother UI / UX and low system resources management** — avoid memory leaks and unneeded allocations, especially with bitmaps or Jetpack Compose recompositions.
-- **Never assume** on anything tech-stack or feature-related — ask first.
-- **Never implement a feature** until it's explicitly requested.
-
-
-
-### Refining Ideas
-
-- Suggest **3-4 approaches** with trade-offs (tech stack, architecture, algorithm, library) before implementing. Prioritize the Optimal and the Industry Standard ones
-
-
-
-</workflow>
-
-
-
-### Code Implementation:
-- When providing code suggestions, prioritize:
-- Performance optimization, Low latency execution and scalability
-- Always think about edge cases and how to handle them
-- Consider user experience and usability
-- Efficient error handling and logging
-- Clean, modular architecture
-- Write code that are production ready
-
-
-### Tools instruction
-- For referring latest document and resolving package error use MCP like [`websearch` (Default), `context7`]
-
-
-
-
-
-- Always consult `.github/design.md` before any structural change.
-
-
+- Do **not** run Gradle locally. GitHub Actions is the build/test authority.
+- Unit tests are under `app/src/test`; add/maintain mapper and hit-testing coverage when changing those contracts.
+- Release generation runs on pushes to `main` and `feature` via `.github/workflows/gh-release.yml`.
+- Preserve unrelated worktree changes. Stage only task files, inspect the staged diff, then commit and push when requested or when following the repository delivery workflow.

@@ -12,6 +12,17 @@ enum class AnnotationTool {
     AddText
 }
 
+/** Controls whether newly saved annotations remain editable or are painted into page content. */
+enum class AnnotationSaveMode {
+    Editable,
+    Flattened
+}
+
+enum class HighlightSource {
+    Session,
+    Embedded
+}
+
 data class AnnotationPalette(
     val colors: List<Long>
 )
@@ -42,6 +53,22 @@ data class PdfTextBox(
 data class TextHighlight(
     val id: Long,
     val pageIndex: Int,
+    val color: Long,
+    val rects: List<Rect>
+)
+
+/** A page-scoped highlight read from the opened PDF, cached off the main thread. */
+data class EmbeddedTextHighlight(
+    val id: String,
+    val pageIndex: Int,
+    val color: Long,
+    val rects: List<Rect>
+)
+
+data class SelectedHighlight(
+    val id: String,
+    val pageIndex: Int,
+    val source: HighlightSource,
     val color: Long,
     val rects: List<Rect>
 )

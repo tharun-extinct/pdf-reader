@@ -1,3 +1,33 @@
+# Gradle
 .gradle/
 build/
 app/build/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Android
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Stitch tool calling
+.stitch-mcp/
+
+
+uidump/
+
+# Environment & local config
+skills/
+.env
+gradlew.bat
+local.properties
+
+
+# OS files
+.DS_Store
+Thumbs.db

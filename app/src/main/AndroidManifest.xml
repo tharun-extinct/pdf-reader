@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:allowBackup="true"
-        android:label="PDF Reader"
+        android:extractNativeLibs="true"
+        android:label="NoxReader"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@style/Theme.NoxReader">
+        <!--
+            NOTE: `preloaded_fonts` meta-data intentionally removed.
+            The XML font files reference Google Play Services as a Downloadable
+            Font provider; preloading them at app start crashes on any device
+            without (or with broken) Play Services. Fonts are now resolved
+            lazily at render time in Type.kt with safe system-font fallbacks.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
