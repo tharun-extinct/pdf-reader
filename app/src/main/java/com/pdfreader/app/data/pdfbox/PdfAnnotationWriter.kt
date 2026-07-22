@@ -3,6 +3,7 @@ package com.pdfreader.app.data.pdfbox
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
+import androidx.compose.ui.geometry.Offset
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
@@ -26,8 +27,9 @@ import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarku
  * PDF spec uses **points** (1pt = 1/72 inch) measured from the **bottom-left**
  * corner.  The conversion is:
  *
- *   pdfX = normalizedX × pageWidthPt
- *   pdfY = (1 − normalizedY) × pageHeightPt
+ * For an unrotated page, `pdfX = CropBox.left + normalizedX × CropBox.width`
+ * and `pdfY = CropBox.bottom + (1 − normalizedY) × CropBox.height`. The helper
+ * below also maps 90° increments of page rotation.
  */
 object PdfAnnotationWriter {
 
@@ -45,8 +47,6 @@ object PdfAnnotationWriter {
     ) {
         if (highlights.isEmpty()) return
         val page = document.getPage(pageIndex)
-        val pw = page.mediaBox.width
-        val ph = page.mediaBox.height
         val annotations = page.annotations
 
         for (highlight in highlights) {
@@ -64,22 +64,23 @@ object PdfAnnotationWriter {
             var qIdx = 0
 
             for (rect in highlight.rects) {
-                // Convert corners to PDF points (bottom-left origin)
-                val pdfLeft   = rect.left   * pw
-                val pdfRight  = rect.right  * pw
-                val pdfTop    = (1f - rect.top)    * ph  // top in screen → high Y in PDF
-                val pdfBottom = (1f - rect.bottom) * ph  // bottom in screen → low Y in PDF
+                val corners = listOf(
+                    page.toPdfPoint(Offset(rect.left, rect.top)),
+                    page.toPdfPoint(Offset(rect.right, rect.top)),
+                    page.toPdfPoint(Offset(rect.left, rect.bottom)),
+                    page.toPdfPoint(Offset(rect.right, rect.bottom))
+                )
 
-                // QuadPoints order (PDF spec): upper-left, upper-right, lower-left, lower-right
-                quadPoints[qIdx++] = pdfLeft;  quadPoints[qIdx++] = pdfTop    // upper-left
-                quadPoints[qIdx++] = pdfRight; quadPoints[qIdx++] = pdfTop    // upper-right
-                quadPoints[qIdx++] = pdfLeft;  quadPoints[qIdx++] = pdfBottom // lower-left
-                quadPoints[qIdx++] = pdfRight; quadPoints[qIdx++] = pdfBottom // lower-right
-
-                if (pdfLeft   < minX) minX = pdfLeft
-                if (pdfBottom < minY) minY = pdfBottom
-                if (pdfRight  > maxX) maxX = pdfRight
-                if (pdfTop    > maxY) maxY = pdfTop
+                // Preserve the display-space quad order. The page transform accounts for
+                // CropBox and rotation before these points are written in PDF user space.
+                for (corner in corners) {
+                    quadPoints[qIdx++] = corner.x
+                    quadPoints[qIdx++] = corner.y
+                    minX = minOf(minX, corner.x)
+                    minY = minOf(minY, corner.y)
+                    maxX = maxOf(maxX, corner.x)
+                    maxY = maxOf(maxY, corner.y)
+                }
             }
 
             val annot = PDAnnotationTextMarkup(PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT)
@@ -105,8 +106,6 @@ object PdfAnnotationWriter {
     ) {
         if (strokes.isEmpty()) return
         val page = document.getPage(pageIndex)
-        val pw = page.mediaBox.width
-        val ph = page.mediaBox.height
         val annotations = page.annotations
 
         for (stroke in strokes) {
@@ -120,14 +119,13 @@ object PdfAnnotationWriter {
             // Each stroke is a single continuous path — one float[] in the inkList
             val path = FloatArray(stroke.points.size * 2)
             for ((i, point) in stroke.points.withIndex()) {
-                val pdfX = point.x * pw
-                val pdfY = (1f - point.y) * ph
-                path[i * 2]     = pdfX
-                path[i * 2 + 1] = pdfY
-                if (pdfX < minX) minX = pdfX
-                if (pdfY < minY) minY = pdfY
-                if (pdfX > maxX) maxX = pdfX
-                if (pdfY > maxY) maxY = pdfY
+                val pdfPoint = page.toPdfPoint(point)
+                path[i * 2] = pdfPoint.x
+                path[i * 2 + 1] = pdfPoint.y
+                minX = minOf(minX, pdfPoint.x)
+                minY = minOf(minY, pdfPoint.y)
+                maxX = maxOf(maxX, pdfPoint.x)
+                maxY = maxOf(maxY, pdfPoint.y)
             }
 
             // Add a small margin around the bounding box to ensure the stroke cap
@@ -142,6 +140,7 @@ object PdfAnnotationWriter {
             )
             annot.inkList = listOf(path)
             annot.color = stroke.color.toRgbPdColor()
+            annot.constantOpacity = ((stroke.color ushr 24) and 0xFF).toFloat() / 255f
 
             // Store the stroke width in the border style array so viewers honour it
             val bs = com.tom_roush.pdfbox.cos.COSDictionary()
@@ -164,20 +163,17 @@ object PdfAnnotationWriter {
     ) {
         if (textAnnotations.isEmpty()) return
         val page = document.getPage(pageIndex)
-        val pw = page.mediaBox.width
-        val ph = page.mediaBox.height
         val annotations = page.annotations
 
         for (ta in textAnnotations) {
             if (ta.text.isBlank()) continue
 
-            val pdfX = ta.position.x * pw
-            val pdfY = (1f - ta.position.y) * ph
+            val pdfPoint = page.toPdfPoint(ta.position)
 
             // Standard note icon is 16×16 pt
             val iconSize = 16f
             val annot = PDAnnotationText()
-            annot.rectangle = PDRectangle(pdfX, pdfY - iconSize, iconSize, iconSize)
+            annot.rectangle = PDRectangle(pdfPoint.x, pdfPoint.y - iconSize, iconSize, iconSize)
             annot.contents = ta.text
             annot.color = ta.color.toRgbPdColor()
             annot.setName(PDAnnotationText.NAME_NOTE)
@@ -221,4 +217,23 @@ object PdfAnnotationWriter {
         val b = ( this          and 0xFF).toFloat() / 255f
         return PDColor(floatArrayOf(r, g, b), PDDeviceRGB.INSTANCE)
     }
+
+    /** Maps normalized, displayed-page coordinates to PDF user space. */
+    private fun PDPage.toPdfPoint(point: Offset): PdfPoint {
+        val box = cropBox
+        val x = point.x.coerceIn(0f, 1f)
+        val y = point.y.coerceIn(0f, 1f)
+        val rotation = ((rotation % 360) + 360) % 360
+
+        val (relativeX, relativeY) = when (rotation) {
+            90 -> y * box.width to x * box.height
+            180 -> (1f - x) * box.width to y * box.height
+            270 -> (1f - y) * box.width to (1f - x) * box.height
+            else -> x * box.width to (1f - y) * box.height
+        }
+
+        return PdfPoint(box.lowerLeftX + relativeX, box.lowerLeftY + relativeY)
+    }
+
+    private data class PdfPoint(val x: Float, val y: Float)
 }

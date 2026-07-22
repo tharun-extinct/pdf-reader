@@ -29,16 +29,15 @@ Provide low-latency PDF reading and annotation with PDFium for raster rendering 
 
 ## Current implementation review (2026-07-22)
 
-Implemented: MVI/Clean layer interfaces, PDFium page rendering, Compose annotation overlays, normalized in-memory strokes/highlights/text notes, PDFBox `/Highlight`, `/Ink`, and `/Text` writing, background save/sync, and document reopen after save.
+Implemented: MVI/Clean layer interfaces, PDFium page rendering (including embedded annotations), Compose annotation overlays with live pen/highlighter previews, normalized in-memory strokes/highlights/text notes, PDFBox `/Highlight`, `/Ink`, and `/Text` writing with CropBox/90°-rotation mapping, background save/sync, and document reopen after save.
 
 Not yet compliant with this contract:
 
 - `PdfPage` renders one full page bitmap and applies Compose scaling; there is no tile cache, viewport rendering, bitmap eviction, or cancellation.
-- A stroke is added to state only on drag end; there is no visible live-stroke overlay during the drag. Edits are not committed at interaction end; only `SaveAnnotations` performs the PDFBox flush.
+- Edits are not committed at interaction end; only `SaveAnnotations` performs the PDFBox flush.
 - `PdfiumEngine` retains the complete PDF byte array and calls `PDDocument.load(ByteArrayInputStream(...))`; bounded `MemoryUsageSetting` is not used.
 - Text boxes come from PDFBox `PDFTextStripper`, not PDFium `FPDFText_*` APIs.
-- Annotation writing uses MediaBox and a simple Y flip. Rotation, CropBox, and renderer-specific transforms are not handled.
-- `renderPageBitmap(..., false)` should be verified/configured to render embedded annotations; otherwise the post-save PDFium refresh will not show the baked annotations.
+- PDFBox annotation writing handles CropBox and page rotation, but PDFium rendering and text-rectangle extraction do not yet share one tested display-transform implementation.
 - The feature blueprint’s “shared-memory buffer” and tile-cache invalidation are not present; the current refresh is a document reopen plus `renderRevision`.
 
 ## Acceptance criteria

@@ -876,7 +876,30 @@ private fun BoxScope.AnnotationGestureLayer(
                     else -> Modifier
                 }
             )
-    )
+    ) {
+        if (currentStrokePoints.isNotEmpty()) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                val previewPath = Path().apply {
+                    currentStrokePoints.forEachIndexed { index, point ->
+                        val displayPoint = point.toDisplayOffset(contentBounds)
+                        if (index == 0) moveTo(displayPoint.x, displayPoint.y)
+                        else lineTo(displayPoint.x, displayPoint.y)
+                    }
+                }
+                val previewColor = if (activeTool == AnnotationTool.Pen) penColor else highlighterColor
+                val previewWidth = if (activeTool == AnnotationTool.Pen) 6f else 22f
+                drawPath(
+                    path = previewPath,
+                    color = Color(previewColor),
+                    style = Stroke(
+                        width = previewWidth,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                        join = androidx.compose.ui.graphics.StrokeJoin.Round
+                    )
+                )
+            }
+        }
+    }
 }
 
 @Composable

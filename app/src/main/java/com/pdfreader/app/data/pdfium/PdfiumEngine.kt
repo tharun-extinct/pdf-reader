@@ -73,7 +73,7 @@ class PdfiumEngine(private val context: Context) : PdfEngine {
         // Render the page onto the bitmap directly mapping it to native memory
         pdfiumCore.renderPageBitmap(
             doc, bitmap, pageIndex, 
-            0, 0, width, height, false
+            0, 0, width, height, true
         )
         
         return bitmap

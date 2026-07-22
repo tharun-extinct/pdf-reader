@@ -222,9 +222,11 @@ class PdfReaderViewModel(
         _state.update { it.copy(isSavingAnnotations = true, errorMessage = null) }
 
         viewModelScope.launch(Dispatchers.IO) {
+            var tempFile: java.io.File? = null
             try {
                 val context = getApplication<Application>().applicationContext
-                val tempFile = java.io.File(context.cacheDir, "annotated_${System.currentTimeMillis()}.pdf")
+                val outputFile = java.io.File(context.cacheDir, "annotated_${System.currentTimeMillis()}.pdf")
+                tempFile = outputFile
 
                 // Write annotations into PDF structure
                 annotationSaver.saveAnnotations(
@@ -232,11 +234,11 @@ class PdfReaderViewModel(
                     strokesByPage = currentState.strokesByPage,
                     highlightsByPage = currentState.highlightsByPage,
                     textAnnotationsByPage = currentState.textAnnotationsByPage,
-                    outputFile = tempFile
+                    outputFile = outputFile
                 )
 
                 // Sync annotated file back to the source URI (Google Drive, local, etc.)
-                val success = syncManager.syncBackToSource(uri, tempFile)
+                val success = syncManager.syncBackToSource(uri, outputFile)
                 if (!success) {
                     _state.update {
                         it.copy(isSavingAnnotations = false, errorMessage = "Failed to save annotations to source.")
@@ -261,9 +263,6 @@ class PdfReaderViewModel(
                     pdfEngine.openDocument(pfd, newBytes)
                 }
 
-                // Clean up temp file
-                tempFile.delete()
-
                 // Bump renderRevision: PdfPage composables observe this key and will
                 // discard their cached bitmaps, triggering a fresh render that shows
                 // the now-embedded annotations via PDFium.
@@ -279,6 +278,8 @@ class PdfReaderViewModel(
                 _state.update {
                     it.copy(isSavingAnnotations = false, errorMessage = "Save failed: ${e.message}")
                 }
+            } finally {
+                tempFile?.delete()
             }
         }
     }
