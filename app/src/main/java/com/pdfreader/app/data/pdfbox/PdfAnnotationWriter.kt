@@ -93,7 +93,7 @@ object PdfAnnotationWriter {
             annot.color = highlight.color.toRgbPdColor()
             // Transparency: ARGB alpha is stored in the upper 8 bits of the Long
             annot.setConstantOpacity(((highlight.color ushr 24) and 0xFF).toFloat() / 255f)
-            annot.createRectangleAppearance(document)
+            annot.createHighlightAppearance(document, quadPoints)
 
             annotations.add(annot)
         }
@@ -308,16 +308,26 @@ object PdfAnnotationWriter {
         }
     }
 
-    /** Supplies an explicit normal appearance so viewers need not synthesize one. */
-    private fun PDAnnotation.createRectangleAppearance(document: PDDocument) {
+    /** Supplies a transparent, quad-based normal appearance so it never obscures page text. */
+    private fun PDAnnotationTextMarkup.createHighlightAppearance(document: PDDocument, quadPoints: FloatArray) {
         val rect = rectangle ?: return
         val appearanceStream = PDAppearanceStream(document)
         appearanceStream.bBox = PDRectangle(0f, 0f, rect.width, rect.height)
         PDPageContentStream(document, appearanceStream).use { stream ->
             val color = color ?: return@use
+            stream.setGraphicsStateParameters(PDExtendedGraphicsState().apply {
+                nonStrokingAlphaConstant = constantOpacity
+            })
             stream.setNonStrokingColor(color)
-            stream.addRect(0f, 0f, rect.width, rect.height)
-            stream.fill()
+            quadPoints.asList().chunked(8).forEach { quad ->
+                if (quad.size != 8) return@forEach
+                stream.moveTo(quad[0] - rect.lowerLeftX, quad[1] - rect.lowerLeftY)
+                stream.lineTo(quad[2] - rect.lowerLeftX, quad[3] - rect.lowerLeftY)
+                stream.lineTo(quad[6] - rect.lowerLeftX, quad[7] - rect.lowerLeftY)
+                stream.lineTo(quad[4] - rect.lowerLeftX, quad[5] - rect.lowerLeftY)
+                stream.closePath()
+                stream.fill()
+            }
         }
         val dictionary = PDAppearanceDictionary()
         dictionary.setNormalAppearance(appearanceStream)

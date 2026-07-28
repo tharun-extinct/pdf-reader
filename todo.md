@@ -8,8 +8,7 @@ The annotations are stored in a mobile temporary storage and it's over writing o
 
 
 
-Read Aloud: 
-- the highlighting area while reading isn't aligning with the PDF container. the highlighting area is floating some where else
+
 
 
 
@@ -21,3 +20,22 @@ Read Aloud:
 - [ ] 7. Implement PDFBox Integration (Embedding annotations back to the PDF file)
 - [ ] 8. Implement Read Aloud (Parsing PDF text, native Android TTS, playback state)
 - [ ] 9. Refine Performance & Latency (Optimize memory allocations, caching rendered bitmaps)
+
+
+
+
+the read aloud isn't syncing with the line text highlight. 
+
+
+> 
+
+
+
+
+
+
+issues:
+---
+
+use context7 mcp to fetch relevant documents
+

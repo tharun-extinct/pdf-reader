@@ -103,6 +103,7 @@ import com.pdfreader.app.presentation.mvi.PdfReaderState
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
+import com.pdfreader.app.presentation.mvi.TextHighlightSelector
 import com.pdfreader.app.domain.tts.TtsState
 import androidx.compose.ui.text.style.TextOverflow
 import com.pdfreader.app.presentation.mvi.formatHexColor
@@ -762,16 +763,14 @@ private fun BoxScope.SelectableTextLayer(
 
     val density = LocalDensity.current
     
-    // Draw highlights for TTS
+    // TTS bounds are normalized to the rendered PDF, not to the whole pager item.
+    // Use the fitted PDF bounds so highlights stay aligned when the page is letterboxed.
     if (highlightRects.isNotEmpty()) {
         Canvas(modifier = Modifier.matchParentSize()) {
             highlightRects.forEach { rect ->
                 drawRect(
-                    color = Color(0xFF64B5F6).copy(alpha = 0.5f), // Nice light blue highlight
-                    topLeft = androidx.compose.ui.geometry.Offset(
-                        x = rect.left * contentBounds.width,
-                        y = rect.top * contentBounds.height
-                    ),
+                    color = Color(0xFF64B5F6).copy(alpha = 0.5f),
+                    topLeft = rect.topLeft.toDisplayOffset(contentBounds),
                     size = androidx.compose.ui.geometry.Size(
                         width = rect.width * contentBounds.width,
                         height = rect.height * contentBounds.height
@@ -818,6 +817,13 @@ private fun BoxScope.AnnotationGestureLayer(
     val highlighterColor = state.highlighterPalette.colors.getOrNull(state.selectedHighlighterColorIndex) ?: state.highlighterPalette.colors.first()
     var currentStrokePoints = remember { mutableStateListOf<Offset>() }
     var dragStart by remember { mutableStateOf<Offset?>(null) }
+    val textSelectionPreview = if (activeTool == AnnotationTool.Highlighter) {
+        val start = dragStart
+        val end = currentStrokePoints.lastOrNull()
+        if (start != null && end != null) TextHighlightSelector.select(textBoxes, start, end) else emptyList()
+    } else {
+        emptyList()
+    }
 
     Box(
         modifier = Modifier
@@ -840,10 +846,7 @@ private fun BoxScope.AnnotationGestureLayer(
                                     val start = dragStart
                                     val end = currentStrokePoints.lastOrNull()
                                     val highlightedText = if (activeTool == AnnotationTool.Highlighter && start != null && end != null) {
-                                        val selectionRect = normalizedSelectionRect(start, end).inflate(0.006f)
-                                        val selectedRects = textBoxes
-                                            .filter { it.bounds.intersects(selectionRect) }
-                                            .map { it.bounds }
+                                        val selectedRects = TextHighlightSelector.select(textBoxes, start, end)
                                         if (selectedRects.isNotEmpty()) {
                                             onIntent(
                                                 PdfReaderIntent.AddTextHighlight(
@@ -918,6 +921,19 @@ private fun BoxScope.AnnotationGestureLayer(
     ) {
         if (currentStrokePoints.isNotEmpty()) {
             Canvas(modifier = Modifier.matchParentSize()) {
+                if (activeTool == AnnotationTool.Highlighter && textSelectionPreview.isNotEmpty()) {
+                    textSelectionPreview.forEach { rect ->
+                        drawRect(
+                            color = Color(highlighterColor),
+                            topLeft = rect.topLeft.toDisplayOffset(contentBounds),
+                            size = androidx.compose.ui.geometry.Size(
+                                width = rect.width * contentBounds.width,
+                                height = rect.height * contentBounds.height
+                            )
+                        )
+                    }
+                    return@Canvas
+                }
                 val previewPath = Path().apply {
                     currentStrokePoints.forEachIndexed { index, point ->
                         val displayPoint = point.toDisplayOffset(contentBounds)
@@ -1138,31 +1154,6 @@ private fun Rect.toDisplayRect(bounds: Rect): Rect {
         right = bottomRight.x,
         bottom = bottomRight.y
     )
-}
-
-private fun normalizedSelectionRect(start: Offset, end: Offset): Rect {
-    return Rect(
-        left = minOf(start.x, end.x),
-        top = minOf(start.y, end.y),
-        right = maxOf(start.x, end.x),
-        bottom = maxOf(start.y, end.y)
-    )
-}
-
-private fun Rect.inflate(amount: Float): Rect {
-    return Rect(
-        left = (left - amount).coerceIn(0f, 1f),
-        top = (top - amount).coerceIn(0f, 1f),
-        right = (right + amount).coerceIn(0f, 1f),
-        bottom = (bottom + amount).coerceIn(0f, 1f)
-    )
-}
-
-private fun Rect.intersects(other: Rect): Boolean {
-    return left < other.right &&
-        right > other.left &&
-        top < other.bottom &&
-        bottom > other.top
 }
 
 private fun toNormalizedIfInside(position: Offset, bounds: Rect): Offset? {

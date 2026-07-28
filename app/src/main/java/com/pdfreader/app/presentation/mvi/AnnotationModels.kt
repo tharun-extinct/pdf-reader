@@ -47,7 +47,9 @@ data class TextAnnotation(
 data class PdfTextBox(
     val pageIndex: Int,
     val text: String,
-    val bounds: Rect
+    val bounds: Rect,
+    /** Per-character geometry used to create continuous, line-aware text selections. */
+    val characterBounds: List<Rect> = listOf(bounds)
 )
 
 data class TextHighlight(
