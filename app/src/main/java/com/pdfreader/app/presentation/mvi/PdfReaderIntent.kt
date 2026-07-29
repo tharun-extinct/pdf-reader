@@ -3,6 +3,7 @@ package com.pdfreader.app.presentation.mvi
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
+import com.pdfreader.app.domain.model.ThemeMode
 
 /**
  * Represents the user intents/actions for the PDF Reader.
@@ -33,6 +34,20 @@ sealed class PdfReaderIntent {
         val pageIndex: Int,
         val onExtracted: (List<PdfTextBox>) -> Unit
     ) : PdfReaderIntent()
+
+    data class PageChanged(val pageIndex: Int) : PdfReaderIntent()
+
+    object ToggleBookmark : PdfReaderIntent()
+
+    object ClearRecentDocuments : PdfReaderIntent()
+
+    object DismissError : PdfReaderIntent()
+
+    data class SetThemeMode(val mode: ThemeMode) : PdfReaderIntent()
+
+    data class SetKeepScreenOn(val enabled: Boolean) : PdfReaderIntent()
+
+    data class SetSpeechRate(val rate: Float) : PdfReaderIntent()
 
     data class SelectTool(val tool: AnnotationTool) : PdfReaderIntent()
 
