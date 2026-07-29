@@ -301,6 +301,9 @@ class PdfReaderViewModel(
                         ?: throw IllegalStateException("Failed to read PDF bytes.")
                     pdfEngine.openDocument(pfd, pdfBytes)
                     val pageCount = pdfEngine.getPageCount()
+                    if (pageCount <= 0) {
+                        throw IllegalStateException("This PDF does not contain any readable pages.")
+                    }
                     
                     // Extract document title from URI
                     val cursor = context.contentResolver.query(uri, null, null, null, null)
@@ -356,8 +359,13 @@ class PdfReaderViewModel(
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                _state.update { 
-                    it.copy(isLoading = false, errorMessage = e.message ?: "Unknown error opening PDF") 
+                pdfEngine.closeDocument()
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        isPdfLoaded = false,
+                        errorMessage = e.message ?: "Unknown error opening PDF"
+                    )
                 }
             }
         }

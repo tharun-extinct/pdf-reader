@@ -15,7 +15,11 @@ data class RecentDocument(
     val bookmarkedPages: Set<Int> = emptySet()
 ) {
     val progress: Float
-        get() = if (pageCount <= 1) 0f else lastPage.toFloat() / (pageCount - 1).toFloat()
+        get() = if (pageCount <= 0) {
+            0f
+        } else {
+            (lastPage + 1).toFloat().div(pageCount.toFloat()).coerceIn(0f, 1f)
+        }
 }
 
 enum class ThemeMode {

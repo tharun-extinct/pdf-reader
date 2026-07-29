@@ -61,6 +61,7 @@ import com.pdfreader.app.presentation.theme.LabelCapsStyle
 import com.pdfreader.app.presentation.theme.NoxReaderTheme
 import com.pdfreader.app.presentation.theme.UiMainStyle
 import com.pdfreader.app.presentation.theme.UiSmStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -432,4 +433,5 @@ private fun SettingsDivider() {
     )
 }
 
-private fun formatSpeechRate(rate: Float): String = String.format("%.1f×", rate)
+private fun formatSpeechRate(rate: Float): String =
+    String.format(Locale.getDefault(), "%.1f×", rate)

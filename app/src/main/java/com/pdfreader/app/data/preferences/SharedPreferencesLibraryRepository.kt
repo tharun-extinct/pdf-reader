@@ -81,6 +81,7 @@ class SharedPreferencesLibraryRepository(context: Context) : LibraryRepository {
     override suspend fun clearRecentDocuments() = withContext(Dispatchers.IO) {
         synchronized(writeLock) {
             preferences.edit().remove(KEY_RECENT_DOCUMENTS).commit()
+            Unit
         }
     }
 
@@ -106,6 +107,7 @@ class SharedPreferencesLibraryRepository(context: Context) : LibraryRepository {
                 .putBoolean(KEY_KEEP_SCREEN_ON, readerPreferences.keepScreenOn)
                 .putFloat(KEY_SPEECH_RATE, readerPreferences.speechRate.coerceIn(0.6f, 1.6f))
                 .commit()
+            Unit
         }
 
     private fun saveDocuments(documents: List<RecentDocument>) {
