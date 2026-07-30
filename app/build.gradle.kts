@@ -79,4 +79,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     // Navigation component for Jetpack Compose (required for multi-screen architecture)
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    testImplementation("junit:junit:4.13.2")
 }

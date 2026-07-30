@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.pdfreader.app.domain.model.ReaderPreferences
 import com.pdfreader.app.domain.model.RecentDocument
 import com.pdfreader.app.domain.repository.LibraryRepository
+import com.pdfreader.app.data.pdfbox.PdfAnnotationWriterImpl
+import com.pdfreader.app.domain.repository.PdfAnnotationSaver
 import com.pdfreader.app.domain.repository.PdfEngine
 import com.pdfreader.app.domain.repository.PdfSyncManager
 import com.pdfreader.app.domain.tts.TtsManager
@@ -31,7 +33,8 @@ class PdfReaderViewModel(
     application: Application,
     private val pdfEngine: PdfEngine,
     private val syncManager: PdfSyncManager,
-    private val libraryRepository: LibraryRepository
+    private val libraryRepository: LibraryRepository,
+    private val annotationSaver: PdfAnnotationSaver = PdfAnnotationWriterImpl()
 ) : AndroidViewModel(application) {
 
     private val ttsManager = TtsManager(application)
@@ -73,6 +76,7 @@ class PdfReaderViewModel(
                 ttsManager.setSpeechRate(rate)
                 updatePreferences { it.copy(speechRate = rate) }
             }
+            is PdfReaderIntent.RequestPageHighlights -> extractEmbeddedHighlights(intent.pageIndex, intent.onLoaded)
             is PdfReaderIntent.SelectTool -> selectTool(intent.tool)
             is PdfReaderIntent.SelectPenColor -> selectPenColor(intent.index)
             is PdfReaderIntent.SelectHighlighterColor -> selectHighlighterColor(intent.index)
@@ -84,10 +88,15 @@ class PdfReaderViewModel(
             is PdfReaderIntent.RemoveStrokeAt -> removeStrokeAt(intent.pageIndex, intent.position)
             is PdfReaderIntent.AddTextAnnotation -> addTextAnnotation(intent.pageIndex, intent.position)
             is PdfReaderIntent.UpdateTextAnnotation -> updateTextAnnotation(intent.annotationId, intent.text)
+            is PdfReaderIntent.SetAnnotationSaveMode -> _state.update { it.copy(annotationSaveMode = intent.mode) }
+            is PdfReaderIntent.SelectHighlightAt -> selectHighlightAt(intent.pageIndex, intent.position)
+            is PdfReaderIntent.ClearHighlightSelection -> _state.update { it.copy(selectedHighlight = null) }
+            is PdfReaderIntent.DeleteSelectedHighlight -> deleteSelectedHighlight()
             is PdfReaderIntent.PlayTts -> playTts(intent.pageIndex, intent.textBoxes)
             is PdfReaderIntent.PauseTts -> ttsManager.pause()
             is PdfReaderIntent.ResumeTts -> ttsManager.resume()
             is PdfReaderIntent.StopTts -> ttsManager.stop()
+            is PdfReaderIntent.SaveAnnotations -> saveAnnotations()
         }
     }
 
@@ -232,6 +241,59 @@ class PdfReaderViewModel(
         }
     }
 
+    private fun selectHighlightAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
+        _state.update { state ->
+            val sessionCandidates = state.highlightsByPage[pageIndex].orEmpty().map {
+                SelectedHighlight(
+                    id = it.id.toString(),
+                    pageIndex = pageIndex,
+                    source = HighlightSource.Session,
+                    color = it.color,
+                    rects = it.rects
+                )
+            }
+            val deletedIds = state.deletedEmbeddedHighlightIdsByPage[pageIndex].orEmpty()
+            val embeddedCandidates = state.embeddedHighlightsByPage[pageIndex].orEmpty()
+                .filterNot { it.id in deletedIds }
+                .map {
+                    SelectedHighlight(
+                        id = it.id,
+                        pageIndex = pageIndex,
+                        source = HighlightSource.Embedded,
+                        color = it.color,
+                        rects = it.rects
+                    )
+                }
+            val selected = HighlightHitTester.select(position, sessionCandidates + embeddedCandidates)
+            state.copy(selectedHighlight = selected)
+        }
+    }
+
+    private fun deleteSelectedHighlight() {
+        _state.update { state ->
+            val selected = state.selectedHighlight ?: return@update state
+            when (selected.source) {
+                HighlightSource.Session -> {
+                    val id = selected.id.toLongOrNull()
+                    val remaining = state.highlightsByPage[selected.pageIndex].orEmpty()
+                        .filterNot { it.id == id }
+                    state.copy(
+                        highlightsByPage = state.highlightsByPage + (selected.pageIndex to remaining),
+                        selectedHighlight = null
+                    )
+                }
+                HighlightSource.Embedded -> {
+                    val existing = state.deletedEmbeddedHighlightIdsByPage[selected.pageIndex].orEmpty()
+                    state.copy(
+                        deletedEmbeddedHighlightIdsByPage = state.deletedEmbeddedHighlightIdsByPage +
+                            (selected.pageIndex to (existing + selected.id)),
+                        selectedHighlight = null
+                    )
+                }
+            }
+        }
+    }
+
     private fun removeStrokeAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
         _state.update { state ->
             val pageStrokes = state.strokesByPage[pageIndex].orEmpty()
@@ -284,6 +346,87 @@ class PdfReaderViewModel(
                 _state.update { it.copy(isSyncing = false, errorMessage = "Failed to sync to cloud provider.") }
             } else {
                 _state.update { it.copy(isSyncing = false) }
+            }
+        }
+    }
+
+    /**
+     * Bakes all in-memory annotations into the PDF using PDFBox, writes the result
+     * to a temp file in cacheDir, syncs it back to the source URI via SAF, then
+     * clears the in-memory overlay and re-opens the document so the next render
+     * reflects the now-embedded annotations.
+     */
+    private fun saveAnnotations() {
+        val uri = _state.value.openedUri ?: return
+        val pdfBytes = pdfEngine.getPdfBytes() ?: return
+        val currentState = _state.value
+
+        // Nothing to save
+        val hasAnnotations = currentState.strokesByPage.values.any { it.isNotEmpty() } ||
+            currentState.highlightsByPage.values.any { it.isNotEmpty() } ||
+            currentState.textAnnotationsByPage.values.any { it.isNotEmpty() } ||
+            currentState.deletedEmbeddedHighlightIdsByPage.values.any { it.isNotEmpty() }
+        if (!hasAnnotations) return
+
+        _state.update { it.copy(isSavingAnnotations = true, errorMessage = null) }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            var tempFile: java.io.File? = null
+            try {
+                val context = getApplication<Application>().applicationContext
+                val outputFile = java.io.File(context.cacheDir, "annotated_${System.currentTimeMillis()}.pdf")
+                tempFile = outputFile
+
+                // Write annotations into PDF structure
+                annotationSaver.saveAnnotations(
+                    pdfBytes = pdfBytes,
+                    strokesByPage = currentState.strokesByPage,
+                    highlightsByPage = currentState.highlightsByPage,
+                    textAnnotationsByPage = currentState.textAnnotationsByPage,
+                    deletedEmbeddedHighlightIdsByPage = currentState.deletedEmbeddedHighlightIdsByPage,
+                    saveMode = currentState.annotationSaveMode,
+                    outputFile = outputFile
+                )
+
+                // Sync annotated file back to the source URI (Google Drive, local, etc.)
+                val success = syncManager.syncBackToSource(uri, outputFile)
+                if (!success) {
+                    _state.update {
+                        it.copy(isSavingAnnotations = false, errorMessage = "Failed to save annotations to source.")
+                    }
+                    return@launch
+                }
+
+                // Re-open the document so PDFium renders the embedded annotations
+                val pfd = context.contentResolver.openFileDescriptor(uri, "r")
+                    ?: throw IllegalStateException("Failed to reopen PDF after saving annotations.")
+                val newBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: throw IllegalStateException("Failed to re-read PDF after saving annotations.")
+                pdfEngine.openDocument(pfd, newBytes)
+
+                // Bump renderRevision: PdfPage composables observe this key and will
+                // discard their cached bitmaps, triggering a fresh render that shows
+                // the now-embedded annotations via PDFium.
+                _state.update {
+                    it.copy(
+                        isSavingAnnotations = false,
+                        strokesByPage = emptyMap(),
+                        highlightsByPage = emptyMap(),
+                        textAnnotationsByPage = emptyMap(),
+                        embeddedHighlightsByPage = emptyMap(),
+                        deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                        selectedHighlight = null,
+                        textBoxesByPage = emptyMap(), // invalidated by document re-open
+                        renderRevision = it.renderRevision + 1
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _state.update {
+                    it.copy(isSavingAnnotations = false, errorMessage = "Save failed: ${e.message}")
+                }
+            } finally {
+                tempFile?.delete()
             }
         }
     }
@@ -345,8 +488,12 @@ class PdfReaderViewModel(
                             recentDocuments = recentDocuments,
                             bookmarkedPages = previousDocument?.bookmarkedPages.orEmpty(),
                             activeTool = AnnotationTool.None,
+                            isSavingAnnotations = false,
                             strokesByPage = emptyMap(),
                             highlightsByPage = emptyMap(),
+                            embeddedHighlightsByPage = emptyMap(),
+                            deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                            selectedHighlight = null,
                             textBoxesByPage = emptyMap(),
                             textAnnotationsByPage = emptyMap(),
                             ttsState = TtsState.Idle
@@ -426,6 +573,25 @@ class PdfReaderViewModel(
         }
     }
 
+    private fun extractEmbeddedHighlights(
+        pageIndex: Int,
+        onLoaded: (List<EmbeddedTextHighlight>) -> Unit
+    ) {
+        val cached = _state.value.embeddedHighlightsByPage[pageIndex]
+        if (cached != null) {
+            onLoaded(cached)
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val highlights = runCatching { pdfEngine.getEmbeddedHighlights(pageIndex) }
+                .getOrElse { emptyList() }
+            _state.update { state ->
+                state.copy(embeddedHighlightsByPage = state.embeddedHighlightsByPage + (pageIndex to highlights))
+            }
+            withContext(Dispatchers.Main) { onLoaded(highlights) }
+        }
+    }
+
     private fun closePdf() {
         val currentState = _state.value
         val uri = currentState.openedUri?.toString()
@@ -444,6 +610,7 @@ class PdfReaderViewModel(
             it.copy(
                 isLoading = false,
                 isSyncing = false,
+                isSavingAnnotations = false,
                 isPdfLoaded = false,
                 pageCount = 0,
                 currentPageIndex = 0,
@@ -454,6 +621,9 @@ class PdfReaderViewModel(
                 activeTool = AnnotationTool.None,
                 strokesByPage = emptyMap(),
                 highlightsByPage = emptyMap(),
+                embeddedHighlightsByPage = emptyMap(),
+                deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                selectedHighlight = null,
                 textBoxesByPage = emptyMap(),
                 textAnnotationsByPage = emptyMap(),
                 selectedTextPositionByPage = emptyMap(),

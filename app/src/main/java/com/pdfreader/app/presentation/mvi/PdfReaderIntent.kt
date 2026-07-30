@@ -49,6 +49,11 @@ sealed class PdfReaderIntent {
 
     data class SetSpeechRate(val rate: Float) : PdfReaderIntent()
 
+    data class RequestPageHighlights(
+        val pageIndex: Int,
+        val onLoaded: (List<EmbeddedTextHighlight>) -> Unit = {}
+    ) : PdfReaderIntent()
+
     data class SelectTool(val tool: AnnotationTool) : PdfReaderIntent()
 
     data class SelectPenColor(val index: Int) : PdfReaderIntent()
@@ -71,8 +76,19 @@ sealed class PdfReaderIntent {
 
     data class UpdateTextAnnotation(val annotationId: Long, val text: String) : PdfReaderIntent()
 
+    data class SetAnnotationSaveMode(val mode: AnnotationSaveMode) : PdfReaderIntent()
+    data class SelectHighlightAt(val pageIndex: Int, val position: Offset) : PdfReaderIntent()
+    object ClearHighlightSelection : PdfReaderIntent()
+    object DeleteSelectedHighlight : PdfReaderIntent()
+
     data class PlayTts(val pageIndex: Int, val textBoxes: List<PdfTextBox>) : PdfReaderIntent()
     object PauseTts : PdfReaderIntent()
     object ResumeTts : PdfReaderIntent()
     object StopTts : PdfReaderIntent()
+
+    /**
+     * Bakes all in-memory annotations into the PDF file and syncs it back
+     * to the original source URI via the Storage Access Framework.
+     */
+    object SaveAnnotations : PdfReaderIntent()
 }

@@ -1,40 +1,55 @@
 ---
 applyTo: "**/*"
 name: PDF Reader Android App
-description: Instructions for developing the highly optimized Android PDF Reader
+description: Agent context for the Android PDF reader and annotation pipeline
 ---
 
-# PDF Reader — Agent Instructions
+# PDF Reader — Agent Context
 
-A lightweight, high-performance Android PDF reader focused purely on **reading and annotating**. This is a compute-intensive app, so **performance, low latency, and a clean modular architecture are non-negotiable**.
+## Product and stack
 
-## Tech Stack (do not change without asking)
-- **Language / UI**: Kotlin + Jetpack Compose
-- **Architecture**: MVI + Clean Architecture; Coroutines + Flow for concurrency
-- **PDF Rendering**: PDFium-Android
-- **Annotation / Editing**: Apache PDFBox — highlight, embedded pen, eraser
-- **Read Aloud**: Uses Android System default TextToSpeech (TTS) Engine
-- **Sync**: Google Drive background sync via Storage Access Framework (SAF)
+Android PDF reader focused on fast reading, pen/highlight/text-note annotation, persistent PDF output, TTS, and SAF sync.
 
-## Non-Negotiable Constraints
-- **Performance first.** Avoid memory leaks and unneeded allocations — especially with **bitmaps** and **Compose recompositions**.
-- **No blocking work on the main thread.** Use Coroutines/Flow; keep heavy I/O and rendering off the UI.
-- **Respect layer boundaries**: Presentation → Domain → Data. Keep the Domain layer framework-agnostic.
-- **Production-ready code only.** Handle edge cases; add efficient error handling and logging so issues are easy to identify and resolve.
-- Full architecture and design decisions live in `.github/design.md`. **Consult it before any structural change.**
+- Kotlin + Jetpack Compose
+- MVI + Clean Architecture; `Presentation → Domain → Data`
+- PDFium-Android for page rasterization; Apache PDFBox Android for text geometry and PDF mutation
+- Coroutines/Flow for background work; Android system TTS; SAF for persistence/sync
 
-## Build & Test Workflow
-- **No local runtime.** Do **NOT** run `./gradlew` locally.
-- All builds run via the **GitHub Actions** pipeline.
-- UI testing is done by downloading APKs from **GitHub Releases** (triggered on the `main` branch).
+PDFBox compatibility is pinned to `com.tom-roush:pdfbox-android:2.0.27.0`. This Android fork does not expose every class from newer upstream PDFBox releases; consult its 2.x API before adding PDF annotation code.
 
-## Required Workflow (every task)
-1. **Plan before coding.** Create a todo list; make the final item *"Commit and push to remote for CI build."*
-2. **Use first-principles thinking** — break the problem down to its fundamentals and reason up from there.
-3. **Before implementing**, propose **3–4 approaches** with trade-offs (tech stack / architecture / algorithm / library). Recommend the **optimal** and the **industry-standard** options.
-4. **Never assume** tech-stack or feature details — **ask first**.
-5. **Never implement a feature** unless it is **explicitly requested**.
+Read `.github/design.md` before structural work. It is the architecture source of truth; `implementation-files/feature01.md`, `feature02.md`, and `feature03.md` are feature-level contracts and status records.
 
-## Tools
-- For latest docs or resolving package errors, use MCP #tool:websearch and #tool:context7/query-docs
+## Current architecture contract
 
+1. Compose renders a PDFium bitmap as the base layer and draws unsaved annotations/selection UI as overlays.
+2. UI positions are normalized (`0..1`, top-left origin). `data/pdfbox/PdfCoordinateMapper.kt` is the shared PDFBox conversion boundary for CropBox and 90° page rotation.
+3. PDFBox reads word boxes plus per-character geometry and embedded highlights off the main thread. `PdfiumEngine` caches both per page; character geometry is required for line-contiguous highlighter selection.
+4. Save snapshots MVI state, writes or flattens annotations on `Dispatchers.IO`, syncs through SAF, reopens the document, increments `renderRevision`, then clears only successfully persisted state.
+5. Existing embedded highlights are cached before pointer hit-testing. Selection is state-driven; selection alone never mutates the PDF.
+
+## Engineering constraints
+
+- Never block the main thread with PDF I/O, parsing, rendering, saving, or sync.
+- Keep domain APIs free of PDFBox/PDFium implementation details. Presentation must not query PDFBox inside a pointer callback.
+- Use `PdfCoordinateMapper`; do not add ad-hoc Y flips, DPI formulas, or MediaBox-only mapping.
+- Preserve existing annotations, forms, and signatures unless a selected mutation explicitly changes them.
+- Editable and flattened saves are distinct. Flattening paints new supported annotations into `/Contents` and removes only those newly created `/Annots`; it is irreversible.
+- Keep bitmaps bounded and release documents, descriptors, and temporary files. PDFBox uses a 50 MiB mixed-memory threshold.
+- For ink annotations, use `PDAnnotationMarkup` with the `/Ink` subtype and its `setInkList`/`setConstantOpacity` APIs; do not reference the newer `PDAnnotationInk` class. Load byte arrays through the supported `InputStream` overload when applying `MemoryUsageSetting.setupMixed(50 MiB)`.
+- Text highlighter selection must be based on cached character geometry, not word-box intersection. A drag selects a contiguous range on the first and last lines and all intervening lines, including reverse drags.
+- Text-markup normal appearances must draw each selected quad with the annotation opacity. Never use the union rectangle as a filled appearance because it obscures the PDF text.
+- Do not claim tile/viewport rendering or cross-viewer fidelity until code and CI/device validation prove it.
+
+## Current feature status
+
+- **Feature 01:** hybrid overlay/commit pipeline, shared coordinate mapper, mixed PDFBox memory, and mapper tests are implemented. Tile/viewport rendering, bitmap eviction, and PDFium text APIs are still pending.
+- **Feature 02:** editable/flattened save modes, quad-based transparent highlight appearances, save/sync/reopen, and flattening of newly saved supported annotations are implemented. External-viewer validation remains pending.
+- **Feature 03:** cached embedded highlights, normalized hit-testing, dashed selection bounds, anchored Delete action, and persistence of deletion are implemented. Color/comment actions and device validation remain pending.
+
+## Validation and delivery
+
+- Do **not** run Gradle locally. GitHub Actions is the build/test authority.
+- Unit tests are under `app/src/test`; add/maintain mapper and hit-testing coverage when changing those contracts.
+- Character-range selection coverage belongs in `TextHighlightSelectorTest`; keep wrapped-line and reverse-drag cases covered when changing highlighter interaction.
+- Release generation runs on pushes to `main` and `feature` via `.github/workflows/gh-release.yml`.
+- Preserve unrelated worktree changes. Stage only task files, inspect the staged diff, then commit and push when requested or when following the repository delivery workflow.

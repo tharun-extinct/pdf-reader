@@ -21,11 +21,14 @@ app/build/
 
 uidump/
 
+
 # Environment & local config
 skills/
 .env
 gradlew.bat
 local.properties
+error.txt
+assets/
 
 
 # OS files
