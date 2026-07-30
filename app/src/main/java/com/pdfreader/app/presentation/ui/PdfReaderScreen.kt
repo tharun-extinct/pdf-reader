@@ -1,8 +1,8 @@
 package com.pdfreader.app.presentation.ui
 
 import android.graphics.Bitmap
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
@@ -28,25 +28,23 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Book
 import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Draw
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FormatColorFill
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Stop
@@ -72,6 +70,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -101,23 +100,38 @@ import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderState
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
-import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
+import com.pdfreader.app.presentation.mvi.TextHighlightSelector
 import com.pdfreader.app.domain.tts.TtsState
 import androidx.compose.ui.text.style.TextOverflow
 import com.pdfreader.app.presentation.mvi.formatHexColor
 import com.pdfreader.app.presentation.mvi.parseHexColor
 import com.pdfreader.app.presentation.theme.UiSmStyle
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PdfReaderScreen(
     viewModel: PdfReaderViewModel,
+    onNavigateBack: () -> Unit,
     onOpenFilePicker: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
-    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { state.pageCount })
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+        initialPage = state.currentPageIndex,
+        pageCount = { state.pageCount }
+    )
+
+    BackHandler(onBack = onNavigateBack)
+
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }
+            .distinctUntilChanged()
+            .collect { pageIndex ->
+                viewModel.processIntent(PdfReaderIntent.PageChanged(pageIndex))
+            }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -128,7 +142,7 @@ fun PdfReaderScreen(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.processIntent(PdfReaderIntent.ClosePdf) }) {
+                    IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                             contentDescription = "Back",
@@ -137,23 +151,21 @@ fun PdfReaderScreen(
                     }
                 },
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Book,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
+                    Column {
                         Text(
                             text = state.documentTitle ?: "Document",
-                            style = UiSmStyle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        if (state.pageCount > 0) {
+                            Text(
+                                text = "Page ${state.currentPageIndex + 1} of ${state.pageCount}",
+                                style = UiSmStyle.copy(fontSize = 11.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -200,11 +212,28 @@ fun PdfReaderScreen(
                         }
                     }
 
-                    IconButton(onClick = { /* bookmark */ }) {
+                    val isBookmarked = state.currentPageIndex in state.bookmarkedPages
+                    IconButton(
+                        onClick = {
+                            viewModel.processIntent(PdfReaderIntent.ToggleBookmark)
+                        }
+                    ) {
                         Icon(
-                            imageVector = Icons.Outlined.BookmarkBorder,
-                            contentDescription = "Bookmark",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = if (isBookmarked) {
+                                Icons.Filled.Bookmark
+                            } else {
+                                Icons.Outlined.BookmarkBorder
+                            },
+                            contentDescription = if (isBookmarked) {
+                                "Remove bookmark from page ${state.currentPageIndex + 1}"
+                            } else {
+                                "Bookmark page ${state.currentPageIndex + 1}"
+                            },
+                            tint = if (isBookmarked) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
                         )
                     }
                 }
@@ -231,16 +260,16 @@ fun PdfReaderScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Loading…",
+                            text = "Opening your document…",
                             style = UiSmStyle,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
                 state.errorMessage != null -> {
-                    Text(
-                        text = "Error: ${state.errorMessage}",
-                        color = MaterialTheme.colorScheme.error,
+                    ReaderErrorState(
+                        message = state.errorMessage.orEmpty(),
+                        onChooseAnother = onOpenFilePicker,
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
@@ -248,7 +277,11 @@ fun PdfReaderScreen(
                     PdfPager(
                         state = state,
                         pagerState = pagerState,
-                        onIntent = viewModel::processIntent
+                        onIntent = viewModel::processIntent,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 96.dp)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                     )
                 }
                 else -> {
@@ -316,6 +349,51 @@ fun PdfReaderScreen(
 }
 
 @Composable
+private fun ReaderErrorState(
+    message: String,
+    onChooseAnother: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.padding(24.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.errorContainer
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 420.dp)
+                .padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Description,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(32.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "We couldn’t open this PDF",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = message,
+                style = UiSmStyle,
+                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.78f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onChooseAnother) {
+                Text("Choose another PDF")
+            }
+        }
+    }
+}
+
+@Composable
 fun TtsControlsOverlay(
     ttsState: TtsState,
     onPlay: () -> Unit,
@@ -326,35 +404,66 @@ fun TtsControlsOverlay(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = 4.dp
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shadowElevation = 4.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Text(
+                text = when (ttsState) {
+                    is TtsState.Playing -> "Reading aloud"
+                    is TtsState.Paused -> "Paused"
+                    is TtsState.Error -> "Read aloud unavailable"
+                    TtsState.Idle -> "Read aloud"
+                },
+                style = UiSmStyle.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(start = 6.dp)
+            )
             when (ttsState) {
                 is TtsState.Idle, is TtsState.Error -> {
                     IconButton(onClick = onPlay) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Play")
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = "Start reading aloud",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                 }
                 is TtsState.Playing -> {
                     IconButton(onClick = onPause) {
-                        Icon(Icons.Default.Pause, contentDescription = "Pause")
+                        Icon(
+                            Icons.Default.Pause,
+                            contentDescription = "Pause reading aloud",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                     IconButton(onClick = onStop) {
-                        Icon(Icons.Default.Stop, contentDescription = "Stop")
+                        Icon(
+                            Icons.Default.Stop,
+                            contentDescription = "Stop reading aloud",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                 }
                 is TtsState.Paused -> {
                     IconButton(onClick = onResume) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = "Resume reading aloud",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                     IconButton(onClick = onStop) {
-                        Icon(Icons.Default.Stop, contentDescription = "Stop")
+                        Icon(
+                            Icons.Default.Stop,
+                            contentDescription = "Stop reading aloud",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                 }
             }
@@ -484,10 +593,10 @@ private fun FloatingAnnotationToolbar(
                 )
                 ToolbarDivider()
                 FloatingToolbarIcon(
-                    icon = Icons.Outlined.BookmarkBorder,
-                    label = "Bookmark",
+                    icon = Icons.Outlined.Palette,
+                    label = "Customize annotation colors",
                     selected = false,
-                    onClick = { /* bookmark page */ }
+                    onClick = { onIntent(PdfReaderIntent.ToggleAnnotationSettings) }
                 )
             }
         }
@@ -537,12 +646,13 @@ private fun ToolbarDivider() {
 fun PdfPager(
     state: PdfReaderState,
     pagerState: androidx.compose.foundation.pager.PagerState,
-    onIntent: (PdfReaderIntent) -> Unit
+    onIntent: (PdfReaderIntent) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     // Use Crossfade to animate page changes smoothly.
     HorizontalPager(
         state = pagerState,
-        modifier = Modifier.fillMaxSize()
+        modifier = modifier
     ) { pageIndex ->
         androidx.compose.animation.Crossfade(targetState = pageIndex) { index ->
             PdfPage(
@@ -624,7 +734,7 @@ fun PdfPage(
                 Box {
                     Image(
                     bitmap = pageImage.asImageBitmap(),
-                    contentDescription = "Page $pageIndex",
+                    contentDescription = "Page ${pageIndex + 1}",
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer(
@@ -634,14 +744,18 @@ fun PdfPage(
                         .pointerInput(Unit) {
                             detectTransformGestures { _, _, zoom, _ ->
                                 // Clamp the scale to a reasonable range.
-                                val newScale = (scale * zoom).coerceIn(0.5f, 5f)
+                                val newScale = (scale * zoom).coerceIn(1f, 5f)
                                 scale = newScale
                             }
                         },
                     contentScale = ContentScale.Fit
                 )
 
-                Canvas(modifier = Modifier.matchParentSize()) {
+                Canvas(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer(scaleX = scale, scaleY = scale)
+                ) {
                 pageHighlights.forEach { highlight ->
                     highlight.rects.forEach { rect ->
                         drawRect(
@@ -695,7 +809,8 @@ fun PdfPage(
                 SelectableTextLayer(
                     textBoxes = pageTextBoxes,
                     contentBounds = contentBounds,
-                    highlightRects = highlightRects
+                    highlightRects = highlightRects,
+                    scale = scale
                 )
             }
 
@@ -704,23 +819,29 @@ fun PdfPage(
                 state = state,
                 contentBounds = contentBounds,
                 textBoxes = pageTextBoxes,
+                scale = scale,
                 onIntent = onIntent
             )
 
-            val selectedHighlight = state.selectedHighlight?.takeIf { it.pageIndex == pageIndex }
-            if (selectedHighlight != null) {
-                SelectedHighlightOverlay(
-                    selected = selectedHighlight,
-                    contentBounds = contentBounds,
-                    containerSize = size,
-                    onDelete = { onIntent(PdfReaderIntent.DeleteSelectedHighlight) }
-                )
-            }
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer(scaleX = scale, scaleY = scale)
+            ) {
+                val selectedHighlight = state.selectedHighlight?.takeIf { it.pageIndex == pageIndex }
+                if (selectedHighlight != null) {
+                    SelectedHighlightOverlay(
+                        selected = selectedHighlight,
+                        contentBounds = contentBounds,
+                        containerSize = size,
+                        onDelete = { onIntent(PdfReaderIntent.DeleteSelectedHighlight) }
+                    )
+                }
 
-            pageTextAnnotations.forEach { annotation ->
+                pageTextAnnotations.forEach { annotation ->
                 val position = annotation.position.toDisplayOffset(contentBounds)
                 Surface(
-                    color = Color(0xF0FFFFFF),
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
                     tonalElevation = 3.dp,
                     shadowElevation = 4.dp,
                     shape = RoundedCornerShape(10.dp),
@@ -740,9 +861,10 @@ fun PdfPage(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
-                        label = { Text("Text") }
+                        label = { Text("Note") }
                     )
                 }
+            }
             }
         } else {
             CircularProgressIndicator()
@@ -754,7 +876,8 @@ fun PdfPage(
 private fun BoxScope.SelectableTextLayer(
     textBoxes: List<PdfTextBox>,
     contentBounds: Rect,
-    highlightRects: List<Rect> = emptyList()
+    highlightRects: List<Rect> = emptyList(),
+    scale: Float = 1f
 ) {
     if (textBoxes.isEmpty() || contentBounds.width <= 0f || contentBounds.height <= 0f) {
         return
@@ -762,26 +885,34 @@ private fun BoxScope.SelectableTextLayer(
 
     val density = LocalDensity.current
     
-    // Draw highlights for TTS
+    // TTS bounds are normalized to the rendered PDF, not to the whole pager item.
+    // Use the fitted PDF bounds so highlights stay aligned when the page is letterboxed.
     if (highlightRects.isNotEmpty()) {
-        Canvas(modifier = Modifier.matchParentSize()) {
+        val ttsHighlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+        Canvas(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer(scaleX = scale, scaleY = scale)
+        ) {
             highlightRects.forEach { rect ->
+                val displayRect = rect.toDisplayRect(contentBounds)
                 drawRect(
-                    color = Color(0xFF64B5F6).copy(alpha = 0.5f), // Nice light blue highlight
-                    topLeft = androidx.compose.ui.geometry.Offset(
-                        x = rect.left * contentBounds.width,
-                        y = rect.top * contentBounds.height
-                    ),
+                    color = ttsHighlightColor,
+                    topLeft = displayRect.topLeft,
                     size = androidx.compose.ui.geometry.Size(
-                        width = rect.width * contentBounds.width,
-                        height = rect.height * contentBounds.height
+                        width = displayRect.width,
+                        height = displayRect.height
                     )
                 )
             }
         }
     }
 
-    SelectionContainer(modifier = Modifier.matchParentSize()) {
+    SelectionContainer(
+        modifier = Modifier
+            .matchParentSize()
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+    ) {
         Box(modifier = Modifier.matchParentSize()) {
             textBoxes.forEach { textBox ->
                 val displayBounds = textBox.bounds.toDisplayRect(contentBounds)
@@ -811,6 +942,7 @@ private fun BoxScope.AnnotationGestureLayer(
     state: PdfReaderState,
     contentBounds: Rect,
     textBoxes: List<PdfTextBox>,
+    scale: Float,
     onIntent: (PdfReaderIntent) -> Unit
 ) {
     val activeTool = state.activeTool
@@ -818,10 +950,18 @@ private fun BoxScope.AnnotationGestureLayer(
     val highlighterColor = state.highlighterPalette.colors.getOrNull(state.selectedHighlighterColorIndex) ?: state.highlighterPalette.colors.first()
     var currentStrokePoints = remember { mutableStateListOf<Offset>() }
     var dragStart by remember { mutableStateOf<Offset?>(null) }
+    val textSelectionPreview = if (activeTool == AnnotationTool.Highlighter) {
+        val start = dragStart
+        val end = currentStrokePoints.lastOrNull()
+        if (start != null && end != null) TextHighlightSelector.select(textBoxes, start, end) else emptyList()
+    } else {
+        emptyList()
+    }
 
     Box(
         modifier = Modifier
             .matchParentSize()
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .then(
                 when (activeTool) {
                     AnnotationTool.Pen, AnnotationTool.Highlighter -> {
@@ -840,10 +980,7 @@ private fun BoxScope.AnnotationGestureLayer(
                                     val start = dragStart
                                     val end = currentStrokePoints.lastOrNull()
                                     val highlightedText = if (activeTool == AnnotationTool.Highlighter && start != null && end != null) {
-                                        val selectionRect = normalizedSelectionRect(start, end).inflate(0.006f)
-                                        val selectedRects = textBoxes
-                                            .filter { it.bounds.intersects(selectionRect) }
-                                            .map { it.bounds }
+                                        val selectedRects = TextHighlightSelector.select(textBoxes, start, end)
                                         if (selectedRects.isNotEmpty()) {
                                             onIntent(
                                                 PdfReaderIntent.AddTextHighlight(
@@ -918,6 +1055,19 @@ private fun BoxScope.AnnotationGestureLayer(
     ) {
         if (currentStrokePoints.isNotEmpty()) {
             Canvas(modifier = Modifier.matchParentSize()) {
+                if (activeTool == AnnotationTool.Highlighter && textSelectionPreview.isNotEmpty()) {
+                    textSelectionPreview.forEach { rect ->
+                        drawRect(
+                            color = Color(highlighterColor),
+                            topLeft = rect.topLeft.toDisplayOffset(contentBounds),
+                            size = androidx.compose.ui.geometry.Size(
+                                width = rect.width * contentBounds.width,
+                                height = rect.height * contentBounds.height
+                            )
+                        )
+                    }
+                    return@Canvas
+                }
                 val previewPath = Path().apply {
                     currentStrokePoints.forEachIndexed { index, point ->
                         val displayPoint = point.toDisplayOffset(contentBounds)
@@ -1138,31 +1288,6 @@ private fun Rect.toDisplayRect(bounds: Rect): Rect {
         right = bottomRight.x,
         bottom = bottomRight.y
     )
-}
-
-private fun normalizedSelectionRect(start: Offset, end: Offset): Rect {
-    return Rect(
-        left = minOf(start.x, end.x),
-        top = minOf(start.y, end.y),
-        right = maxOf(start.x, end.x),
-        bottom = maxOf(start.y, end.y)
-    )
-}
-
-private fun Rect.inflate(amount: Float): Rect {
-    return Rect(
-        left = (left - amount).coerceIn(0f, 1f),
-        top = (top - amount).coerceIn(0f, 1f),
-        right = (right + amount).coerceIn(0f, 1f),
-        bottom = (bottom + amount).coerceIn(0f, 1f)
-    )
-}
-
-private fun Rect.intersects(other: Rect): Boolean {
-    return left < other.right &&
-        right > other.left &&
-        top < other.bottom &&
-        bottom > other.top
 }
 
 private fun toNormalizedIfInside(position: Offset, bounds: Rect): Offset? {

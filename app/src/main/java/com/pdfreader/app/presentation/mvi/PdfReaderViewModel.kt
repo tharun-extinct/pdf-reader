@@ -5,6 +5,9 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pdfreader.app.domain.model.ReaderPreferences
+import com.pdfreader.app.domain.model.RecentDocument
+import com.pdfreader.app.domain.repository.LibraryRepository
 import com.pdfreader.app.data.pdfbox.PdfAnnotationWriterImpl
 import com.pdfreader.app.domain.repository.PdfAnnotationSaver
 import com.pdfreader.app.domain.repository.PdfEngine
@@ -12,6 +15,8 @@ import com.pdfreader.app.domain.repository.PdfSyncManager
 import com.pdfreader.app.domain.tts.TtsManager
 import com.pdfreader.app.domain.tts.TtsState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +33,7 @@ class PdfReaderViewModel(
     application: Application,
     private val pdfEngine: PdfEngine,
     private val syncManager: PdfSyncManager,
+    private val libraryRepository: LibraryRepository,
     private val annotationSaver: PdfAnnotationSaver = PdfAnnotationWriterImpl()
 ) : AndroidViewModel(application) {
 
@@ -35,6 +41,8 @@ class PdfReaderViewModel(
 
     private val _state = MutableStateFlow(PdfReaderState())
     val state: StateFlow<PdfReaderState> = _state.asStateFlow()
+    private var progressSaveJob: Job? = null
+    private var preferencesSaveJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -42,6 +50,7 @@ class PdfReaderViewModel(
                 _state.update { it.copy(ttsState = ttsState) }
             }
         }
+        loadLibrary()
     }
 
     fun processIntent(intent: PdfReaderIntent) {
@@ -56,6 +65,17 @@ class PdfReaderViewModel(
                 intent.onRendered
             )
             is PdfReaderIntent.RequestPageText -> extractPageText(intent.pageIndex, intent.onExtracted)
+            is PdfReaderIntent.PageChanged -> onPageChanged(intent.pageIndex)
+            PdfReaderIntent.ToggleBookmark -> toggleBookmark()
+            PdfReaderIntent.ClearRecentDocuments -> clearRecentDocuments()
+            PdfReaderIntent.DismissError -> _state.update { it.copy(errorMessage = null) }
+            is PdfReaderIntent.SetThemeMode -> updatePreferences { it.copy(themeMode = intent.mode) }
+            is PdfReaderIntent.SetKeepScreenOn -> updatePreferences { it.copy(keepScreenOn = intent.enabled) }
+            is PdfReaderIntent.SetSpeechRate -> {
+                val rate = intent.rate.coerceIn(0.6f, 1.6f)
+                ttsManager.setSpeechRate(rate)
+                updatePreferences { it.copy(speechRate = rate) }
+            }
             is PdfReaderIntent.RequestPageHighlights -> extractEmbeddedHighlights(intent.pageIndex, intent.onLoaded)
             is PdfReaderIntent.SelectTool -> selectTool(intent.tool)
             is PdfReaderIntent.SelectPenColor -> selectPenColor(intent.index)
@@ -80,17 +100,87 @@ class PdfReaderViewModel(
         }
     }
 
+    private fun loadLibrary() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val recentDocuments = libraryRepository.getRecentDocuments()
+            val preferences = libraryRepository.getPreferences()
+            withContext(Dispatchers.Main) {
+                ttsManager.setSpeechRate(preferences.speechRate)
+            }
+            _state.update {
+                it.copy(
+                    isLibraryLoading = false,
+                    recentDocuments = recentDocuments,
+                    preferences = preferences
+                )
+            }
+        }
+    }
+
+    private fun updatePreferences(transform: (ReaderPreferences) -> ReaderPreferences) {
+        val updated = transform(_state.value.preferences)
+        _state.update { it.copy(preferences = updated) }
+        preferencesSaveJob?.cancel()
+        preferencesSaveJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(PREFERENCES_SAVE_DEBOUNCE_MS)
+            libraryRepository.savePreferences(updated)
+        }
+    }
+
+    private fun onPageChanged(pageIndex: Int) {
+        val currentState = _state.value
+        if (!currentState.isPdfLoaded || currentState.pageCount <= 0) return
+
+        val safePageIndex = pageIndex.coerceIn(0, currentState.pageCount - 1)
+        _state.update { it.copy(currentPageIndex = safePageIndex) }
+
+        val uri = currentState.openedUri?.toString() ?: return
+        progressSaveJob?.cancel()
+        progressSaveJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(PROGRESS_SAVE_DEBOUNCE_MS)
+            libraryRepository.updateProgress(uri, safePageIndex)
+            val recentDocuments = libraryRepository.getRecentDocuments()
+            _state.update { it.copy(recentDocuments = recentDocuments) }
+        }
+    }
+
+    private fun toggleBookmark() {
+        val currentState = _state.value
+        val uri = currentState.openedUri?.toString() ?: return
+        val pageIndex = currentState.currentPageIndex
+        viewModelScope.launch(Dispatchers.IO) {
+            val bookmarkedPages = libraryRepository.toggleBookmark(uri, pageIndex)
+            val recentDocuments = libraryRepository.getRecentDocuments()
+            _state.update {
+                it.copy(
+                    bookmarkedPages = bookmarkedPages,
+                    recentDocuments = recentDocuments
+                )
+            }
+        }
+    }
+
+    private fun clearRecentDocuments() {
+        viewModelScope.launch(Dispatchers.IO) {
+            libraryRepository.clearRecentDocuments()
+            _state.update { it.copy(recentDocuments = emptyList()) }
+        }
+    }
+
     private fun playTts(pageIndex: Int, textBoxes: List<com.pdfreader.app.presentation.mvi.PdfTextBox>) {
         ttsManager.play(pageIndex, textBoxes)
     }
 
     private fun selectTool(tool: AnnotationTool) {
+        val nextTool = if (_state.value.activeTool == tool) {
+            AnnotationTool.None
+        } else {
+            tool
+        }
+        if (nextTool != AnnotationTool.ReadAloud) {
+            ttsManager.stop()
+        }
         _state.update { state ->
-            val nextTool = if (state.activeTool == tool && (tool == AnnotationTool.Pen || tool == AnnotationTool.Highlighter)) {
-                AnnotationTool.None
-            } else {
-                tool
-            }
             state.copy(activeTool = nextTool, isAnnotationSettingsOpen = false)
         }
     }
@@ -354,6 +444,9 @@ class PdfReaderViewModel(
                         ?: throw IllegalStateException("Failed to read PDF bytes.")
                     pdfEngine.openDocument(pfd, pdfBytes)
                     val pageCount = pdfEngine.getPageCount()
+                    if (pageCount <= 0) {
+                        throw IllegalStateException("This PDF does not contain any readable pages.")
+                    }
                     
                     // Extract document title from URI
                     val cursor = context.contentResolver.query(uri, null, null, null, null)
@@ -366,14 +459,44 @@ class PdfReaderViewModel(
                             }
                         }
                     }
-                    
-                    _state.update { 
+
+                    val previousDocument = libraryRepository.getRecentDocuments()
+                        .firstOrNull { it.uri == uri.toString() }
+                    val initialPage = previousDocument?.lastPage
+                        ?.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+                        ?: 0
+                    libraryRepository.recordDocument(
+                        RecentDocument(
+                            uri = uri.toString(),
+                            title = title,
+                            pageCount = pageCount,
+                            lastPage = initialPage,
+                            lastOpenedAt = System.currentTimeMillis(),
+                            bookmarkedPages = previousDocument?.bookmarkedPages.orEmpty()
+                        )
+                    )
+                    val recentDocuments = libraryRepository.getRecentDocuments()
+
+                    _state.update {
                         it.copy(
                             isLoading = false,
                             isPdfLoaded = true,
                             pageCount = pageCount,
+                            currentPageIndex = initialPage,
                             openedUri = uri,
-                            documentTitle = title
+                            documentTitle = title,
+                            recentDocuments = recentDocuments,
+                            bookmarkedPages = previousDocument?.bookmarkedPages.orEmpty(),
+                            activeTool = AnnotationTool.None,
+                            isSavingAnnotations = false,
+                            strokesByPage = emptyMap(),
+                            highlightsByPage = emptyMap(),
+                            embeddedHighlightsByPage = emptyMap(),
+                            deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                            selectedHighlight = null,
+                            textBoxesByPage = emptyMap(),
+                            textAnnotationsByPage = emptyMap(),
+                            ttsState = TtsState.Idle
                         )
                     }
                 } else {
@@ -383,8 +506,13 @@ class PdfReaderViewModel(
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                _state.update { 
-                    it.copy(isLoading = false, errorMessage = e.message ?: "Unknown error opening PDF") 
+                pdfEngine.closeDocument()
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        isPdfLoaded = false,
+                        errorMessage = e.message ?: "Unknown error opening PDF"
+                    )
                 }
             }
         }
@@ -465,14 +593,54 @@ class PdfReaderViewModel(
     }
 
     private fun closePdf() {
+        val currentState = _state.value
+        val uri = currentState.openedUri?.toString()
+        val pageIndex = currentState.currentPageIndex
+        progressSaveJob?.cancel()
+        if (uri != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                libraryRepository.updateProgress(uri, pageIndex)
+                val recentDocuments = libraryRepository.getRecentDocuments()
+                _state.update { it.copy(recentDocuments = recentDocuments) }
+            }
+        }
+        ttsManager.stop()
         pdfEngine.closeDocument()
-        _state.update { PdfReaderState() }
+        _state.update {
+            it.copy(
+                isLoading = false,
+                isSyncing = false,
+                isSavingAnnotations = false,
+                isPdfLoaded = false,
+                pageCount = 0,
+                currentPageIndex = 0,
+                openedUri = null,
+                documentTitle = null,
+                errorMessage = null,
+                bookmarkedPages = emptySet(),
+                activeTool = AnnotationTool.None,
+                strokesByPage = emptyMap(),
+                highlightsByPage = emptyMap(),
+                embeddedHighlightsByPage = emptyMap(),
+                deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                selectedHighlight = null,
+                textBoxesByPage = emptyMap(),
+                textAnnotationsByPage = emptyMap(),
+                selectedTextPositionByPage = emptyMap(),
+                ttsState = TtsState.Idle
+            )
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
         pdfEngine.closeDocument()
         ttsManager.shutdown()
+    }
+
+    private companion object {
+        const val PROGRESS_SAVE_DEBOUNCE_MS = 500L
+        const val PREFERENCES_SAVE_DEBOUNCE_MS = 250L
     }
 }
 

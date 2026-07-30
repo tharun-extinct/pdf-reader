@@ -161,6 +161,7 @@ private class PositionedWordStripper(
     val words = mutableListOf<PdfTextBox>()
     private var currentText = StringBuilder()
     private var currentBounds: Rect? = null
+    private val currentCharacterBounds = mutableListOf<Rect>()
     private var previousPosition: TextPosition? = null
 
     override fun processTextPosition(text: TextPosition) {
@@ -184,6 +185,7 @@ private class PositionedWordStripper(
 
         currentText.append(value)
         currentBounds = currentBounds?.union(bounds) ?: bounds
+        currentCharacterBounds += bounds
         previousPosition = text
     }
 
@@ -197,10 +199,16 @@ private class PositionedWordStripper(
         val text = currentText.toString()
         val bounds = currentBounds
         if (text.isNotBlank() && bounds != null) {
-            words += PdfTextBox(pageIndex = pageIndex, text = text, bounds = bounds)
+            words += PdfTextBox(
+                pageIndex = pageIndex,
+                text = text,
+                bounds = bounds,
+                characterBounds = currentCharacterBounds.toList()
+            )
         }
         currentText = StringBuilder()
         currentBounds = null
+        currentCharacterBounds.clear()
     }
 }
 

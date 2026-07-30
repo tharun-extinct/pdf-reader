@@ -2,11 +2,13 @@ package com.pdfreader.app.presentation.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -63,17 +65,56 @@ private val NoxReaderLightColorScheme = lightColorScheme(
     surfaceContainerHighest = NoxReaderSurfaceContainerHighest,
 )
 
+private val NoxReaderDarkColorScheme = darkColorScheme(
+    primary = NoxReaderDarkPrimary,
+    onPrimary = NoxReaderDarkOnPrimary,
+    primaryContainer = NoxReaderDarkPrimaryContainer,
+    onPrimaryContainer = NoxReaderDarkOnPrimaryContainer,
+    inversePrimary = NoxReaderPrimary,
+    secondary = NoxReaderSecondaryFixedDim,
+    onSecondary = NoxReaderOnSecondaryFixed,
+    secondaryContainer = NoxReaderOnSecondaryFixedVariant,
+    onSecondaryContainer = NoxReaderSecondaryFixed,
+    tertiary = NoxReaderTertiaryFixedDim,
+    onTertiary = NoxReaderOnTertiaryFixed,
+    tertiaryContainer = NoxReaderOnTertiaryFixedVariant,
+    onTertiaryContainer = NoxReaderTertiaryFixed,
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
+    background = NoxReaderDarkBackground,
+    onBackground = NoxReaderDarkOnBackground,
+    surface = NoxReaderDarkSurface,
+    onSurface = NoxReaderDarkOnSurface,
+    surfaceVariant = NoxReaderDarkSurfaceVariant,
+    onSurfaceVariant = NoxReaderDarkOnSurfaceVariant,
+    surfaceTint = NoxReaderDarkPrimary,
+    inverseSurface = NoxReaderInverseOnSurface,
+    inverseOnSurface = NoxReaderInverseSurface,
+    outline = NoxReaderDarkOutline,
+    outlineVariant = NoxReaderDarkOutlineVariant,
+    surfaceBright = NoxReaderDarkSurfaceContainerHighest,
+    surfaceDim = NoxReaderDarkSurfaceContainerLowest,
+    surfaceContainerLowest = NoxReaderDarkSurfaceContainerLowest,
+    surfaceContainerLow = NoxReaderDarkSurfaceContainerLow,
+    surfaceContainer = NoxReaderDarkSurfaceContainer,
+    surfaceContainerHigh = NoxReaderDarkSurfaceContainerHigh,
+    surfaceContainerHighest = NoxReaderDarkSurfaceContainerHighest,
+)
+
 // ── Theme Composable ──────────────────────────────────────────────────
 
 @Composable
 fun NoxReaderTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
     CompositionLocalProvider(
         LocalNoxReaderSpacing provides NoxReaderSpacing()
     ) {
         MaterialTheme(
-            colorScheme = NoxReaderLightColorScheme,
+            colorScheme = if (darkTheme) NoxReaderDarkColorScheme else NoxReaderLightColorScheme,
             typography = NoxReaderTypography,
             content = content
         )

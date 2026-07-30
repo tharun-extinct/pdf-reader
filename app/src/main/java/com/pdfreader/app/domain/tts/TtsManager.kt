@@ -22,6 +22,7 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
     private var currentTextBoxes: List<PdfTextBox> = emptyList()
     private var chunks: List<TtsChunk> = emptyList()
     private var currentChunkIndex = 0
+    private var speechRate = 1f
 
     init {
         tts = TextToSpeech(context, this)
@@ -34,6 +35,7 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
                 _ttsState.value = TtsState.Error("Language not supported")
             } else {
                 isInitialized = true
+                tts?.setSpeechRate(speechRate)
                 setupProgressListener()
             }
         } else {
@@ -98,6 +100,13 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         
         if (chunks.isNotEmpty()) {
             speakCurrentChunk()
+        }
+    }
+
+    fun setSpeechRate(rate: Float) {
+        speechRate = rate.coerceIn(0.6f, 1.6f)
+        if (isInitialized) {
+            tts?.setSpeechRate(speechRate)
         }
     }
 
@@ -183,7 +192,7 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
     }
 
     private fun speakCurrentChunk() {
-        val chunk = chunks[currentChunkIndex]
+        val chunk = chunks.getOrNull(currentChunkIndex) ?: return
         tts?.speak(chunk.text, TextToSpeech.QUEUE_FLUSH, null, chunk.utteranceId)
     }
 

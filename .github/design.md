@@ -4,6 +4,8 @@
 
 This is a low-latency Android PDF reader built for reading and annotation. PDFium owns static page rasterization; PDFBox owns text geometry, embedded annotation metadata, and durable PDF changes. Compose owns all interaction and optimistic UI feedback.
 
+The data layer targets `com.tom-roush:pdfbox-android:2.0.27.0`. Its annotation API is an Android-specific PDFBox 2.x surface: freehand marks are represented by `PDAnnotationMarkup` with `/Subtype /Ink`, and opacity/ink paths use the methods exposed by that fork. Newer upstream-only annotation classes must not be introduced without first changing and validating the dependency.
+
 ## Technology and boundaries
 
 | Layer | Responsibility | Main components |
@@ -33,10 +35,18 @@ flowchart LR
 4. On Save, the ViewModel snapshots pending state and performs PDFBox writing plus SAF sync on `Dispatchers.IO`.
 5. After sync and successful reopen, `renderRevision` invalidates rendered pages and state caches. Only then are session overlays/deletion intents cleared.
 
+### Text highlighter interaction
+
+Text extraction retains both word bounds and per-character bounds. The highlighter resolves drag endpoints into reading-order cursors and creates one continuous rectangle per affected line: the range from the starting cursor to the end of the first line, complete intervening lines, and the beginning of the final line through the ending cursor. Reverse drags are normalized to the same reading-order range. The preview and persisted annotation use the same normalized rectangles.
+
 ### Save modes
 
-- **Editable:** PDFBox keeps `/Annots` entries for highlights, ink, and text notes. New annotations include normal appearances.
+- **Editable:** PDFBox keeps `/Annots` entries for highlights, ink, and text notes. New text highlights include a normal appearance made from their selected quads with the configured opacity; the annotation union rectangle is metadata only and is never painted as a solid box.
 - **Flattened:** PDFBox appends supported new annotation marks to page `/Contents`, then removes only those new annotation entries. Existing annotations remain intact.
+
+## Future enhancements
+
+- Local NPU-based voice model for higher-quality Read Aloud (for example, Piper TTS via ONNX/TFLite).
 
 ## Embedded highlight selection
 
@@ -46,12 +56,14 @@ When a page becomes visible, `PdfiumEngine.getEmbeddedHighlights()` reads PDFBox
 
 - PDF rendering, PDFBox parsing/saving, text/highlight extraction, and SAF I/O run off the main thread.
 - PDFBox document loading uses `MemoryUsageSetting.setupMixed(50 MiB)`.
+- Annotation saves load the in-memory PDF through PDFBox's `InputStream` plus `MemoryUsageSetting` overload; this preserves the mixed-memory limit while remaining compatible with the Android fork.
 - PDF documents and temporary save files are closed/deleted during close, replacement, save completion, and failure paths.
 - The current page renderer is still a full-page bitmap. Tile/viewport rendering, bitmap eviction, and request cancellation are planned work; do not describe them as implemented.
 
 ## Verification and delivery
 
 - Coordinate round-trip and overlap hit-testing JVM tests live in `app/src/test`.
+- `TextHighlightSelectorTest` covers contiguous wrapped-line ranges and reverse drag direction.
 - GitHub Actions is the only build/test environment; do not run local Gradle.
 - `.github/workflows/gh-release.yml` generates releases on `main` and `feature` pushes.
 
