@@ -8,7 +8,25 @@ description: Product, architecture, UI, and delivery context for the Android PDF
 
 ## Start here
 
-Read `.github/design.md` before product, UI, architecture, PDF pipeline, or persistence work. It is the current source of truth. The files under `implementation-files/` are historical feature contracts and audits; use them for rationale, but prefer current code and `design.md` when they differ.
+Use progressive disclosure for PDF reader feature and architecture work:
+
+1. Read `feature-blueprints/README.md` and classify the request by task intent.
+2. Load only the primary blueprint selected by its routing table.
+3. Follow that blueprint's links to the applicable sections of `.github/architecture.md`.
+4. Inspect the blueprint's implementation and tests before changing behavior or status documentation.
+5. Load an impact-check blueprint only when the change touches the shared behavior named in the manifest.
+
+If no manifest row matches, such as isolated CI, dependency, or general
+documentation work, do not force a blueprint match. Inspect the directly
+relevant files and load architecture context only if a shared contract changes.
+
+Do not load every blueprint for an isolated feature task. Read the complete
+architecture and every affected blueprint for structural, cross-cutting,
+persistence-wide, coordinate-contract, or ambiguous changes. Current code and
+verified tests override stale status prose.
+
+Files under `implementation-files/` are historical audits and plans. Use them
+only for rationale; they are not current feature contracts.
 
 NoxReader is a local-first Android PDF reader with:
 
@@ -123,17 +141,8 @@ All UI annotation coordinates are normalized `0..1` display-space values with a 
 
 When behavior, navigation, visual tokens, dependencies, build branches, or architecture change:
 
-1. update `.github/design.md`;
-2. update this file if agent guidance changed;
-3. update `README.md` if users or contributors are affected;
-4. keep statements limited to behavior present in code or verified CI.
-
-
-
-
----
-applyTo: "**/features/"
-name: features folder update
-description: Product, architecture, UI, and delivery context for the Android PDF reader
----
-
+1. update `.github/architecture.md` when a shared contract changed;
+2. update the relevant file under `feature-blueprints/` when feature behavior or verified status changed;
+3. update this file if agent routing or guidance changed;
+4. update `README.md` if users or contributors are affected;
+5. keep statements limited to behavior present in code or verified CI.

@@ -1,4 +1,4 @@
-# NoxReader Design and Architecture
+# NoxReader Architecture
 
 ## Product vision
 
@@ -186,17 +186,49 @@ flowchart LR
 
 ## Document and annotation pipeline
 
+PDFBox compatibility is pinned to `com.tom-roush:pdfbox-android:2.0.27.0`. This Android PDFBox 2.x fork does not expose every newer upstream API. Ink uses `PDAnnotationMarkup` with `/Subtype /Ink`; text notes and markup appearances must use APIs verified against the pinned AAR.
+
+### Coordinate system
+
+Domain and UI annotation geometry uses normalized `0..1` display-space
+coordinates with a top-left origin. Durable PDF geometry uses PDF points and
+the page box used for rendering, normally CropBox with MediaBox fallback.
+
+`PdfCoordinateMapper` is the single conversion boundary. It accounts for page
+dimensions and right-angle rotation; feature code must not introduce ad-hoc DPI
+scaling, Y-axis flips, or MediaBox-only conversions. For an unrotated page of
+width `W` and height `H`, the shared mapping is `pdfX = x * W` and
+`pdfY = (1 - y) * H`.
+
+The same bidirectional transform applies to rendering bounds, pointer input,
+text geometry, hit-testing, annotation rectangles, quad points, ink paths, and
+note anchors. Portrait, landscape, cropped, rotated, and non-standard pages
+must remain covered by mapper tests.
+
+### Rendering and overlay model
+
+PDFium owns the static page-bitmap layer. Compose owns pending annotations,
+gesture previews, selection feedback, handles, and contextual actions. Pointer
+interaction updates optimistic MVI state without mutating PDFBox or rerendering
+the base page.
+
+Rendering, overlays, and hit-testing share the fitted page `contentBounds`
+transform. The current implementation renders one full-page bitmap; viewport
+tiles, bounded bitmap eviction, obsolete-request cancellation, and complete
+zoom panning remain planned and must not be described as shipped.
+
+### Commit pipeline
+
 1. The Android document picker returns a persistable SAF URI.
 2. The ViewModel reads the file on `Dispatchers.IO`, retaining raw bytes for PDFBox and a file descriptor for PDFium.
 3. PDFium renders static page bitmaps. PDFBox supplies positioned word/character geometry and embedded highlight metadata.
-4. UI positions are normalized to `0..1` display space with a top-left origin.
-5. `PdfCoordinateMapper` converts between display space and PDF CropBox coordinates, including 90-degree page rotations.
-6. Compose draws pending annotations and interaction feedback optimistically.
-7. Save snapshots pending MVI state, writes a temporary PDF, syncs it to the original SAF URI, reopens it, increments `renderRevision`, and only then clears persisted overlays.
+4. Compose records pending annotation changes in immutable MVI state.
+5. Save snapshots pending state and writes a temporary PDF off the main thread.
+6. The sync layer copies the result to the original SAF URI.
+7. The engine reopens the synchronized document and increments `renderRevision`.
+8. Only successfully persisted overlays and deletions are cleared.
 
-PDFBox compatibility is pinned to `com.tom-roush:pdfbox-android:2.0.27.0`. This Android PDFBox 2.x fork does not expose every newer upstream API. Ink uses `PDAnnotationMarkup` with `/Subtype /Ink`; text notes and markup appearances must use APIs verified against the pinned AAR.
-
-### Text highlighting
+### Text geometry and highlighting
 
 Text extraction retains word bounds and per-character bounds. `TextHighlightSelector` resolves drag endpoints into reading-order cursors and creates a continuous range:
 
@@ -212,6 +244,18 @@ Reverse drags normalize to the same result. Preview and persistence use identica
 - **Flattened:** paints newly created supported annotations into page `/Contents`, then removes only those newly created annotation entries. Existing annotations remain intact. Flattening is irreversible.
 
 The annotation union rectangle is metadata only and must never be rendered as a solid highlight because it can obscure text between selected lines.
+
+### Failure handling and invalidation
+
+Opening may succeed while save-back fails because a SAF provider is read-only
+or unavailable. A failed write, sync, or reopen keeps pending overlays,
+deletions, and note contents available for retry and exposes an actionable
+error.
+
+A successful reopen clears page-scoped text and embedded-highlight caches and
+increments `renderRevision` before persisted optimistic items are removed.
+Future tile caches must include document version, page, viewport, zoom, and tile
+identity and must invalidate affected entries only after commit succeeds.
 
 ## Local data and privacy
 
@@ -252,10 +296,16 @@ PDF contents stay at their selected SAF location. The file provider determines w
 6. Bundle chosen serif/sans-serif fonts if product identity requires consistent typography across devices.
 7. Consider an on-device neural voice only after size, latency, privacy, and fallback behavior are validated.
 
-## Feature contracts
+## Feature blueprints
 
-| Feature file | Design sections | Current scope |
-|---|---|---|
-| `implementation-files/feature01.md` | Architecture; document pipeline; performance | Rendering, normalized coordinates, overlays, and lifecycle foundation |
-| `implementation-files/feature02.md` | Annotation pipeline; save modes | Editable and flattened persistence |
-| `implementation-files/feature03.md` | Existing highlight selection | Cached selection, deletion, and save-back |
+[`feature-blueprints/README.md`](../feature-blueprints/README.md) is the task
+router for progressive agent context loading. Shared contracts remain
+authoritative here; each blueprint states how they constrain that feature.
+
+| Blueprint | Current scope |
+|---|---|
+| [`pdf-rendering.md`](../feature-blueprints/pdf-rendering.md) | Page rendering, transforms, zoom, caching, and lifecycle |
+| [`annotation-persistence.md`](../feature-blueprints/annotation-persistence.md) | Editable/flattened save, SAF sync, reopen, and failure recovery |
+| [`text-highlighting.md`](../feature-blueprints/text-highlighting.md) | Text selection, embedded-highlight interaction, deletion, and geometry |
+| [`freehand-annotation.md`](../feature-blueprints/freehand-annotation.md) | Pen/freehand strokes, erasing, ink output, and flattening |
+| [`text-notes.md`](../feature-blueprints/text-notes.md) | Note placement, editing, display, and persistence |

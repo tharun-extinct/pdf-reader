@@ -77,7 +77,11 @@ Compose UI <- StateFlow<PdfReaderState>
 
 PDFium renders page bitmaps. PDFBox Android extracts positioned text, reads embedded highlights, and writes PDF changes. UI coordinates are normalized and converted through one shared CropBox/rotation-aware mapper.
 
-For the complete product and engineering contract, see [`.github/design.md`](.github/design.md). Contributors and coding agents should also read [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
+For shared engineering contracts, see [`.github/architecture.md`](.github/architecture.md).
+Coding agents should use [`feature-blueprints/README.md`](feature-blueprints/README.md)
+to load only the blueprint relevant to a task, then follow
+[`.github/copilot-instructions.md`](.github/copilot-instructions.md) or
+[`AGENTS.md`](AGENTS.md).
 
 ## Technology
 
@@ -137,8 +141,9 @@ To test on a device:
 
 Before changing UI, architecture, storage, annotations, or build workflows:
 
-1. read [`.github/design.md`](.github/design.md);
-2. read [`.github/copilot-instructions.md`](.github/copilot-instructions.md);
-3. keep PDF work off the main thread;
-4. preserve the shared coordinate-mapping and save/reopen contracts;
-5. update documentation when user-visible behavior or delivery rules change.
+1. route the task through [`feature-blueprints/README.md`](feature-blueprints/README.md);
+2. read the matching blueprint and its linked [architecture sections](.github/architecture.md);
+3. read [`.github/copilot-instructions.md`](.github/copilot-instructions.md) or [`AGENTS.md`](AGENTS.md);
+4. keep PDF work off the main thread;
+5. preserve the shared coordinate-mapping and save/reopen contracts;
+6. update documentation when user-visible behavior or delivery rules change.
