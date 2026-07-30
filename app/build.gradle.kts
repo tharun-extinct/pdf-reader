@@ -37,6 +37,14 @@ android {
         }
     }
 
+    packaging {
+        jniLibs {
+            // Preserve extracted native libraries for PDFium without using the
+            // deprecated AndroidManifest application attribute.
+            useLegacyPackaging = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

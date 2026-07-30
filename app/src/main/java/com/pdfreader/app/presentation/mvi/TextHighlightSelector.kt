@@ -16,7 +16,9 @@ object TextHighlightSelector {
             .sortedWith(compareBy<Rect> { it.top }.thenBy { it.left })
             .fold(mutableListOf<MutableList<Rect>>()) { result, character ->
                 val line = result.lastOrNull()
-                if (line == null || !isOnSameLine(line.first(), character)) result += mutableListOf()
+                if (line == null || !isOnSameLine(line.first(), character)) {
+                    result.add(mutableListOf())
+                }
                 result.last() += character
                 result
             }

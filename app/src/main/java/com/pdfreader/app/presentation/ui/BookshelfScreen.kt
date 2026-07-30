@@ -1,7 +1,7 @@
 package com.pdfreader.app.presentation.ui
 
 import android.net.Uri
-import androidx.compose.animation.animateFloatAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
