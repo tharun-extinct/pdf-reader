@@ -187,7 +187,7 @@ object PdfAnnotationWriter {
             annot.color = ta.color.toRgbPdColor()
             annot.setName(PDAnnotationText.NAME_NOTE)
             annot.setOpen(false)
-            annot.createRectangleAppearance(document)
+            annot.constructAppearances(document)
 
             annotations.add(annot)
         }
