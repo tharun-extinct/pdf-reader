@@ -1,7 +1,7 @@
-# Libro App Restyle Implementation Document
+# NoxReader App Restyle Implementation Document
 
 ## Overview
-This document outlines the implementation details for restyling the Android PDF Reader app to the "Cloud PDF" design system (app name: Libro), sourced from Stitch (Project ID: `6349643411786464155`).
+This document outlines the implementation details for restyling the Android PDF Reader app to the "Cloud PDF" design system (app name: NoxReader), sourced from Stitch (Project ID: `6349643411786464155`).
 
 ## Design System Integration
 The app has been restyled using Jetpack Compose Material 3 with custom theming to match the Stitch design.
@@ -19,7 +19,7 @@ A custom light-mode color palette was implemented, heavily featuring warm off-wh
 - **Containers**: Elevated surfaces use subtle grey-whites (`#EFEEEC`, `#F4F3F1`)
 
 ### 3. Theme Infrastructure
-- `LibroTheme.kt`: Wraps `MaterialTheme` with the custom color scheme and typography.
+- `NoxReaderTheme.kt`: Wraps `MaterialTheme` with the custom color scheme and typography.
 - `Color.kt`: Contains all exact hex codes from the Stitch design.
 - `Type.kt`: Maps Stitch typography tokens to Material 3 typography roles.
 
@@ -27,7 +27,7 @@ A custom light-mode color palette was implemented, heavily featuring warm off-wh
 
 ### Library Screen (`BookshelfScreen.kt`)
 The main landing screen was completely rewritten:
-- **Top App Bar**: Minimalist design with a hamburger menu, center title ("Libro"), and settings gear.
+- **Top App Bar**: Minimalist design with a hamburger menu, center title ("NoxReader"), and settings gear.
 - **Continue Reading Hero Card**: Displays the current book with a gradient placeholder cover, title, author, and a progress bar.
 - **My Collection**: A horizontally scrolling row of book cards with varied gradient covers.
 - **Annotations & Notes**: A vertical list of recent user annotations and highlights.
@@ -46,7 +46,7 @@ Completely rewritten to present a sectioned layout:
 - **About**: App version and information.
 
 ## Next Steps / Pending Items
-- Wrap `MainActivity.kt`'s `NavHost` with the new `LibroTheme`.
-- Update `AndroidManifest.xml` to rename the app label to "Libro".
+- Wrap `MainActivity.kt`'s `NavHost` with the new `NoxReaderTheme`.
+- Update `AndroidManifest.xml` to rename the app label to "NoxReader".
 - Connect the Settings Screen UI components (e.g., Theme Color Picker, Reading Font toggle) to persistent state (DataStore/SharedPreferences) to make them fully functional.
 - Generate and load actual book cover images in the Library screen to replace the placeholder gradients.

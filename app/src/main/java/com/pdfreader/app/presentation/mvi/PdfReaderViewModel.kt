@@ -5,9 +5,18 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pdfreader.app.domain.model.ReaderPreferences
+import com.pdfreader.app.domain.model.RecentDocument
+import com.pdfreader.app.domain.repository.LibraryRepository
+import com.pdfreader.app.data.pdfbox.PdfAnnotationWriterImpl
+import com.pdfreader.app.domain.repository.PdfAnnotationSaver
 import com.pdfreader.app.domain.repository.PdfEngine
 import com.pdfreader.app.domain.repository.PdfSyncManager
+import com.pdfreader.app.domain.tts.TtsManager
+import com.pdfreader.app.domain.tts.TtsState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,11 +32,26 @@ import kotlin.math.hypot
 class PdfReaderViewModel(
     application: Application,
     private val pdfEngine: PdfEngine,
-    private val syncManager: PdfSyncManager
+    private val syncManager: PdfSyncManager,
+    private val libraryRepository: LibraryRepository,
+    private val annotationSaver: PdfAnnotationSaver = PdfAnnotationWriterImpl()
 ) : AndroidViewModel(application) {
+
+    private val ttsManager = TtsManager(application)
 
     private val _state = MutableStateFlow(PdfReaderState())
     val state: StateFlow<PdfReaderState> = _state.asStateFlow()
+    private var progressSaveJob: Job? = null
+    private var preferencesSaveJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            ttsManager.ttsState.collect { ttsState ->
+                _state.update { it.copy(ttsState = ttsState) }
+            }
+        }
+        loadLibrary()
+    }
 
     fun processIntent(intent: PdfReaderIntent) {
         when (intent) {
@@ -41,6 +65,18 @@ class PdfReaderViewModel(
                 intent.onRendered
             )
             is PdfReaderIntent.RequestPageText -> extractPageText(intent.pageIndex, intent.onExtracted)
+            is PdfReaderIntent.PageChanged -> onPageChanged(intent.pageIndex)
+            PdfReaderIntent.ToggleBookmark -> toggleBookmark()
+            PdfReaderIntent.ClearRecentDocuments -> clearRecentDocuments()
+            PdfReaderIntent.DismissError -> _state.update { it.copy(errorMessage = null) }
+            is PdfReaderIntent.SetThemeMode -> updatePreferences { it.copy(themeMode = intent.mode) }
+            is PdfReaderIntent.SetKeepScreenOn -> updatePreferences { it.copy(keepScreenOn = intent.enabled) }
+            is PdfReaderIntent.SetSpeechRate -> {
+                val rate = intent.rate.coerceIn(0.6f, 1.6f)
+                ttsManager.setSpeechRate(rate)
+                updatePreferences { it.copy(speechRate = rate) }
+            }
+            is PdfReaderIntent.RequestPageHighlights -> extractEmbeddedHighlights(intent.pageIndex, intent.onLoaded)
             is PdfReaderIntent.SelectTool -> selectTool(intent.tool)
             is PdfReaderIntent.SelectPenColor -> selectPenColor(intent.index)
             is PdfReaderIntent.SelectHighlighterColor -> selectHighlighterColor(intent.index)
@@ -52,16 +88,99 @@ class PdfReaderViewModel(
             is PdfReaderIntent.RemoveStrokeAt -> removeStrokeAt(intent.pageIndex, intent.position)
             is PdfReaderIntent.AddTextAnnotation -> addTextAnnotation(intent.pageIndex, intent.position)
             is PdfReaderIntent.UpdateTextAnnotation -> updateTextAnnotation(intent.annotationId, intent.text)
+            is PdfReaderIntent.SetAnnotationSaveMode -> _state.update { it.copy(annotationSaveMode = intent.mode) }
+            is PdfReaderIntent.SelectHighlightAt -> selectHighlightAt(intent.pageIndex, intent.position)
+            is PdfReaderIntent.ClearHighlightSelection -> _state.update { it.copy(selectedHighlight = null) }
+            is PdfReaderIntent.DeleteSelectedHighlight -> deleteSelectedHighlight()
+            is PdfReaderIntent.PlayTts -> playTts(intent.pageIndex, intent.textBoxes)
+            is PdfReaderIntent.PauseTts -> ttsManager.pause()
+            is PdfReaderIntent.ResumeTts -> ttsManager.resume()
+            is PdfReaderIntent.StopTts -> ttsManager.stop()
+            is PdfReaderIntent.SaveAnnotations -> saveAnnotations()
         }
     }
 
-    private fun selectTool(tool: AnnotationTool) {
-        _state.update { state ->
-            val nextTool = if (state.activeTool == tool && (tool == AnnotationTool.Pen || tool == AnnotationTool.Highlighter)) {
-                AnnotationTool.None
-            } else {
-                tool
+    private fun loadLibrary() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val recentDocuments = libraryRepository.getRecentDocuments()
+            val preferences = libraryRepository.getPreferences()
+            withContext(Dispatchers.Main) {
+                ttsManager.setSpeechRate(preferences.speechRate)
             }
+            _state.update {
+                it.copy(
+                    isLibraryLoading = false,
+                    recentDocuments = recentDocuments,
+                    preferences = preferences
+                )
+            }
+        }
+    }
+
+    private fun updatePreferences(transform: (ReaderPreferences) -> ReaderPreferences) {
+        val updated = transform(_state.value.preferences)
+        _state.update { it.copy(preferences = updated) }
+        preferencesSaveJob?.cancel()
+        preferencesSaveJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(PREFERENCES_SAVE_DEBOUNCE_MS)
+            libraryRepository.savePreferences(updated)
+        }
+    }
+
+    private fun onPageChanged(pageIndex: Int) {
+        val currentState = _state.value
+        if (!currentState.isPdfLoaded || currentState.pageCount <= 0) return
+
+        val safePageIndex = pageIndex.coerceIn(0, currentState.pageCount - 1)
+        _state.update { it.copy(currentPageIndex = safePageIndex) }
+
+        val uri = currentState.openedUri?.toString() ?: return
+        progressSaveJob?.cancel()
+        progressSaveJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(PROGRESS_SAVE_DEBOUNCE_MS)
+            libraryRepository.updateProgress(uri, safePageIndex)
+            val recentDocuments = libraryRepository.getRecentDocuments()
+            _state.update { it.copy(recentDocuments = recentDocuments) }
+        }
+    }
+
+    private fun toggleBookmark() {
+        val currentState = _state.value
+        val uri = currentState.openedUri?.toString() ?: return
+        val pageIndex = currentState.currentPageIndex
+        viewModelScope.launch(Dispatchers.IO) {
+            val bookmarkedPages = libraryRepository.toggleBookmark(uri, pageIndex)
+            val recentDocuments = libraryRepository.getRecentDocuments()
+            _state.update {
+                it.copy(
+                    bookmarkedPages = bookmarkedPages,
+                    recentDocuments = recentDocuments
+                )
+            }
+        }
+    }
+
+    private fun clearRecentDocuments() {
+        viewModelScope.launch(Dispatchers.IO) {
+            libraryRepository.clearRecentDocuments()
+            _state.update { it.copy(recentDocuments = emptyList()) }
+        }
+    }
+
+    private fun playTts(pageIndex: Int, textBoxes: List<com.pdfreader.app.presentation.mvi.PdfTextBox>) {
+        ttsManager.play(pageIndex, textBoxes)
+    }
+
+    private fun selectTool(tool: AnnotationTool) {
+        val nextTool = if (_state.value.activeTool == tool) {
+            AnnotationTool.None
+        } else {
+            tool
+        }
+        if (nextTool != AnnotationTool.ReadAloud) {
+            ttsManager.stop()
+        }
+        _state.update { state ->
             state.copy(activeTool = nextTool, isAnnotationSettingsOpen = false)
         }
     }
@@ -122,6 +241,59 @@ class PdfReaderViewModel(
         }
     }
 
+    private fun selectHighlightAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
+        _state.update { state ->
+            val sessionCandidates = state.highlightsByPage[pageIndex].orEmpty().map {
+                SelectedHighlight(
+                    id = it.id.toString(),
+                    pageIndex = pageIndex,
+                    source = HighlightSource.Session,
+                    color = it.color,
+                    rects = it.rects
+                )
+            }
+            val deletedIds = state.deletedEmbeddedHighlightIdsByPage[pageIndex].orEmpty()
+            val embeddedCandidates = state.embeddedHighlightsByPage[pageIndex].orEmpty()
+                .filterNot { it.id in deletedIds }
+                .map {
+                    SelectedHighlight(
+                        id = it.id,
+                        pageIndex = pageIndex,
+                        source = HighlightSource.Embedded,
+                        color = it.color,
+                        rects = it.rects
+                    )
+                }
+            val selected = HighlightHitTester.select(position, sessionCandidates + embeddedCandidates)
+            state.copy(selectedHighlight = selected)
+        }
+    }
+
+    private fun deleteSelectedHighlight() {
+        _state.update { state ->
+            val selected = state.selectedHighlight ?: return@update state
+            when (selected.source) {
+                HighlightSource.Session -> {
+                    val id = selected.id.toLongOrNull()
+                    val remaining = state.highlightsByPage[selected.pageIndex].orEmpty()
+                        .filterNot { it.id == id }
+                    state.copy(
+                        highlightsByPage = state.highlightsByPage + (selected.pageIndex to remaining),
+                        selectedHighlight = null
+                    )
+                }
+                HighlightSource.Embedded -> {
+                    val existing = state.deletedEmbeddedHighlightIdsByPage[selected.pageIndex].orEmpty()
+                    state.copy(
+                        deletedEmbeddedHighlightIdsByPage = state.deletedEmbeddedHighlightIdsByPage +
+                            (selected.pageIndex to (existing + selected.id)),
+                        selectedHighlight = null
+                    )
+                }
+            }
+        }
+    }
+
     private fun removeStrokeAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
         _state.update { state ->
             val pageStrokes = state.strokesByPage[pageIndex].orEmpty()
@@ -178,6 +350,87 @@ class PdfReaderViewModel(
         }
     }
 
+    /**
+     * Bakes all in-memory annotations into the PDF using PDFBox, writes the result
+     * to a temp file in cacheDir, syncs it back to the source URI via SAF, then
+     * clears the in-memory overlay and re-opens the document so the next render
+     * reflects the now-embedded annotations.
+     */
+    private fun saveAnnotations() {
+        val uri = _state.value.openedUri ?: return
+        val pdfBytes = pdfEngine.getPdfBytes() ?: return
+        val currentState = _state.value
+
+        // Nothing to save
+        val hasAnnotations = currentState.strokesByPage.values.any { it.isNotEmpty() } ||
+            currentState.highlightsByPage.values.any { it.isNotEmpty() } ||
+            currentState.textAnnotationsByPage.values.any { it.isNotEmpty() } ||
+            currentState.deletedEmbeddedHighlightIdsByPage.values.any { it.isNotEmpty() }
+        if (!hasAnnotations) return
+
+        _state.update { it.copy(isSavingAnnotations = true, errorMessage = null) }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            var tempFile: java.io.File? = null
+            try {
+                val context = getApplication<Application>().applicationContext
+                val outputFile = java.io.File(context.cacheDir, "annotated_${System.currentTimeMillis()}.pdf")
+                tempFile = outputFile
+
+                // Write annotations into PDF structure
+                annotationSaver.saveAnnotations(
+                    pdfBytes = pdfBytes,
+                    strokesByPage = currentState.strokesByPage,
+                    highlightsByPage = currentState.highlightsByPage,
+                    textAnnotationsByPage = currentState.textAnnotationsByPage,
+                    deletedEmbeddedHighlightIdsByPage = currentState.deletedEmbeddedHighlightIdsByPage,
+                    saveMode = currentState.annotationSaveMode,
+                    outputFile = outputFile
+                )
+
+                // Sync annotated file back to the source URI (Google Drive, local, etc.)
+                val success = syncManager.syncBackToSource(uri, outputFile)
+                if (!success) {
+                    _state.update {
+                        it.copy(isSavingAnnotations = false, errorMessage = "Failed to save annotations to source.")
+                    }
+                    return@launch
+                }
+
+                // Re-open the document so PDFium renders the embedded annotations
+                val pfd = context.contentResolver.openFileDescriptor(uri, "r")
+                    ?: throw IllegalStateException("Failed to reopen PDF after saving annotations.")
+                val newBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: throw IllegalStateException("Failed to re-read PDF after saving annotations.")
+                pdfEngine.openDocument(pfd, newBytes)
+
+                // Bump renderRevision: PdfPage composables observe this key and will
+                // discard their cached bitmaps, triggering a fresh render that shows
+                // the now-embedded annotations via PDFium.
+                _state.update {
+                    it.copy(
+                        isSavingAnnotations = false,
+                        strokesByPage = emptyMap(),
+                        highlightsByPage = emptyMap(),
+                        textAnnotationsByPage = emptyMap(),
+                        embeddedHighlightsByPage = emptyMap(),
+                        deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                        selectedHighlight = null,
+                        textBoxesByPage = emptyMap(), // invalidated by document re-open
+                        renderRevision = it.renderRevision + 1
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _state.update {
+                    it.copy(isSavingAnnotations = false, errorMessage = "Save failed: ${e.message}")
+                }
+            } finally {
+                tempFile?.delete()
+            }
+        }
+    }
+
     private fun openPdf(uri: Uri) {
         _state.update { it.copy(isLoading = true, errorMessage = null) }
         
@@ -191,14 +444,60 @@ class PdfReaderViewModel(
                         ?: throw IllegalStateException("Failed to read PDF bytes.")
                     pdfEngine.openDocument(pfd, pdfBytes)
                     val pageCount = pdfEngine.getPageCount()
+                    if (pageCount <= 0) {
+                        throw IllegalStateException("This PDF does not contain any readable pages.")
+                    }
                     
-                    _state.update { 
+                    // Extract document title from URI
+                    val cursor = context.contentResolver.query(uri, null, null, null, null)
+                    var title = "Document"
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val displayNameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (displayNameIndex != -1) {
+                                title = it.getString(displayNameIndex)
+                            }
+                        }
+                    }
+
+                    val previousDocument = libraryRepository.getRecentDocuments()
+                        .firstOrNull { it.uri == uri.toString() }
+                    val initialPage = previousDocument?.lastPage
+                        ?.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+                        ?: 0
+                    libraryRepository.recordDocument(
+                        RecentDocument(
+                            uri = uri.toString(),
+                            title = title,
+                            pageCount = pageCount,
+                            lastPage = initialPage,
+                            lastOpenedAt = System.currentTimeMillis(),
+                            bookmarkedPages = previousDocument?.bookmarkedPages.orEmpty()
+                        )
+                    )
+                    val recentDocuments = libraryRepository.getRecentDocuments()
+
+                    _state.update {
                         it.copy(
                             isLoading = false,
                             isPdfLoaded = true,
                             pageCount = pageCount,
-                            openedUri = uri
-                        ) 
+                            currentPageIndex = initialPage,
+                            openedUri = uri,
+                            documentTitle = title,
+                            recentDocuments = recentDocuments,
+                            bookmarkedPages = previousDocument?.bookmarkedPages.orEmpty(),
+                            activeTool = AnnotationTool.None,
+                            isSavingAnnotations = false,
+                            strokesByPage = emptyMap(),
+                            highlightsByPage = emptyMap(),
+                            embeddedHighlightsByPage = emptyMap(),
+                            deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                            selectedHighlight = null,
+                            textBoxesByPage = emptyMap(),
+                            textAnnotationsByPage = emptyMap(),
+                            ttsState = TtsState.Idle
+                        )
                     }
                 } else {
                     _state.update { 
@@ -207,8 +506,13 @@ class PdfReaderViewModel(
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                _state.update { 
-                    it.copy(isLoading = false, errorMessage = e.message ?: "Unknown error opening PDF") 
+                pdfEngine.closeDocument()
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        isPdfLoaded = false,
+                        errorMessage = e.message ?: "Unknown error opening PDF"
+                    )
                 }
             }
         }
@@ -269,14 +573,74 @@ class PdfReaderViewModel(
         }
     }
 
+    private fun extractEmbeddedHighlights(
+        pageIndex: Int,
+        onLoaded: (List<EmbeddedTextHighlight>) -> Unit
+    ) {
+        val cached = _state.value.embeddedHighlightsByPage[pageIndex]
+        if (cached != null) {
+            onLoaded(cached)
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val highlights = runCatching { pdfEngine.getEmbeddedHighlights(pageIndex) }
+                .getOrElse { emptyList() }
+            _state.update { state ->
+                state.copy(embeddedHighlightsByPage = state.embeddedHighlightsByPage + (pageIndex to highlights))
+            }
+            withContext(Dispatchers.Main) { onLoaded(highlights) }
+        }
+    }
+
     private fun closePdf() {
+        val currentState = _state.value
+        val uri = currentState.openedUri?.toString()
+        val pageIndex = currentState.currentPageIndex
+        progressSaveJob?.cancel()
+        if (uri != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                libraryRepository.updateProgress(uri, pageIndex)
+                val recentDocuments = libraryRepository.getRecentDocuments()
+                _state.update { it.copy(recentDocuments = recentDocuments) }
+            }
+        }
+        ttsManager.stop()
         pdfEngine.closeDocument()
-        _state.update { PdfReaderState() }
+        _state.update {
+            it.copy(
+                isLoading = false,
+                isSyncing = false,
+                isSavingAnnotations = false,
+                isPdfLoaded = false,
+                pageCount = 0,
+                currentPageIndex = 0,
+                openedUri = null,
+                documentTitle = null,
+                errorMessage = null,
+                bookmarkedPages = emptySet(),
+                activeTool = AnnotationTool.None,
+                strokesByPage = emptyMap(),
+                highlightsByPage = emptyMap(),
+                embeddedHighlightsByPage = emptyMap(),
+                deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                selectedHighlight = null,
+                textBoxesByPage = emptyMap(),
+                textAnnotationsByPage = emptyMap(),
+                selectedTextPositionByPage = emptyMap(),
+                ttsState = TtsState.Idle
+            )
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
         pdfEngine.closeDocument()
+        ttsManager.shutdown()
+    }
+
+    private companion object {
+        const val PROGRESS_SAVE_DEBOUNCE_MS = 500L
+        const val PREFERENCES_SAVE_DEBOUNCE_MS = 250L
     }
 }
 

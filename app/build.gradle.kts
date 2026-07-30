@@ -62,7 +62,12 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    
+
+    // Material Components (provides the Theme.Material3.* XML window themes
+    // referenced by AndroidManifest -> @style/Theme.NoxReader). Required even for a
+    // pure-Compose app because ComponentActivity needs a valid XML window theme.
+    implementation("com.google.android.material:material:1.11.0")
+
     // ViewModel Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     
@@ -74,4 +79,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     // Navigation component for Jetpack Compose (required for multi-screen architecture)
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    testImplementation("junit:junit:4.13.2")
 }

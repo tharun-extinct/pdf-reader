@@ -2,7 +2,7 @@ name: Android Release
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feature" ]
 
 concurrency:
   group: android-release-${{ github.ref }}

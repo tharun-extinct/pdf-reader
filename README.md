@@ -1,4 +1,4 @@
-﻿# PDF Reader (Compute Intensive Application)
+﻿# NoxReader
 
 A lightweight, highly optimized Android PDF reading application built in Kotlin with Jetpack Compose. This project focuses purely on the reading experience, with deep optimizations for smoother UI/UX and low system resource management.
 

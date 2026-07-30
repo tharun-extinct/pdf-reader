@@ -1,10 +1,8 @@
 package com.pdfreader.app.presentation.ui
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import android.net.Uri
+import androidx.compose.animation.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,77 +15,58 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Book
-import androidx.compose.material.icons.outlined.Bookmark
-import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.FolderSpecial
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Headphones
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.filled.Book
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.pdfreader.app.domain.model.RecentDocument
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
-import com.pdfreader.app.presentation.theme.LibroTheme
 import com.pdfreader.app.presentation.theme.DisplayTitleStyle
 import com.pdfreader.app.presentation.theme.HeadlineLgMobileStyle
 import com.pdfreader.app.presentation.theme.LabelCapsStyle
+import com.pdfreader.app.presentation.theme.NoxReaderTheme
 import com.pdfreader.app.presentation.theme.UiMainStyle
 import com.pdfreader.app.presentation.theme.UiSmStyle
-import com.pdfreader.app.presentation.theme.SourceSerif4FontFamily
-import com.pdfreader.app.presentation.theme.LibroPrimaryFixed
-import com.pdfreader.app.presentation.theme.LibroOnPrimaryFixed
-import com.pdfreader.app.presentation.theme.LibroTertiaryFixed
-import com.pdfreader.app.presentation.theme.LibroTertiaryFixedDim
-import com.pdfreader.app.presentation.theme.LibroPrimaryContainer
-import com.pdfreader.app.presentation.theme.LibroOnPrimaryContainer
 
-/**
- * Libro Library screen — the app's main landing screen.
- *
- * Design sourced from Stitch "Cloud PDF" project, screen "Libro - My Library".
- * Features:
- * - Mobile top bar with hamburger, "Libro" title, settings gear
- * - "Continue Reading" hero card
- * - "My Collection" horizontally scrollable book cards
- * - "Annotations & Notes" recent activity list
- * - Bottom navigation bar (All Books, Recent, Annotations, Collections)
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookshelfScreen(
@@ -95,374 +74,167 @@ fun BookshelfScreen(
     navController: NavController,
     onOpenFilePicker: () -> Unit
 ) {
-    val spacing = LibroTheme.spacing
-    var selectedNavIndex by remember { mutableIntStateOf(0) }
+    val state by viewModel.state.collectAsState()
+    val spacing = NoxReaderTheme.spacing
+
+    LaunchedEffect(state.isPdfLoaded) {
+        if (state.isPdfLoaded) {
+            navController.navigate("reader") {
+                launchSingleTop = true
+            }
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            // ── Mobile Top App Bar ──────────────────────────────────
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.background
                 ),
-                navigationIcon = {
-                    IconButton(onClick = { /* drawer toggle */ }) {
-                        Icon(
-                            imageVector = Icons.Outlined.Menu,
-                            contentDescription = "Menu",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                title = {
+                    Column {
+                        Text(
+                            text = "NoxReader",
+                            style = DisplayTitleStyle.copy(fontSize = 24.sp, lineHeight = 28.sp),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Your quiet reading space",
+                            style = UiSmStyle.copy(fontSize = 12.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                },
-                title = {
-                    Text(
-                        text = "Libro",
-                        style = DisplayTitleStyle.copy(fontSize = 24.sp),
-                        color = MaterialTheme.colorScheme.primary
-                    )
                 },
                 actions = {
                     IconButton(onClick = { navController.navigate("settings") }) {
                         Icon(
                             imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Settings",
+                            contentDescription = "Open settings",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             )
         },
-        bottomBar = {
-            // ── Bottom Navigation Bar ───────────────────────────────
-            LibroBottomNavBar(
-                selectedIndex = selectedNavIndex,
-                onItemSelected = { selectedNavIndex = it }
-            )
-        },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onOpenFilePicker,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Add,
-                    contentDescription = "Add Book"
+            if (!state.isLoading && state.recentDocuments.isNotEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = onOpenFilePicker,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Description,
+                            contentDescription = null
+                        )
+                    },
+                    text = { Text("Open PDF") },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             }
         }
     ) { paddingValues ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            contentPadding = PaddingValues(vertical = spacing.gutter)
+            contentAlignment = Alignment.TopCenter
         ) {
-            // ── Continue Reading Hero ───────────────────────────────
-            item {
-                SectionHeader(
-                    title = "CONTINUE READING",
-                    modifier = Modifier.padding(horizontal = spacing.marginMobile)
-                )
-                Spacer(Modifier.height(12.dp))
-                ContinueReadingCard(
-                    modifier = Modifier.padding(horizontal = spacing.marginMobile),
-                    onTap = { navController.navigate("reader") }
-                )
-            }
-
-            // ── My Collection ───────────────────────────────────────
-            item {
-                Spacer(Modifier.height(spacing.gutter))
-                SectionHeader(
-                    title = "MY COLLECTION",
-                    modifier = Modifier.padding(horizontal = spacing.marginMobile)
-                )
-                Spacer(Modifier.height(12.dp))
-                BookCollectionRow(
-                    onBookTap = { navController.navigate("reader") }
-                )
-            }
-
-            // ── Annotations & Notes ─────────────────────────────────
-            item {
-                Spacer(Modifier.height(spacing.gutter))
-                SectionHeader(
-                    title = "ANNOTATIONS & NOTES",
-                    modifier = Modifier.padding(horizontal = spacing.marginMobile)
-                )
-                Spacer(Modifier.height(12.dp))
-                AnnotationsList(
-                    modifier = Modifier.padding(horizontal = spacing.marginMobile)
-                )
-            }
-        }
-    }
-}
-
-// ── Section Header ──────────────────────────────────────────────────────
-
-@Composable
-private fun SectionHeader(title: String, modifier: Modifier = Modifier) {
-    Text(
-        text = title,
-        style = LabelCapsStyle,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier
-    )
-}
-
-// ── Continue Reading Card ───────────────────────────────────────────────
-
-@Composable
-private fun ContinueReadingCard(modifier: Modifier = Modifier, onTap: () -> Unit) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onTap),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp,
-        shadowElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Book cover placeholder
-            Box(
-                modifier = Modifier
-                    .size(width = 60.dp, height = 86.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                LibroPrimaryContainer,
-                                LibroPrimaryFixed
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Book,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.5f),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Spacer(Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Great Expectations",
-                    style = HeadlineLgMobileStyle.copy(fontSize = 18.sp),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "Charles Dickens",
-                    style = UiSmStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    LinearProgressIndicator(
-                        progress = { 0.42f },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.outlineVariant,
-                    )
-                    Text(
-                        text = "42%",
-                        style = UiSmStyle.copy(fontSize = 12.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Chapter 4: The Digital Sanctuary",
-                    style = UiSmStyle.copy(fontSize = 12.sp),
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-        }
-    }
-}
-
-// ── Book Collection Row ─────────────────────────────────────────────────
-
-private data class BookItem(
-    val title: String,
-    val author: String,
-    val progress: Float,
-    val gradientColors: List<Color>
-)
-
-@Composable
-private fun BookCollectionRow(onBookTap: () -> Unit) {
-    val spacing = LibroTheme.spacing
-    val books = remember {
-        listOf(
-            BookItem("Pride & Prejudice", "Jane Austen", 0.78f,
-                listOf(Color(0xFF3D2907), Color(0xFFAE8F64))),
-            BookItem("1984", "George Orwell", 0.15f,
-                listOf(Color(0xFF1A2E44), Color(0xFF4C6078))),
-            BookItem("The Great Gatsby", "F. Scott Fitzgerald", 0.55f,
-                listOf(Color(0xFF35485F), Color(0xFFB4C8E4))),
-            BookItem("Brave New World", "Aldous Huxley", 0.0f,
-                listOf(Color(0xFF5A431F), Color(0xFFE3C193))),
-            BookItem("To Kill a Mockingbird", "Harper Lee", 0.33f,
-                listOf(Color(0xFF03192E), Color(0xFF8296B0)))
-        )
-    }
-
-    Row(
-        modifier = Modifier
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = spacing.marginMobile),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        books.forEach { book ->
-            BookCard(book = book, onClick = onBookTap)
-        }
-    }
-}
-
-@Composable
-private fun BookCard(book: BookItem, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(120.dp)
-            .clickable(onClick = onClick)
-    ) {
-        // Cover
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(170.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Brush.verticalGradient(book.gradientColors)),
-            contentAlignment = Alignment.BottomStart
-        ) {
-            // Subtle book icon watermark
-            Icon(
-                imageVector = Icons.Outlined.Book,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.15f),
-                modifier = Modifier
-                    .size(48.dp)
-                    .align(Alignment.Center)
-            )
-            // Progress indicator at bottom
-            if (book.progress > 0f) {
-                LinearProgressIndicator(
-                    progress = { book.progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp),
-                    color = Color.White.copy(alpha = 0.8f),
-                    trackColor = Color.White.copy(alpha = 0.2f),
-                )
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = book.title,
-            style = UiSmStyle.copy(fontWeight = FontWeight.Medium),
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = book.author,
-            style = UiSmStyle.copy(fontSize = 12.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-// ── Annotations List ────────────────────────────────────────────────────
-
-@Composable
-private fun AnnotationsList(modifier: Modifier = Modifier) {
-    val annotations = remember {
-        listOf(
-            Triple("\"The margin is where the reader converses with the author.\"", "Great Expectations · Ch. 4", "Nov 12"),
-            Triple("Key theme: invisible design philosophy", "Great Expectations · Ch. 3", "Nov 10"),
-            Triple("Architecture of focus — cognitive necessity", "Great Expectations · Ch. 4", "Nov 12")
-        )
-    }
-
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        annotations.forEach { (text, source, date) ->
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                tonalElevation = 0.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    // Annotation marker
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .background(
-                                LibroTertiaryFixed.copy(alpha = 0.3f),
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.EditNote,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(16.dp)
-                        )
+            when {
+                state.isLibraryLoading -> LibraryLoadingState()
+                state.recentDocuments.isEmpty() -> EmptyLibrary(
+                    errorMessage = state.errorMessage,
+                    onOpenFilePicker = onOpenFilePicker,
+                    onDismissError = {
+                        viewModel.processIntent(PdfReaderIntent.DismissError)
                     }
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = text,
-                            style = UiSmStyle,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = source,
-                                style = UiSmStyle.copy(fontSize = 11.sp),
-                                color = MaterialTheme.colorScheme.outline
+                )
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 760.dp),
+                        contentPadding = PaddingValues(
+                            start = spacing.marginMobile,
+                            top = 12.dp,
+                            end = spacing.marginMobile,
+                            bottom = 112.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (state.isLoading) {
+                            item {
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(CircleShape),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                            }
+                        }
+
+                        state.errorMessage?.let { message ->
+                            item {
+                                ErrorBanner(
+                                    message = message,
+                                    onDismiss = {
+                                        viewModel.processIntent(PdfReaderIntent.DismissError)
+                                    }
+                                )
+                            }
+                        }
+
+                        item {
+                            ContinueReadingCard(
+                                document = state.recentDocuments.first(),
+                                onClick = {
+                                    viewModel.processIntent(
+                                        PdfReaderIntent.OpenPdf(
+                                            Uri.parse(state.recentDocuments.first().uri)
+                                        )
+                                    )
+                                }
                             )
-                            Text(
-                                text = date,
-                                style = UiSmStyle.copy(fontSize = 11.sp),
-                                color = MaterialTheme.colorScheme.outline
+                        }
+
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 14.dp, bottom = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "RECENT DOCUMENTS",
+                                    style = LabelCapsStyle,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = "${state.recentDocuments.size} saved",
+                                    style = UiSmStyle.copy(fontSize = 12.sp),
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+
+                        items(
+                            items = state.recentDocuments,
+                            key = { it.uri }
+                        ) { document ->
+                            RecentDocumentRow(
+                                document = document,
+                                onClick = {
+                                    viewModel.processIntent(
+                                        PdfReaderIntent.OpenPdf(Uri.parse(document.uri))
+                                    )
+                                }
                             )
+                        }
+
+                        item {
+                            StorageNote()
                         }
                     }
                 }
@@ -471,57 +243,337 @@ private fun AnnotationsList(modifier: Modifier = Modifier) {
     }
 }
 
-// ── Bottom Navigation Bar ───────────────────────────────────────────────
-
-private data class NavItem(
-    val label: String,
-    val icon: ImageVector,
-    val selectedIcon: ImageVector
-)
-
 @Composable
-private fun LibroBottomNavBar(
-    selectedIndex: Int,
-    onItemSelected: (Int) -> Unit
-) {
-    val items = remember {
-        listOf(
-            NavItem("All Books", Icons.Outlined.Book, Icons.Filled.Book),
-            NavItem("Recent", Icons.Outlined.History, Icons.Outlined.History),
-            NavItem("Annotations", Icons.Outlined.EditNote, Icons.Outlined.EditNote),
-            NavItem("Collections", Icons.Outlined.FolderSpecial, Icons.Outlined.FolderSpecial)
+private fun LibraryLoadingState() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(36.dp),
+            strokeWidth = 3.dp
+        )
+        Spacer(Modifier.height(14.dp))
+        Text(
+            text = "Preparing your library",
+            style = UiSmStyle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
 
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp
+@Composable
+private fun EmptyLibrary(
+    errorMessage: String?,
+    onOpenFilePicker: () -> Unit,
+    onDismissError: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 680.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        items.forEachIndexed { index, item ->
-            NavigationBarItem(
-                selected = index == selectedIndex,
-                onClick = { onItemSelected(index) },
-                icon = {
-                    Icon(
-                        imageVector = if (index == selectedIndex) item.selectedIcon else item.icon,
-                        contentDescription = item.label,
-                        modifier = Modifier.size(24.dp)
-                    )
-                },
-                label = {
+        errorMessage?.let {
+            item {
+                ErrorBanner(message = it, onDismiss = onDismissError)
+            }
+        }
+
+        item {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 30.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(
+                                MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.MenuBook,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(28.dp))
                     Text(
-                        text = item.label,
-                        style = UiSmStyle.copy(fontSize = 11.sp)
+                        text = "A focused place for every page.",
+                        style = HeadlineLgMobileStyle.copy(fontSize = 28.sp, lineHeight = 34.sp),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = LibroOnPrimaryFixed,
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                    indicatorColor = LibroPrimaryFixed,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = "Open a PDF from your device or cloud provider. NoxReader remembers your place without moving the original file.",
+                        style = UiMainStyle.copy(fontWeight = FontWeight.Normal),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    Button(
+                        onClick = onOpenFilePicker,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            contentColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Choose a PDF")
+                    }
+                }
+            }
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FeatureRow(
+                    icon = Icons.Outlined.Headphones,
+                    title = "Read aloud",
+                    body = "Listen with synchronized page highlighting."
                 )
+                FeatureRow(
+                    icon = Icons.Outlined.BookmarkBorder,
+                    title = "Keep your place",
+                    body = "Reading progress and bookmarks stay on this device."
+                )
+                FeatureRow(
+                    icon = Icons.Outlined.CloudDone,
+                    title = "Cloud-friendly",
+                    body = "Open files through Android’s secure document picker."
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContinueReadingCard(
+    document: RecentDocument,
+    onClick: () -> Unit
+) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = document.progress.coerceIn(0f, 1f),
+        label = "Reading progress"
+    )
+
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Box(
+            modifier = Modifier.background(
+                Brush.linearGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.86f),
+                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f)
+                    )
+                )
+            )
+        ) {
+            Column(modifier = Modifier.padding(22.dp)) {
+                Text(
+                    text = "CONTINUE READING",
+                    style = LabelCapsStyle,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f)
+                )
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    text = document.title,
+                    style = HeadlineLgMobileStyle,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = pageLabel(document),
+                    style = UiSmStyle,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
+                )
+                Spacer(Modifier.height(18.dp))
+                LinearProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .clip(CircleShape),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentDocumentRow(
+    document: RecentDocument,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 46.dp, height = 58.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Description,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = document.title,
+                    style = UiMainStyle.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = pageLabel(document),
+                    style = UiSmStyle.copy(fontSize = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (document.bookmarkedPages.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "${document.bookmarkedPages.size} bookmark${if (document.bookmarkedPages.size == 1) "" else "s"}",
+                        style = UiSmStyle.copy(fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+            }
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline
             )
         }
     }
+}
+
+@Composable
+private fun FeatureRow(
+    icon: ImageVector,
+    title: String,
+    body: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(21.dp)
+            )
+        }
+        Spacer(Modifier.width(14.dp))
+        Column {
+            Text(
+                text = title,
+                style = UiMainStyle.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = body,
+                style = UiSmStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ErrorBanner(
+    message: String,
+    onDismiss: (() -> Unit)? = null
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.errorContainer
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = message,
+                style = UiSmStyle,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f)
+            )
+            onDismiss?.let {
+                TextButton(
+                    onClick = it,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                ) {
+                    Text("Dismiss")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StorageNote() {
+    Text(
+        text = "Recent history is stored only on this device. Your PDFs remain in their original location.",
+        style = UiSmStyle.copy(fontSize = 12.sp),
+        color = MaterialTheme.colorScheme.outline,
+        modifier = Modifier.padding(horizontal = 6.dp, vertical = 18.dp)
+    )
+}
+
+private fun pageLabel(document: RecentDocument): String {
+    if (document.pageCount <= 0) return "Ready to read"
+    return "Page ${(document.lastPage + 1).coerceAtMost(document.pageCount)} of ${document.pageCount}"
 }

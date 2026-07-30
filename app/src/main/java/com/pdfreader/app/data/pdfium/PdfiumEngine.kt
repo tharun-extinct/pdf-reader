@@ -6,12 +6,16 @@ import android.os.ParcelFileDescriptor
 import android.util.Size
 import androidx.compose.ui.geometry.Rect
 import com.pdfreader.app.domain.repository.PdfEngine
+import com.pdfreader.app.data.pdfbox.PdfCoordinateMapper
+import com.pdfreader.app.presentation.mvi.EmbeddedTextHighlight
 import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.shockwave.pdfium.PdfDocument
 import com.shockwave.pdfium.PdfiumCore
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
+import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.text.TextPosition
 import java.io.ByteArrayInputStream
@@ -24,22 +28,36 @@ import kotlin.math.min
  * Operates at the C++ level underneath, minimizing JVM garbage collection overhead
  * for reading/rendering files.
  */
-class PdfiumEngine(context: Context) : PdfEngine {
-    private val pdfiumCore = PdfiumCore(context)
+class PdfiumEngine(private val context: Context) : PdfEngine {
+    /**
+     * PDFium loads native (.so) libraries on first touch. Initializing it lazily
+     * (instead of in the constructor) keeps app launch crash-free: the native
+     * library is only loaded when a PDF is actually opened, so a missing/incompatible
+     * ABI surfaces as a recoverable error on the reader screen rather than taking
+     * down the whole app at startup (the engine is built during ViewModel creation).
+     */
+    private val pdfiumCore: PdfiumCore by lazy {
+        PDFBoxResourceLoader.init(context)
+        PdfiumCore(context)
+    }
     private var pdfDocument: PdfDocument? = null
     private var textDocument: PDDocument? = null
+    private var rawPdfBytes: ByteArray? = null
     private val textBoxCache = mutableMapOf<Int, List<PdfTextBox>>()
-
-    init {
-        PDFBoxResourceLoader.init(context)
-    }
+    private val embeddedHighlightCache = mutableMapOf<Int, List<EmbeddedTextHighlight>>()
 
     override fun openDocument(pfd: ParcelFileDescriptor, pdfBytes: ByteArray) {
         // Closes previous document if exists
         closeDocument()
+        rawPdfBytes = pdfBytes
         pdfDocument = pdfiumCore.newDocument(pfd)
-        textDocument = PDDocument.load(ByteArrayInputStream(pdfBytes))
+        textDocument = PDDocument.load(
+            ByteArrayInputStream(pdfBytes),
+            MemoryUsageSetting.setupMixed(PDFBOX_MEMORY_LIMIT_BYTES)
+        )
     }
+
+    override fun getPdfBytes(): ByteArray? = rawPdfBytes
 
     override fun getPageCount(): Int {
         return pdfDocument?.let { pdfiumCore.getPageCount(it) } ?: 0
@@ -63,7 +81,7 @@ class PdfiumEngine(context: Context) : PdfEngine {
         // Render the page onto the bitmap directly mapping it to native memory
         pdfiumCore.renderPageBitmap(
             doc, bitmap, pageIndex, 
-            0, 0, width, height, false
+            0, 0, width, height, true
         )
         
         return bitmap
@@ -87,15 +105,52 @@ class PdfiumEngine(context: Context) : PdfEngine {
         return boxes
     }
 
+    override fun getEmbeddedHighlights(pageIndex: Int): List<EmbeddedTextHighlight> {
+        embeddedHighlightCache[pageIndex]?.let { return it }
+        val page = textDocument?.getPage(pageIndex) ?: return emptyList()
+        val highlights = page.annotations.mapIndexedNotNull { annotationIndex, annotation ->
+            val markup = annotation as? PDAnnotationTextMarkup
+            if (markup?.subtype != PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT) return@mapIndexedNotNull null
+
+            val quads = markup.quadPoints ?: return@mapIndexedNotNull null
+            val rects = quads.asList()
+                .chunked(8)
+                .mapNotNull { quad -> PdfCoordinateMapper.toNormalizedDisplayRect(page, quad.toFloatArray()) }
+            if (rects.isEmpty()) return@mapIndexedNotNull null
+
+            EmbeddedTextHighlight(
+                id = "embedded:$pageIndex:$annotationIndex",
+                pageIndex = pageIndex,
+                color = markup.toArgbColor(),
+                rects = rects
+            )
+        }
+        embeddedHighlightCache[pageIndex] = highlights
+        return highlights
+    }
+
     override fun closeDocument() {
-        pdfDocument?.let { 
-            pdfiumCore.closeDocument(it) 
+        pdfDocument?.let {
+            pdfiumCore.closeDocument(it)
         }
         pdfDocument = null
         textDocument?.close()
         textDocument = null
+        rawPdfBytes = null
         textBoxCache.clear()
+        embeddedHighlightCache.clear()
     }
+}
+
+private const val PDFBOX_MEMORY_LIMIT_BYTES = 50L * 1024L * 1024L
+
+private fun PDAnnotationTextMarkup.toArgbColor(): Long {
+    val components = color?.components ?: floatArrayOf(1f, 1f, 0f)
+    val red = ((components.getOrElse(0) { 1f } * 255).toInt()).coerceIn(0, 255)
+    val green = ((components.getOrElse(1) { 1f } * 255).toInt()).coerceIn(0, 255)
+    val blue = ((components.getOrElse(2) { 0f } * 255).toInt()).coerceIn(0, 255)
+    val alpha = (constantOpacity * 255).toInt().coerceIn(0, 255)
+    return (alpha.toLong() shl 24) or (red.toLong() shl 16) or (green.toLong() shl 8) or blue.toLong()
 }
 
 private class PositionedWordStripper(
@@ -106,6 +161,7 @@ private class PositionedWordStripper(
     val words = mutableListOf<PdfTextBox>()
     private var currentText = StringBuilder()
     private var currentBounds: Rect? = null
+    private val currentCharacterBounds = mutableListOf<Rect>()
     private var previousPosition: TextPosition? = null
 
     override fun processTextPosition(text: TextPosition) {
@@ -129,6 +185,7 @@ private class PositionedWordStripper(
 
         currentText.append(value)
         currentBounds = currentBounds?.union(bounds) ?: bounds
+        currentCharacterBounds += bounds
         previousPosition = text
     }
 
@@ -142,10 +199,16 @@ private class PositionedWordStripper(
         val text = currentText.toString()
         val bounds = currentBounds
         if (text.isNotBlank() && bounds != null) {
-            words += PdfTextBox(pageIndex = pageIndex, text = text, bounds = bounds)
+            words += PdfTextBox(
+                pageIndex = pageIndex,
+                text = text,
+                bounds = bounds,
+                characterBounds = currentCharacterBounds.toList()
+            )
         }
         currentText = StringBuilder()
         currentBounds = null
+        currentCharacterBounds.clear()
     }
 }
 

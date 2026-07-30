@@ -2,7 +2,6 @@
 .gradle/
 build/
 app/build/
-gradle/wrapper/gradle-wrapper.jar
 
 # IDE
 .idea/
@@ -19,13 +18,17 @@ gradle/wrapper/gradle-wrapper.jar
 # Stitch tool calling
 .stitch-mcp/
 
+
+uidump/
+
+
 # Environment & local config
 skills/
 .env
-gradle-wrapper.properties
-gradlew
 gradlew.bat
 local.properties
+error.txt
+assets/
 
 
 # OS files

@@ -2,11 +2,6 @@
 
 Note: _This is purely the output of the chat conversation and does not contain any raw data, codebase snippets, etc. used to generate the output._
 
-
-
-
-
-
 Achieving Adobe Acrobat-level annotations (high-fidelity rendering, seamless ink drawing, standard PDF object highlighting, standard annotation flattening) is notoriously difficult due to the complexity of the PDF specification.
 
 
@@ -46,9 +41,6 @@ MuPDF is a lightweight, high-performance C-based renderer with Java/Kotlin bindi
 *   **The Industry-Standard Option (If you have a budget): Approach 2 (Nutrient/PSPDFKit).** If the goal is truly to match the premium feel and feature completeness of *Adobe Acrobat* without spending months reinventing the wheel, Nutrient is the undisputed choice for modern Android/Compose apps.
 
 Please let me know if you would like me to draft an **Implementation Plan** for **Approach 1 (Current Stack)**, or if you'd prefer to pivot to one of the commercial SDKs!
-
-
-
 
 
 
