@@ -1,55 +1,139 @@
 ---
 applyTo: "**/*"
-name: PDF Reader Android App
-description: Agent context for the Android PDF reader and annotation pipeline
+name: NoxReader Android App
+description: Product, architecture, UI, and delivery context for the Android PDF reader
 ---
 
-# PDF Reader — Agent Context
+# NoxReader Agent Context
 
-## Product and stack
+## Start here
 
-Android PDF reader focused on fast reading, pen/highlight/text-note annotation, persistent PDF output, TTS, and SAF sync.
+Read `.github/design.md` before product, UI, architecture, PDF pipeline, or persistence work. It is the current source of truth. The files under `implementation-files/` are historical feature contracts and audits; use them for rationale, but prefer current code and `design.md` when they differ.
 
-- Kotlin + Jetpack Compose
-- MVI + Clean Architecture; `Presentation → Domain → Data`
-- PDFium-Android for page rasterization; Apache PDFBox Android for text geometry and PDF mutation
-- Coroutines/Flow for background work; Android system TTS; SAF for persistence/sync
+NoxReader is a local-first Android PDF reader with:
 
-PDFBox compatibility is pinned to `com.tom-roush:pdfbox-android:2.0.27.0`. This Android fork does not expose every class from newer upstream PDFBox releases; consult its 2.x API before adding PDF annotation code.
+- a bookshelf for recent documents, progress, and bookmarks;
+- horizontal reading, pinch zoom, text selection, and Android TTS;
+- pen, text-aware highlighter, eraser, text notes, and palette customization;
+- editable or flattened annotation save-back through Android SAF;
+- System, Light, and Dark themes plus keep-awake and speech-rate preferences.
 
-Read `.github/design.md` before structural work. It is the architecture source of truth; `implementation-files/feature01.md`, `feature02.md`, and `feature03.md` are feature-level contracts and status records.
+Do not describe unfinished work as shipped. Tile/viewport rendering, bounded bitmap eviction, zoom panning, page thumbnails, broad external-viewer validation, and automated device UI coverage remain open.
 
-## Current architecture contract
+## Stack and versions
 
-1. Compose renders a PDFium bitmap as the base layer and draws unsaved annotations/selection UI as overlays.
-2. UI positions are normalized (`0..1`, top-left origin). `data/pdfbox/PdfCoordinateMapper.kt` is the shared PDFBox conversion boundary for CropBox and 90° page rotation.
-3. PDFBox reads word boxes plus per-character geometry and embedded highlights off the main thread. `PdfiumEngine` caches both per page; character geometry is required for line-contiguous highlighter selection.
-4. Save snapshots MVI state, writes or flattens annotations on `Dispatchers.IO`, syncs through SAF, reopens the document, increments `renderRevision`, then clears only successfully persisted state.
-5. Existing embedded highlights are cached before pointer hit-testing. Selection is state-driven; selection alone never mutates the PDF.
+- Kotlin 1.9.22, Java 17
+- Android Gradle Plugin 8.3.0; Gradle wrapper 8.4
+- minSdk 26, target/compileSdk 34
+- Jetpack Compose with BOM `2024.02.00` and Material 3
+- Compose Navigation 2.7.7
+- PDFium Android 1.9.0 for bitmap rendering
+- `com.tom-roush:pdfbox-android:2.0.27.0` for text geometry, embedded annotations, and PDF mutation
+- Coroutines/StateFlow, Android TextToSpeech, SAF, and SharedPreferences
 
-## Engineering constraints
+PDFBox Android is a 2.x fork and does not expose every newer upstream PDFBox API. Verify methods against the pinned AAR before using them. Ink annotations use `PDAnnotationMarkup` with `/Subtype /Ink`; do not introduce the newer `PDAnnotationInk` class.
 
-- Never block the main thread with PDF I/O, parsing, rendering, saving, or sync.
-- Keep domain APIs free of PDFBox/PDFium implementation details. Presentation must not query PDFBox inside a pointer callback.
-- Use `PdfCoordinateMapper`; do not add ad-hoc Y flips, DPI formulas, or MediaBox-only mapping.
-- Preserve existing annotations, forms, and signatures unless a selected mutation explicitly changes them.
-- Editable and flattened saves are distinct. Flattening paints new supported annotations into `/Contents` and removes only those newly created `/Annots`; it is irreversible.
-- Keep bitmaps bounded and release documents, descriptors, and temporary files. PDFBox uses a 50 MiB mixed-memory threshold.
-- For ink annotations, use `PDAnnotationMarkup` with the `/Ink` subtype and its `setInkList`/`setConstantOpacity` APIs; do not reference the newer `PDAnnotationInk` class. Load byte arrays through the supported `InputStream` overload when applying `MemoryUsageSetting.setupMixed(50 MiB)`.
-- Text highlighter selection must be based on cached character geometry, not word-box intersection. A drag selects a contiguous range on the first and last lines and all intervening lines, including reverse drags.
-- Text-markup normal appearances must draw each selected quad with the annotation opacity. Never use the union rectangle as a filled appearance because it obscures the PDF text.
-- Do not claim tile/viewport rendering or cross-viewer fidelity until code and CI/device validation prove it.
+## Architecture contract
 
-## Current feature status
+NoxReader uses Clean Architecture boundaries with an MVI-style presentation layer:
 
-- **Feature 01:** hybrid overlay/commit pipeline, shared coordinate mapper, mixed PDFBox memory, and mapper tests are implemented. Tile/viewport rendering, bitmap eviction, and PDFium text APIs are still pending.
-- **Feature 02:** editable/flattened save modes, quad-based transparent highlight appearances, save/sync/reopen, and flattening of newly saved supported annotations are implemented. External-viewer validation remains pending.
-- **Feature 03:** cached embedded highlights, normalized hit-testing, dashed selection bounds, anchored Delete action, and persistence of deletion are implemented. Color/comment actions and device validation remain pending.
+```text
+Compose screens -> PdfReaderIntent -> PdfReaderViewModel -> domain contracts -> data implementations
+                <- StateFlow<PdfReaderState> <-
+```
 
-## Validation and delivery
+- **Presentation:** `presentation/ui`, `presentation/mvi`, and `presentation/theme`.
+- **Domain:** engine, saver, sync, library, and TTS contracts/models.
+- **Data:** PDFium/PDFBox, SAF, and SharedPreferences implementations.
+- **Composition root:** `MainActivity` manually creates dependencies and owns the shared activity-scoped ViewModel.
 
-- Do **not** run Gradle locally. GitHub Actions is the build/test authority.
-- Unit tests are under `app/src/test`; add/maintain mapper and hit-testing coverage when changing those contracts.
-- Character-range selection coverage belongs in `TextHighlightSelectorTest`; keep wrapped-line and reverse-drag cases covered when changing highlighter interaction.
-- Release generation runs on pushes to `main` and `feature` via `.github/workflows/gh-release.yml`.
-- Preserve unrelated worktree changes. Stage only task files, inspect the staged diff, then commit and push when requested or when following the repository delivery workflow.
+Keep domain APIs independent of concrete PDFBox/PDFium types except for unavoidable Android boundary types already in existing contracts. Presentation must not parse a PDF or perform storage I/O inside a pointer callback.
+
+## State and navigation
+
+Routes are `bookshelf`, `reader`, and `settings`.
+
+- The bookshelf navigates to the reader only after `isPdfLoaded` becomes true.
+- Opening a recent document restores its last valid page and bookmarks.
+- Page changes persist reading progress asynchronously.
+- Back from the reader dispatches `ClosePdf` before popping navigation.
+- `PdfReaderState` stays immutable and lightweight; rendered bitmaps are returned by callbacks rather than stored in StateFlow.
+- UI changes flow through `PdfReaderIntent`; avoid screen-owned shadow state for durable product behavior.
+
+## UI and UX rules
+
+- Preserve the calm, editorial visual system in `presentation/theme`: serif headings, sans-serif controls, warm paper surfaces, navy emphasis, rounded containers, and restrained elevation.
+- Use Material semantic colors and typography tokens. Hard-coded colors are reserved for annotation palettes and purpose-specific overlays.
+- Use `NoxReaderTheme.spacing` and current width caps (760 dp library, 720 dp settings) instead of scattered layout constants for new top-level content.
+- Keep document content visually dominant and controls contextual. Reader controls belong in the compact top bar or floating bottom tool system.
+- Every stateful operation needs visible feedback and a recoverable failure state. Never remove library content while a new document is opening.
+- Use at least 48 dp touch targets where practical and meaningful `contentDescription`/semantics for icon-only actions. Do not rely on color alone for selected state.
+- Confirm destructive collection-level actions. Targeted highlight deletion is allowed only after an explicit selection is visible.
+- Keep UI copy direct and specific: say what will change, where data is stored, and whether the source PDF is affected.
+
+## Document pipeline
+
+1. The document picker returns a persistable SAF URI.
+2. `PdfReaderViewModel` reads on `Dispatchers.IO`.
+3. `PdfiumEngine` uses PDFium for static bitmaps and PDFBox for text geometry and embedded highlight metadata.
+4. Compose renders pending annotation and selection overlays.
+5. Save writes a temporary PDF, syncs it to the original URI, reopens it, increments `renderRevision`, and only then clears successfully persisted state.
+
+All UI annotation coordinates are normalized `0..1` display-space values with a top-left origin. `data/pdfbox/PdfCoordinateMapper.kt` is the only PDFBox coordinate conversion boundary for CropBox and right-angle page rotation. Do not add ad-hoc Y flips, DPI formulas, or MediaBox-only conversions.
+
+### Text and highlights
+
+- Text extraction retains word bounds and per-character geometry.
+- `TextHighlightSelector` creates a continuous reading-order range across wrapped lines and normalizes reverse drags.
+- Preview and persisted text highlights use the same normalized rectangles.
+- Embedded highlights are loaded and cached before hit testing.
+- `HighlightHitTester` selects the smallest overlapping target.
+- Selection alone never mutates the PDF.
+- Highlight appearances paint individual quads with opacity. Never fill the union rectangle.
+
+### Saving
+
+- **Editable:** keeps new annotation objects in `/Annots`.
+- **Flattened:** paints only newly created supported marks into page contents and removes only those new annotation entries.
+- Preserve unrelated existing annotations, forms, and signatures.
+- Flattening is irreversible; keep the UI mode explicit.
+- A failed write, sync, or reopen must retain pending overlays/deletions for retry.
+
+## Concurrency and resources
+
+- Never block the main thread with rendering, parsing, saving, SAF access, or preference disk I/O.
+- Keep PDFBox at `MemoryUsageSetting.setupMixed(50 MiB)` and use the supported `InputStream` load overload.
+- Bound allocations and release PDFium/PDFBox documents, file descriptors, bitmaps, temporary files, and TTS resources on close and failure paths.
+- Cache text boxes and embedded highlights only for the active document; invalidate them after reopen.
+- Keep provider access resilient: some SAF sources are read-only. Opening may succeed while save-back fails.
+
+## Tests and delivery
+
+- Do **not** run Gradle locally. GitHub Actions is the build/test authority for this repository.
+- JVM tests live under `app/src/test`.
+- Maintain `PdfCoordinateMapperTest` for CropBox/rotation mapping.
+- Maintain `HighlightHitTesterTest` for overlap and smallest-target selection.
+- Maintain `TextHighlightSelectorTest` for wrapped lines and reverse drags.
+- `.github/workflows/build.yml` builds release APKs for pushes and pull requests to `master`.
+- `.github/workflows/gh-release.yml` publishes releases for `main` and `feature`; `.github/workflows/gh-release-gptoss.yml` handles `gptoss`.
+- Treat `main` and `master` as different branches. Do not silently change workflow triggers or claim a release runs on a branch it does not list.
+- Preserve unrelated worktree changes. Stage only task files, inspect staged changes, and push only when the user or repository workflow authorizes it.
+
+## Documentation discipline
+
+When behavior, navigation, visual tokens, dependencies, build branches, or architecture change:
+
+1. update `.github/design.md`;
+2. update this file if agent guidance changed;
+3. update `README.md` if users or contributors are affected;
+4. keep statements limited to behavior present in code or verified CI.
+
+
+
+
+---
+applyTo: "**/features/"
+name: features folder update
+description: Product, architecture, UI, and delivery context for the Android PDF reader
+---
+

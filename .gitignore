@@ -23,7 +23,6 @@ uidump/
 
 
 # Environment & local config
-skills/
 .env
 gradlew.bat
 local.properties
