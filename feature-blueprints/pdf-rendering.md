@@ -8,12 +8,14 @@ requests must not cause unbounded memory use.
 
 ## Current verified status
 
-**Partial — last verified 2026-07-30.**
+**Status: Partial - last inspected 2026-08-02.**
 
 - `PdfiumEngine` renders PDFium pages into ARGB bitmaps off the main thread.
 - Rendered bitmaps are returned through callbacks rather than stored in
   `PdfReaderState`.
 - Compose draws pending annotations and interaction feedback above the bitmap.
+- The reader presents pages in a horizontal pager, fades in completed renders,
+  reports `Page N of M`, and clamps pinch zoom to `1x..5x`.
 - Saving reopens the document and increments `renderRevision`.
 - Rendering still creates one full-page bitmap. Viewport tiles, bounded bitmap
   eviction, render cancellation, and complete zoom panning are not implemented.
@@ -28,6 +30,8 @@ requests must not cause unbounded memory use.
 ## Feature-specific implications
 
 - PDFium owns the static page layer; interaction previews stay in Compose.
+- Opening and rendering expose progress; a load error keeps a Choose another PDF
+  recovery action available.
 - Rendering and every overlay must use the same fitted page `contentBounds`.
 - Page size, CropBox, and right-angle rotation data must feed the shared
   coordinate mapper rather than local DPI or Y-flip calculations.
@@ -65,4 +69,5 @@ requests must not cause unbounded memory use.
 - Viewport/tile rendering and stable tile cache keys.
 - Bounded bitmap eviction and obsolete-request cancellation.
 - Complete pan, reset, and double-tap zoom behavior.
+- Page thumbnails or a scrubber for long-document navigation.
 - Device validation for rotation, rapid paging, and large documents.

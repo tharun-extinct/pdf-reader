@@ -7,10 +7,12 @@ interaction or losing unsaved note contents during a failed save.
 
 ## Current verified status
 
-**Partial — implementation updated 2026-08-02; CI verification pending.**
+**Status: Partial - implementation updated 2026-08-02; CI verification pending.**
 
 - `TextAnnotation` stores page, normalized position, color, and text.
 - Add Text places an editable note field and updates it through MVI intents.
+- The reader exposes Add text as a semantic 48 dp toolbar action and keeps the
+  editable field as an optimistic Compose overlay until Save succeeds.
 - PDFBox writes `/Text` note annotations with contents, icon rectangle, color,
   closed state, and a normal appearance.
 - Newly saved notes participate in editable and flattened save modes. Flattened

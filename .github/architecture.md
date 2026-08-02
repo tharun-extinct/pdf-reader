@@ -32,84 +32,21 @@ Navigation is implemented by a Compose `NavHost` in `MainActivity`:
 
 Opening a document is state-driven. The bookshelf observes `isPdfLoaded` and navigates to the reader only after the file has opened successfully.
 
-## Experience specification
+## Feature experience ownership
 
-### Library
+User-visible behavior belongs to the task-routed feature blueprints rather than
+this shared contract. Load the manifest entry for the requested capability:
 
-The library uses a restrained editorial hierarchy:
-
-1. A compact app bar identifies NoxReader as "Your quiet reading space."
-2. The most recently opened document is promoted as a **Continue reading** card with animated progress.
-3. Remaining items appear in a scannable **Recent documents** list with title, current page, page count, progress, and bookmark count.
-4. A persistent **Open PDF** extended FAB is shown when history exists.
-5. A first-run empty state explains the product and provides a prominent **Choose a PDF** action.
-
-Required states:
-
-- **Loading:** centered progress indicator while local library metadata is read.
-- **Empty:** product introduction, file picker CTA, storage note, and any recoverable error.
-- **Populated:** continue card, recent list, progress, and open-file FAB.
-- **Opening:** linear progress at the top of the list; existing content remains visible.
-- **Error:** dismissible inline banner that does not erase the library.
-
-The list is capped at 20 recent documents. Selecting a recent entry reuses its persisted SAF URI and resumes at the last valid page.
-
-### Reader
-
-The reader prioritizes the page canvas while keeping document status and important actions reachable.
-
-#### Top app bar
-
-- Back closes the active document and returns to the library.
-- Title is single-line and ellipsized.
-- Page position is always shown as `Page N of M`.
-- `Edit` / `Flat` toggles the annotation save mode.
-- Save is disabled until there are pending annotations or embedded-highlight deletions and shows progress while writing.
-- Bookmark toggles the current page and exposes a state-specific accessibility label.
-
-#### Page canvas
-
-- Pages are horizontally paged.
-- Each page is rendered as a fitted ARGB bitmap with a fade-in.
-- Pinch zoom is clamped from 1x to 5x.
-- Text geometry is overlaid transparently for selection and synchronized read-aloud highlighting.
-- Unsaved strokes, highlights, text notes, current gesture previews, and selected-highlight actions remain Compose overlays until Save succeeds.
-
-The current renderer is full-page bitmap based. Tile rendering, bitmap eviction, zoom panning, render cancellation, and a page scrubber are not yet complete and must not be presented as shipped features.
-
-#### Floating tool system
-
-The bottom pill toolbar provides:
-
-- **Read aloud:** opens play/pause/resume/stop controls.
-- **Pen:** creates freehand ink with the selected color.
-- **Highlighter:** selects text using cached character geometry; if no text range is resolved, the gesture falls back to a freehand highlight stroke.
-- **Eraser:** removes matching unsaved strokes and session highlights along a drag.
-- **Add text:** places an editable note field at the tapped location.
-- **Palette:** edits pen and highlighter color sets.
-
-Pen and Highlighter show a contextual palette above the main toolbar. A selected tool uses a filled container plus icon tint, rather than color alone. Tool actions use 48 dp icon buttons and semantic labels.
-
-#### Existing highlight selection
-
-With no annotation tool active, tapping an embedded or session highlight selects the smallest matching target. Selection is represented by a dashed blue union boundary and an anchored **Delete** action. Deletion updates optimistic UI state and is persisted only after Save.
-
-#### Feedback and recovery
-
-- Opening, rendering, saving, and read-aloud each expose visible progress or state.
-- A reader load failure provides a **Choose another PDF** recovery action.
-- Save failures retain pending overlays and show an error; pending state is cleared only after the updated source reopens successfully.
-
-### Settings
-
-Settings are grouped into readable cards:
-
-- **Appearance:** System, Light, and Dark theme modes.
-- **Reading:** keep screen awake and read-aloud speed from 0.6x to 1.6x.
-- **Privacy & storage:** explains on-device history and clears recent metadata.
-- **About:** product name and version.
-
-Clearing recent history requires confirmation and explicitly states that PDF files are not deleted.
+- [Document library](../feature-blueprints/document-library.md) owns opening,
+  recents, resume position, bookmarks, and library states.
+- [PDF rendering](../feature-blueprints/pdf-rendering.md) owns the reader canvas,
+  paging, zoom, and render feedback.
+- [Read aloud](../feature-blueprints/read-aloud.md) owns playback controls,
+  chunking, synchronized highlighting, and TTS errors.
+- [Reader preferences](../feature-blueprints/reader-preferences.md) owns settings
+  behavior, theme selection, keep-awake, speech rate, and history clearing.
+- Annotation interaction and save behavior belong to their corresponding
+  blueprints in the [feature manifest](../feature-blueprints/README.md).
 
 ## Visual system
 
@@ -143,20 +80,17 @@ Spacing tokens live in `NoxReaderSpacing`:
 | Desktop margin | 64 dp | Future larger-window layouts |
 | Reading max width | 720 dp | Comfortable content width |
 
-Library content is capped at 760 dp and Settings at 720 dp. Rounded cards, restrained elevation, 48 dp icon buttons, and generous bottom padding keep controls readable and clear of floating actions.
+Feature blueprints own screen-specific width caps and component arrangements.
+Interactive controls use at least 48 dp touch targets where practical and must
+remain clear of floating actions and system insets.
 
 ### Motion
 
-Motion communicates state rather than decoration:
+Motion communicates state rather than decoration. Feature blueprints define the
+specific transition and its trigger. Transitions must remain short,
+non-essential, and safe to disable when reduced-motion support is added.
 
-- Recent-document progress animates to its stored value.
-- Page content fades in after rendering.
-- Page transitions crossfade within horizontal paging.
-- Contextual annotation palettes appear only for the active drawing tool.
-
-Respect a future reduced-motion setting by keeping transitions short and non-essential.
-
-## Architecture
+## Component model and state ownership
 
 NoxReader uses MVI-style unidirectional state with Clean Architecture boundaries.
 
@@ -285,21 +219,26 @@ PDF contents stay at their selected SAF location. The file provider determines w
 
 ## Validation and delivery
 
-- JVM tests cover coordinate mapping, overlapping-highlight hit testing, and contiguous/reverse text selection under `app/src/test`.
+- JVM test sources cover coordinate mapping, overlapping-highlight hit testing,
+  contiguous/reverse text selection, flattened note text retention, and
+  flattened ink width under `app/src/test`.
 - GitHub Actions is the build and test authority; repository guidance intentionally forbids local Gradle execution.
-- `.github/workflows/build.yml` builds a release APK for pushes and pull requests targeting `master`.
+- `.github/workflows/build.yml` builds a release APK for pushes and pull requests
+  targeting `master`; it currently runs `assembleRelease` without an explicit
+  unit-test or lint task.
 - `.github/workflows/gh-release.yml` publishes release APKs for pushes to `main` or `feature`. Note that `main` and `master` are distinct branch names; workflow changes must keep branch policy explicit.
 - `.github/workflows/gh-release-gptoss.yml` publishes the separate `gptoss` branch release.
 
-## Known gaps and next priorities
+## Cross-cutting gaps
 
-1. Add zoom panning and reset/double-tap behavior.
-2. Add bounded bitmap eviction, render cancellation, and viewport/tile rendering for large documents.
-3. Add page thumbnails or a scrubber for long-document navigation.
-4. Validate editable and flattened output across major external PDF viewers and read-only providers.
-5. Add device/Compose UI tests for accessibility, gestures, rotation, process recreation, and provider failures.
-6. Bundle chosen serif/sans-serif fonts if product identity requires consistent typography across devices.
-7. Consider an on-device neural voice only after size, latency, privacy, and fallback behavior are validated.
+- Device and Compose UI coverage does not yet verify accessibility, rotation,
+  process recreation, or provider-failure recovery across feature domains.
+- Resource ownership and cancellation need stress coverage for rapid document
+  replacement, paging, saving, and activity destruction.
+- Supported PDF mutations need a maintained provider and external-viewer
+  compatibility matrix.
+- Product typography still relies on system serif and sans-serif families;
+  bundling fonts would be a cross-screen visual-system change.
 
 ## Feature blueprints
 
@@ -314,3 +253,6 @@ authoritative here; each blueprint states how they constrain that feature.
 | [`text-highlighting.md`](../feature-blueprints/text-highlighting.md) | Text selection, embedded-highlight interaction, deletion, and geometry |
 | [`freehand-annotation.md`](../feature-blueprints/freehand-annotation.md) | Pen/freehand strokes, erasing, ink output, and flattening |
 | [`text-notes.md`](../feature-blueprints/text-notes.md) | Note placement, editing, display, and persistence |
+| [`document-library.md`](../feature-blueprints/document-library.md) | PDF selection, persisted access, recents, progress, and bookmarks |
+| [`read-aloud.md`](../feature-blueprints/read-aloud.md) | TTS lifecycle, chunking, synchronized highlighting, and playback controls |
+| [`reader-preferences.md`](../feature-blueprints/reader-preferences.md) | Theme, screen-awake, speech-rate, privacy, and history controls |

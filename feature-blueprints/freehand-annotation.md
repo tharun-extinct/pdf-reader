@@ -8,11 +8,13 @@ content.
 
 ## Current verified status
 
-**Partial — implementation updated 2026-08-02; CI verification pending.**
+**Status: Partial - implementation updated 2026-08-02; CI verification pending.**
 
 - `FreehandStroke` stores page, tool, color, width, and normalized points.
 - Compose renders the in-progress stroke and committed session overlays.
 - Pen and highlighter palettes are configurable in reader state.
+- The floating toolbar exposes Pen, Highlighter, and Eraser with 48 dp semantic
+  controls; Pen and Highlighter show the active contextual palette.
 - The eraser removes matching unsaved strokes along a drag.
 - PDFBox writes vector `/Ink` annotations with normal appearances; newly saved
   strokes can be flattened with their configured `/BS /W` width.

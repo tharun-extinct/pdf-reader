@@ -8,7 +8,7 @@ and persisted geometry aligned.
 
 ## Current verified status
 
-**Partial — last verified 2026-07-30.**
+**Status: Partial - last inspected 2026-08-02.**
 
 - PDFBox extraction supplies word and per-character bounds.
 - `TextHighlightSelector` creates continuous wrapped-line ranges and normalizes
@@ -17,6 +17,8 @@ and persisted geometry aligned.
 - `HighlightHitTester` selects the smallest overlapping candidate.
 - A selected highlight shows a translucent overlay, dashed union boundary, and
   anchored Delete action.
+- With no annotation tool active, a tap selects the smallest matching session or
+  embedded highlight; an outside tap clears the selection.
 - Deleting a session highlight updates state immediately; embedded deletion is
   recorded for the next save.
 - Color-change and comment actions, tile-aware transforms, and broad device or

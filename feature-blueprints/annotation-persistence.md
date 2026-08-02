@@ -8,7 +8,7 @@ work on write, provider-sync, or reopen failure.
 
 ## Current verified status
 
-**Partial — implementation updated 2026-08-02; CI verification pending.**
+**Status: Partial - implementation updated 2026-08-02; CI verification pending.**
 
 - `AnnotationSaveMode` exposes `Editable` and `Flattened`.
 - PDFBox writes highlights, `/Ink` strokes, and `/Text` notes with normal
@@ -22,6 +22,8 @@ work on write, provider-sync, or reopen failure.
   than losing their payload.
 - Save writes a temporary PDF, syncs through SAF, reopens the document, and
   clears optimistic state only after success.
+- Reader controls keep editable versus flattened mode explicit, disable Save
+  when no supported pending change exists, and expose save progress.
 - Broad Acrobat, PDFium, Drive, form, and signature fidelity is not verified by
   fixtures or a maintained cross-viewer matrix.
 
@@ -41,6 +43,8 @@ work on write, provider-sync, or reopen failure.
 - Sync to the original SAF URI before reopening and clearing optimistic state.
 - Treat a read-only provider as a recoverable save failure even when opening
   succeeded.
+- A save failure must retain every pending overlay and deletion and expose a
+  retryable error; only a successful reopen may clear them.
 - Use the shared mapper and each annotation feature's geometry; persistence must
   not reinterpret display coordinates independently.
 
