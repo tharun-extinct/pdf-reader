@@ -7,7 +7,8 @@ clear local-data controls whose effects are immediate, bounded, and private.
 
 ## Current verified status
 
-**Status: Partial - code inspected 2026-08-02; no dedicated automated tests found.**
+**Status: Partial - Proto DataStore implementation and tests added 2026-08-02;
+CI verification pending.**
 
 - System, Light, and Dark theme modes are stored and applied at the activity
   theme root.
@@ -17,6 +18,8 @@ clear local-data controls whose effects are immediate, bounded, and private.
   to `TtsManager`.
 - Preference updates change immutable UI state immediately and save after a
   250 ms debounce on the IO dispatcher.
+- Durable values use the versioned `ReaderDataProto` schema and transactional
+  `updateData` writes; legacy SharedPreferences values migrate once.
 - Settings explains on-device metadata and confirms before clearing recent
   document names, progress, and bookmarks without deleting PDFs.
 - Preference persistence failures and process-recreation behavior have no
@@ -52,8 +55,8 @@ clear local-data controls whose effects are immediate, bounded, and private.
 
 ### Local data and privacy
 
-- Preferences and recent-document metadata remain device-local in private
-  SharedPreferences.
+- Preferences and recent-document metadata remain device-local in one private
+  Proto DataStore file.
 - Clear history removes recent metadata only. Preference values and source PDFs
   remain unchanged unless a separate control explicitly says otherwise.
 - Privacy copy must distinguish metadata retention from SAF file access and from
@@ -61,8 +64,8 @@ clear local-data controls whose effects are immediate, bounded, and private.
 
 ### Performance and lifecycle
 
-- Preference reads and writes stay off the main thread; visible theme and window
-  effects follow state without blocking Compose.
+- DataStore owns asynchronous preference IO; visible theme and window effects
+  follow state without blocking Compose.
 - Keep-awake flags must be cleared when the preference is false and must not leak
   to unrelated windows or outlive the activity.
 - Speech-rate changes update the live TTS manager as well as durable preferences.
@@ -88,16 +91,25 @@ clear local-data controls whose effects are immediate, bounded, and private.
   modes, defaults, keep-awake flag, and speech-rate value.
 - `app/src/main/java/com/pdfreader/app/domain/repository/LibraryRepository.kt` -
   preference persistence boundary and history-clearing operation.
-- `app/src/main/java/com/pdfreader/app/data/preferences/SharedPreferencesLibraryRepository.kt` -
-  serialization, defaults, rate clamping, and recent-metadata deletion.
+- `app/src/main/proto/reader_data.proto` - versioned typed schema.
+- `app/src/main/java/com/pdfreader/app/data/preferences/ProtoLibraryRepository.kt` -
+  transactional preference updates and domain mappings.
+- `app/src/main/java/com/pdfreader/app/data/preferences/ReaderDataStore.kt` -
+  application-scoped store, serializer, migration chain, and corruption policy.
+- `app/src/main/java/com/pdfreader/app/data/preferences/ReaderDataMigrations.kt` -
+  legacy preference import and schema-version normalization.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderViewModel.kt` -
   initial load, optimistic updates, debounced save, and TTS rate propagation.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/SettingsScreen.kt` -
   settings controls and clear-history confirmation.
 - `app/src/main/java/com/pdfreader/app/MainActivity.kt` - root theme and window
   flag effects.
-- No dedicated preference repository, debounce, process-recreation, theme, or
-  window-flag tests currently exist under `app/src/test`.
+- `app/src/test/java/com/pdfreader/app/data/preferences/ProtoLibraryRepositoryTest.kt` -
+  preference durability alongside independent history clearing.
+- `app/src/test/java/com/pdfreader/app/data/preferences/ReaderDataMigrationsTest.kt` -
+  legacy values, schema defaults, and migration idempotence.
+- `macrobenchmark/src/main/java/com/pdfreader/macrobenchmark/NoxReaderMacrobenchmark.kt` -
+  Settings scrolling frame timing in separate benchmark CI.
 
 ## Acceptance criteria
 
@@ -108,17 +120,20 @@ clear local-data controls whose effects are immediate, bounded, and private.
 - [ ] Rapid preference changes persist the final accepted value without blocking
   the main thread.
 - [ ] Invalid or unknown stored values fall back to documented defaults.
+- [ ] Legacy preferences migrate exactly once, and every future semantic schema
+  change has an idempotent version-to-version migration test.
 - [ ] Clear history requires confirmation, removes only recent metadata, and
   leaves preferences and PDF files unchanged.
 - [ ] Storage failures are observable or have an explicit recovery policy.
 
 ## Remaining gaps
 
-- SharedPreferences commit results are ignored, so failed durable writes are not
-  visible to the user or ViewModel.
+- CI has not yet compiled or executed the new DataStore tests or Macrobenchmarks.
+- DataStore write failures are not yet surfaced by the ViewModel as recoverable
+  UI state.
 - A pending debounced preference write is not explicitly flushed before the
   ViewModel scope is cancelled.
-- No automated coverage for serialization, defaults, debouncing, recreation,
-  theme application, window flags, or clear-history boundaries.
+- No automated coverage for ViewModel debouncing, recreation, theme application,
+  or window flags.
 - Reduced-motion, font, and additional accessibility preferences are not
   implemented.

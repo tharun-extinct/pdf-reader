@@ -98,7 +98,7 @@ NoxReader uses MVI-style unidirectional state with Clean Architecture boundaries
 |---|---|---|
 | Presentation | Compose UI, immutable state, intents, gesture interpretation, optimistic overlays | `BookshelfScreen`, `PdfReaderScreen`, `SettingsScreen`, `PdfReaderViewModel`, `PdfReaderState` |
 | Domain | Stable engine, saving, sync, library, and TTS contracts/models | `PdfEngine`, `PdfAnnotationSaver`, `PdfSyncManager`, `LibraryRepository`, library models |
-| Data | PDFium, PDFBox Android, SAF, and SharedPreferences implementations | `PdfiumEngine`, `PdfAnnotationWriterImpl`, `SafPdfSyncManager`, `SharedPreferencesLibraryRepository` |
+| Data | PDFium, PDFBox Android, SAF, and Proto DataStore implementations | `PdfiumEngine`, `PdfAnnotationWriterImpl`, `SafPdfSyncManager`, `ProtoLibraryRepository` |
 
 Dependencies are manually assembled in `MainActivity`. Shared state is owned by one activity-scoped `PdfReaderViewModel` and exposed through `StateFlow`.
 
@@ -109,7 +109,7 @@ flowchart LR
     VM --> Engine["PdfEngine / PdfiumEngine"]
     VM --> Saver["PdfAnnotationSaver / PDFBox"]
     VM --> Sync["PdfSyncManager / SAF"]
-    VM --> Library["LibraryRepository / SharedPreferences"]
+    VM --> Library["LibraryRepository / Proto DataStore"]
     VM --> TTS["Android TextToSpeech"]
     Engine --> PDFium["PDFium page bitmap"]
     Engine --> PDFBoxRead["PDFBox text and highlight parsing"]
@@ -198,7 +198,7 @@ identity and must invalidate affected entries only after commit succeeds.
 
 ## Local data and privacy
 
-`SharedPreferencesLibraryRepository` stores only:
+`ProtoLibraryRepository` stores one private `ReaderDataProto` containing only:
 
 - document URI and display title;
 - page count and last page;
@@ -206,11 +206,26 @@ identity and must invalidate affected entries only after commit succeeds.
 - bookmarked page indices;
 - theme, keep-awake, and speech-rate preferences.
 
+The root message carries an explicit `schema_version`. Protobuf field numbers
+must never be reused, and compatible fields are added with safe defaults.
+Semantic changes require an ordered, idempotent `DataMigration` that upgrades
+one schema version at a time before normal reads or writes occur.
+
+Version 1 first imports the legacy `nox_reader_preferences` SharedPreferences
+keys, then normalizes schema defaults and marks the migration complete. A
+completed version prevents a cleanup retry from overwriting newer DataStore
+state. All normal mutations use `DataStore.updateData`, making each
+read-transform-write operation transactional and durable before it returns.
+Malformed Proto data is replaced with versioned defaults; source PDFs remain
+unaffected.
+
 PDF contents stay at their selected SAF location. The file provider determines whether save-back is available; read-only sources may open but cannot be updated.
 
 ## Performance and lifecycle
 
-- Rendering, text extraction, PDFBox parsing/writing, SAF I/O, and preference disk access run off the main thread.
+- Rendering, text extraction, PDFBox parsing/writing, SAF I/O, and local metadata
+  access never block Compose. Proto DataStore owns its application-scoped IO and
+  serializes concurrent metadata updates.
 - PDFBox uses `MemoryUsageSetting.setupMixed(50 MiB)`.
 - Render callbacks keep bitmap objects out of `PdfReaderState`.
 - Page text and embedded highlights are cached per open document.
@@ -221,11 +236,17 @@ PDF contents stay at their selected SAF location. The file provider determines w
 
 - JVM test sources cover coordinate mapping, overlapping-highlight hit testing,
   contiguous/reverse text selection, flattened note text retention, and
-  flattened ink width under `app/src/test`.
+  flattened ink width under `app/src/test`. Proto repository and migration tests
+  cover bounded history, bookmarks, preferences, defaults, legacy JSON mapping,
+  and migration idempotence.
 - GitHub Actions is the build and test authority; repository guidance intentionally forbids local Gradle execution.
-- `.github/workflows/build.yml` builds a release APK for pushes and pull requests
-  targeting `master`; it currently runs `assembleRelease` without an explicit
-  unit-test or lint task.
+- `.github/workflows/build.yml` runs debug JVM tests and builds a release APK for
+  pushes and pull requests targeting `master`; lint is not yet an explicit task.
+- `.github/workflows/macrobenchmark.yml` runs cold-start and Settings frame
+  benchmarks on a fixed API 34 managed emulator and uploads results and traces.
+  Emulator results are regression signals, not device-representative release
+  numbers; authoritative comparisons run the same tests on controlled physical
+  hardware.
 - `.github/workflows/gh-release.yml` publishes release APKs for pushes to `main` or `feature`. Note that `main` and `master` are distinct branch names; workflow changes must keep branch policy explicit.
 - `.github/workflows/gh-release-gptoss.yml` publishes the separate `gptoss` branch release.
 

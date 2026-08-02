@@ -47,7 +47,7 @@ Do not describe unfinished work as shipped. Tile/viewport rendering, bounded bit
 - Compose Navigation 2.7.7
 - PDFium Android 1.9.0 for bitmap rendering
 - `com.tom-roush:pdfbox-android:2.0.27.0` for text geometry, embedded annotations, and PDF mutation
-- Coroutines/StateFlow, Android TextToSpeech, SAF, and SharedPreferences
+- Coroutines/StateFlow, Android TextToSpeech, SAF, and Proto DataStore
 
 PDFBox Android is a 2.x fork and does not expose every newer upstream PDFBox API. Verify methods against the pinned AAR before using them. Ink annotations use `PDAnnotationMarkup` with `/Subtype /Ink`; do not introduce the newer `PDAnnotationInk` class.
 
@@ -62,7 +62,7 @@ Compose screens -> PdfReaderIntent -> PdfReaderViewModel -> domain contracts -> 
 
 - **Presentation:** `presentation/ui`, `presentation/mvi`, and `presentation/theme`.
 - **Domain:** engine, saver, sync, library, and TTS contracts/models.
-- **Data:** PDFium/PDFBox, SAF, and SharedPreferences implementations.
+- **Data:** PDFium/PDFBox, SAF, and versioned Proto DataStore implementations.
 - **Composition root:** `MainActivity` manually creates dependencies and owns the shared activity-scoped ViewModel.
 
 Keep domain APIs independent of concrete PDFBox/PDFium types except for unavoidable Android boundary types already in existing contracts. Presentation must not parse a PDF or perform storage I/O inside a pointer callback.

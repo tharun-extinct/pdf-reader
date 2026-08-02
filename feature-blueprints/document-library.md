@@ -8,13 +8,16 @@ document contents.
 
 ## Current verified status
 
-**Status: Partial - code inspected 2026-08-02; no dedicated automated tests found.**
+**Status: Partial - Proto DataStore implementation and tests added 2026-08-02;
+CI verification pending.**
 
 - The Android document picker is restricted to `application/pdf` and the app
   attempts to persist read/write access, falling back to read access.
 - Navigation to the reader occurs only after `isPdfLoaded` becomes true.
 - Recent metadata is keyed by the SAF URI, sorted by last-opened time, and capped
   at 20 entries.
+- History and bookmarks use transactional Proto DataStore updates. Existing
+  SharedPreferences JSON is imported once before schema version 1 is activated.
 - Opening a recent item clamps and restores its last page; page changes are
   saved after a 500 ms debounce.
 - Bookmarks are page-index sets stored with each recent document.
@@ -44,6 +47,8 @@ document contents.
   current page, and bookmarks in immutable state.
 - `LibraryRepository` owns only device-local metadata. The PDF engine owns the
   open document, and the SAF URI remains its durable identity.
+- Repository mutations transform the current Proto root atomically, so progress,
+  bookmark, and history updates cannot overwrite one another with stale reads.
 - Opening a URI merges existing bookmarks and clamps stored progress against the
   newly observed page count.
 
@@ -58,7 +63,8 @@ document contents.
 
 ### Performance and lifecycle
 
-- Provider access and metadata reads/writes stay off the main thread.
+- Provider access stays off the main thread; the application-scoped DataStore
+  serializes metadata IO and completes updates only after durable persistence.
 - Rapid page changes coalesce progress writes. Close snapshots the last observed
   page, schedules its metadata write, and then releases active reader state.
 - Replacement, close, and failure paths must release the previous document and
@@ -87,14 +93,23 @@ document contents.
   document metadata and progress calculation.
 - `app/src/main/java/com/pdfreader/app/domain/repository/LibraryRepository.kt` -
   metadata persistence boundary.
-- `app/src/main/java/com/pdfreader/app/data/preferences/SharedPreferencesLibraryRepository.kt` -
-  ordering, 20-item limit, bookmarks, progress, and serialization.
+- `app/src/main/proto/reader_data.proto` - versioned history and preference
+  schema.
+- `app/src/main/java/com/pdfreader/app/data/preferences/ProtoLibraryRepository.kt` -
+  transactional ordering, 20-item limit, bookmarks, progress, and domain maps.
+- `app/src/main/java/com/pdfreader/app/data/preferences/ReaderDataMigrations.kt` -
+  legacy JSON import and ordered schema upgrade.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderViewModel.kt` -
   open, resume, progress debounce, bookmark, clear, and close flows.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/BookshelfScreen.kt` -
   loading, empty, opening, populated, and error presentation.
-- No dedicated library repository, ViewModel, SAF, or navigation tests currently
-  exist under `app/src/test`.
+- `app/src/test/java/com/pdfreader/app/data/preferences/ProtoLibraryRepositoryTest.kt` -
+  bounded history, bookmark, preference, and clear-history transactions.
+- `app/src/test/java/com/pdfreader/app/data/preferences/ReaderDataMigrationsTest.kt` -
+  legacy history conversion, defaults, and idempotence.
+- `macrobenchmark/src/main/java/com/pdfreader/macrobenchmark/NoxReaderMacrobenchmark.kt` -
+  cold startup through the library-ready signal; executed only in benchmark CI
+  or on a connected physical device.
 
 ## Acceptance criteria
 
@@ -106,16 +121,19 @@ document contents.
   states have recoverable UI behavior.
 - [ ] Page progress and bookmarks survive process recreation without UI-thread
   disk access.
+- [ ] Existing SharedPreferences history and bookmarks migrate exactly once and
+  future schema versions preserve all still-supported fields.
 - [ ] Clearing history removes metadata but leaves every source PDF untouched.
 - [ ] Read-only access remains useful for reading and produces an explicit save
   limitation when a write is requested.
 
 ## Remaining gaps
 
-- No automated repository, ViewModel, navigation, or SAF permission-revocation
-  coverage.
+- CI has not yet compiled or executed the new Proto repository and migration
+  tests.
+- No ViewModel, navigation, or SAF permission-revocation coverage.
 - Back closes a document without confirming pending annotation changes; any fix
   must be coordinated with annotation persistence.
-- Corrupt stored JSON falls back to an empty library without diagnostics, and
-  SharedPreferences commit failures are not surfaced.
+- Android instrumentation does not yet verify the complete on-device
+  SharedPreferences cleanup step after a successful import.
 - Revoked or moved recent-document URIs have no dedicated repair or removal flow.

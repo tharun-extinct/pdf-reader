@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "PDF-Reader"
 include(":app")
+include(":macrobenchmark")

@@ -64,7 +64,7 @@ Compose UI
   -> PdfReaderIntent
   -> PdfReaderViewModel
   -> domain contracts
-  -> PDFium / PDFBox / SAF / SharedPreferences
+  -> PDFium / PDFBox / SAF / Proto DataStore
 
 Compose UI <- StateFlow<PdfReaderState>
 ```
@@ -92,7 +92,8 @@ to load only the blueprint relevant to a task, then follow
 - PDFBox Android 2.0.27.0
 - Android TextToSpeech
 - Storage Access Framework
-- SharedPreferences for small local metadata
+- Proto DataStore with a versioned schema and legacy SharedPreferences migration
+- Macrobenchmark instrumentation in a separate CI-managed emulator module
 
 ## Project structure
 
@@ -115,10 +116,17 @@ app/src/main/java/com/pdfreader/app/
 
 This repository intentionally uses GitHub Actions as the build/test authority. Do not run Gradle locally.
 
-- Pushes and pull requests to `master` run [`.github/workflows/build.yml`](.github/workflows/build.yml), which assembles a release APK and uploads it as a 14-day artifact.
+- Pushes and pull requests to `master` run [`.github/workflows/build.yml`](.github/workflows/build.yml), which runs JVM tests, assembles a release APK, and uploads it as a 14-day artifact.
 - Pushes to `main` or `feature` run [`.github/workflows/gh-release.yml`](.github/workflows/gh-release.yml), which assembles and publishes a GitHub Release APK.
 - Pushes to `gptoss` use the separate gptoss release workflow.
-- JVM tests cover coordinate mapping, overlapping highlight selection, and wrapped/reverse text-highlighter selection.
+- [`.github/workflows/macrobenchmark.yml`](.github/workflows/macrobenchmark.yml)
+  runs separately on a schedule or manual dispatch using a managed API 34
+  emulator. It uploads cold-start, frame-timing, and trace artifacts for
+  regression comparison; physical-device runs remain authoritative for release
+  performance numbers.
+- JVM tests cover Proto DataStore migration/repository behavior, coordinate
+  mapping, overlapping highlight selection, annotation writing, and
+  wrapped/reverse text selection.
 
 The current release build uses the debug signing configuration. Configure a protected production keystore before distributing through an app store.
 

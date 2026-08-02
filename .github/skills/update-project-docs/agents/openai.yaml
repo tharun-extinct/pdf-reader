@@ -1,4 +1,0 @@
-interface:
-  display_name: "Update Project Docs"
-  short_description: "Create and maintain code-aligned project docs"
-  default_prompt: "Use $update-project-docs to create or update the README, design documentation, and coding-agent instructions in the current repository."

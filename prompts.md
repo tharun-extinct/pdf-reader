@@ -20,9 +20,49 @@ Read Aloud:
 - [ ] 9. Refine Performance & Latency (Optimize memory allocations, caching rendered bitmaps)
 
 
+# Feature blueprints
+ 
+- the agent-optimized blueprint structure
 
+
+
+# NoxReader
+
+- Table of Contents (Top left corner)
+
+- 
+
+## Text to Speech
+
+- Back to the previous paragraph
+
+- Fast forward to next paragraph
+
+- Speed selection
+
+- 
+
+<!-- - Black out other content than the  -->
 
 the read aloud isn't syncing with the line text highlight.
+
+
+- Add to Favorites
+
+- Add to read
+
+- Add to have read
+
+- Collections
+
+- More options (Move to trash, Edit (Title, Author, Series, Annotation))
+
+
+Accorlite 
+
+DB
+
+
 
 
 >
@@ -93,6 +133,14 @@ After saving, the width of the annotation is increased drastically
 
 - Put annotation color setting in the `settings`
 - Annotation color settings UI (in the PDF reading window) is so worst, I can't even a drag it down. [Don't repeat this]
+
+
+
+
+
+
+use DataStore Proto with schema migrations capabilities
+
 
 
 
