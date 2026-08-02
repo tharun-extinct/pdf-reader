@@ -1,20 +1,31 @@
 package com.pdfreader.app.data.pdfbox
 
 import androidx.compose.ui.geometry.Offset
+import androidx.test.core.app.ApplicationProvider
 import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import com.pdfreader.app.presentation.mvi.AnnotationTool
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.io.ByteArrayOutputStream
 
+@RunWith(RobolectricTestRunner::class)
 class PdfAnnotationWriterTest {
+    @Before
+    fun initializePdfBoxResources() {
+        PDFBoxResourceLoader.init(ApplicationProvider.getApplicationContext())
+    }
+
     @Test
     fun flattenedTextNoteWritesVisibleTextAndRemovesAnnotation() {
         PDDocument().use { document ->

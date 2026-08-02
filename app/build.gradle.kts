@@ -64,6 +64,9 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.10"
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -103,6 +106,8 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    testImplementation("androidx.test:core:1.5.0")
+    testImplementation("org.robolectric:robolectric:4.11.1")
 }
 
 protobuf {
