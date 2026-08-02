@@ -142,5 +142,5 @@ After saving, the width of the annotation is increased drastically
 use DataStore Proto with schema migrations capabilities
 
 
-
+Archive or remove stale implementation-files/ documents. Several contain obsolete file:///x:/... links and duplicate current documentation.
 

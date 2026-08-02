@@ -247,6 +247,9 @@ PDF contents stay at their selected SAF location. The file provider determines w
   Emulator results are regression signals, not device-representative release
   numbers; authoritative comparisons run the same tests on controlled physical
   hardware.
+- `.github/workflows/docs-check.yml` is manually dispatched and validates local
+  Markdown links and anchors, the required feature-blueprint sections, and
+  complete task-router coverage without invoking the Android toolchain.
 - `.github/workflows/gh-release.yml` publishes release APKs for pushes to `main` or `feature`. Note that `main` and `master` are distinct branch names; workflow changes must keep branch policy explicit.
 - `.github/workflows/gh-release-gptoss.yml` publishes the separate `gptoss` branch release.
 

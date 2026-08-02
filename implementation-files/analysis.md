@@ -97,21 +97,14 @@ Here are some of the top open-source Android PDF reader applications and librari
 
 **3. Book's Story**
 *   **GitHub Link:** [https://github.com/Acclorite/book-story](https://github.com/Acclorite/book-story)
-*   **Overview:** A broader open-source eBook reader that supports PDF (alongside EPUB, FB2, etc.). It features a beautiful, ad-free UI built with Material You design and Jetpack Compose.
 
 ### Open-Source Developer Libraries (SDKs)
 
-If you are looking for open-source *engines* that you can plug directly into your own app code to render the PDFs:
-
-**4. AndroidPdfViewer (by barteksc)**
+**AndroidPdfViewer (by barteksc)**
 *   **GitHub Link:** [https://github.com/barteksc/AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer)
-*   **Overview:** This is arguably the most widely used open-source PDF viewing library in the Android ecosystem. It provides a highly optimized wrapper around the `PdfiumAndroid` engine.
-*   *Note: The original repository is mostly unmaintained now. If you want to use this library on modern Android versions, developers currently rely on active forks, such as:*
-    *   **Maintained Fork:** [https://github.com/mhiew/AndroidPdfViewer](https://github.com/mhiew/AndroidPdfViewer)
 
-**5. MuPDF for Android**
-*   **Link:** [https://mupdf.com/docs/android-sdk.html](https://mupdf.com/docs/android-sdk.html) (Core open-source engine: [https://github.com/ArtifexSoftware/mupdf](https://github.com/ArtifexSoftware/mupdf))
-*   **Overview:** The incredibly fast C-based rendering engine discussed earlier. While it has an open-source AGPL version, you must open-source your entire Android application if you choose to integrate this version of their SDK.
+** MuPDF for Android**
+*   **Link:** [https://github.com/ArtifexSoftware/mupdf](https://github.com/ArtifexSoftware/mupdf)
 
 
 

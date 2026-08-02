@@ -124,6 +124,10 @@ This repository intentionally uses GitHub Actions as the build/test authority. D
   emulator. It uploads cold-start, frame-timing, and trace artifacts for
   regression comparison; physical-device runs remain authoritative for release
   performance numbers.
+- [`.github/workflows/docs-check.yml`](.github/workflows/docs-check.yml) runs on
+  manual dispatch and checks local Markdown links, required blueprint sections,
+  and task-router coverage. The same check can be run without Gradle using
+  `python scripts/check_docs.py`.
 - JVM tests cover Proto DataStore migration/repository behavior, coordinate
   mapping, overlapping highlight selection, annotation writing, and
   wrapped/reverse text selection.
