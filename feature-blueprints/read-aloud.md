@@ -7,7 +7,8 @@ highlighting while releasing Android TextToSpeech resources when reading ends.
 
 ## Current verified status
 
-**Status: Partial - code inspected 2026-08-02; no dedicated automated tests found.**
+**Status: Partial - code and test tree inspected 2026-08-03; no dedicated
+automated tests found.**
 
 - `TtsManager` initializes Android TextToSpeech with `Locale.US` and publishes
   Idle, Playing, Paused, and Error states through `StateFlow`.
@@ -20,6 +21,8 @@ highlighting while releasing Android TextToSpeech resources when reading ends.
 - Speech rate is applied from reader preferences and clamped to `0.6f..1.6f`.
 - Playback is page-scoped; it does not continue to the next page, detect document
   language, or resume at an exact word after pause.
+- Opening a replacement PDF resets observable TTS state but does not explicitly
+  stop the platform engine first.
 
 ## Architecture dependencies
 
@@ -123,3 +126,9 @@ highlighting while releasing Android TextToSpeech resources when reading ends.
 - The 3000-character fallback is checked after each complete text box, so one
   unusually large box can still exceed that threshold.
 - No automated tests around chunking, mapping, platform callbacks, or lifecycle.
+- Spoken-range alignment inherits the current MediaBox-based text extraction;
+  cropped and rotated page alignment is not fixture-verified.
+- Document replacement can leave the previous utterance playing underneath the
+  newly opened document because `openPdf()` does not call `TtsManager.stop()`.
+- A Play request made before TTS initialization completes is ignored without an
+  observable loading or retry state.

@@ -7,8 +7,7 @@ clear local-data controls whose effects are immediate, bounded, and private.
 
 ## Current verified status
 
-**Status: Partial - Proto DataStore implementation and tests added 2026-08-02;
-CI verification pending.**
+**Status: Partial - code, tests, and Actions history inspected 2026-08-03.**
 
 - System, Light, and Dark theme modes are stored and applied at the activity
   theme root.
@@ -22,6 +21,9 @@ CI verification pending.**
   `updateData` writes; legacy SharedPreferences values migrate once.
 - Settings explains on-device metadata and confirms before clearing recent
   document names, progress, and bookmarks without deleting PDFs.
+- No recorded GitHub Actions run includes the Proto DataStore commit `7186d8a`
+  or the Macrobenchmark workflow, so both remain source-inspected rather than
+  CI-verified.
 - Preference persistence failures and process-recreation behavior have no
   dedicated automated coverage.
 
@@ -128,7 +130,8 @@ CI verification pending.**
 
 ## Remaining gaps
 
-- CI has not yet compiled or executed the new DataStore tests or Macrobenchmarks.
+- CI has not yet compiled or executed the DataStore tests or Macrobenchmarks;
+  the latest recorded Android Build predates commit `7186d8a`.
 - DataStore write failures are not yet surfaced by the ViewModel as recoverable
   UI state.
 - A pending debounced preference write is not explicitly flushed before the

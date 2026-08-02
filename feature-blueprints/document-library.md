@@ -8,8 +8,7 @@ document contents.
 
 ## Current verified status
 
-**Status: Partial - Proto DataStore implementation and tests added 2026-08-02;
-CI verification pending.**
+**Status: Partial - code, tests, and Actions history inspected 2026-08-03.**
 
 - The Android document picker is restricted to `application/pdf` and the app
   attempts to persist read/write access, falling back to read access.
@@ -23,6 +22,9 @@ CI verification pending.**
 - Bookmarks are page-index sets stored with each recent document.
 - The library renders loading, empty, opening, populated, and recoverable error
   states; clearing history is exposed through Settings.
+- No recorded GitHub Actions run includes the Proto DataStore commit `7186d8a`
+  or a later project revision, so the repository and migration tests remain
+  source-inspected rather than CI-verified.
 
 ## Architecture dependencies
 
@@ -129,8 +131,8 @@ CI verification pending.**
 
 ## Remaining gaps
 
-- CI has not yet compiled or executed the new Proto repository and migration
-  tests.
+- CI has not yet compiled or executed the Proto repository and migration tests;
+  the latest recorded Android Build predates commit `7186d8a`.
 - No ViewModel, navigation, or SAF permission-revocation coverage.
 - Back closes a document without confirming pending annotation changes; any fix
   must be coordinated with annotation persistence.
