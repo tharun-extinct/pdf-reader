@@ -143,3 +143,9 @@ use DataStore Proto with schema migrations capabilities
 
 
 Archive or remove stale implementation-files/ documents. Several contain obsolete file:///x:/... links and duplicate current documentation.
+
+
+
+
+After those foundations, the strongest product additions would be document search, outline navigation, thumbnails/scrubber, undo/redo, automatic draft recovery, “Save a copy” for read-only providers, and editing existing ink and notes.
+My recommended next milestone is Safe Save and Recovery: fix SAF success detection, preserve flattened note content and ink width, guard unsaved navigation, serialize document operations, and add PDF/provider failure fixtures. No files were changed during this audit.

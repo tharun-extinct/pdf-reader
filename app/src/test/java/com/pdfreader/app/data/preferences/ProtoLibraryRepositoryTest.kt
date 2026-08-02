@@ -71,6 +71,7 @@ class ProtoLibraryRepositoryTest {
                     uri = "content://documents/untitled.pdf",
                     title = "",
                     pageCount = 1,
+                    lastPage = 0,
                     lastOpenedAt = 100L
                 )
             )
