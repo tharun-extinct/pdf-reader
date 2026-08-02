@@ -224,7 +224,13 @@ object PdfAnnotationWriter {
                 val newAnnotations = page.annotations.drop(annotationCountBeforeWrite)
                 val flattenedAnnotations = flattenAnnotations(document, page, newAnnotations)
                 page.annotations = page.annotations
-                    .filterNot { annotation -> flattenedAnnotations.any { it === annotation } }
+                    // PDFBox materializes fresh annotation wrapper objects every time
+                    // `page.annotations` is read, so Kotlin object identity cannot
+                    // identify the entries that were just flattened. The COS dictionary
+                    // is the stable backing object shared by those wrappers.
+                    .filterNot { annotation ->
+                        flattenedAnnotations.any { it.cosObject === annotation.cosObject }
+                    }
                     .toMutableList()
             }
         }

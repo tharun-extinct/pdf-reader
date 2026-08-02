@@ -8,13 +8,14 @@ work on write, provider-sync, or reopen failure.
 
 ## Current verified status
 
-**Status: Partial - code and test sources inspected 2026-08-03.**
+**Status: Partial - implementation updated 2026-08-03; CI verification pending.**
 
 - `AnnotationSaveMode` exposes `Editable` and `Flattened`.
 - PDFBox writes highlights, `/Ink` strokes, and `/Text` notes with normal
   appearances.
-- Flattening paints newly created supported annotations into page content and
-  removes only those new annotation entries.
+- Flattening is implemented to paint newly created supported annotations into
+  page content and remove only those new annotation entries. The JVM regression
+  tests await CI verification after fixing PDFBox wrapper-identity removal.
 - Flattened ink reads the stroke width stored in `/BS /W` instead of substituting
   a fixed width.
 - Flattened text notes render their complete encodable contents in a visible
