@@ -7,13 +7,15 @@ interaction or losing unsaved note contents during a failed save.
 
 ## Current verified status
 
-**Partial — last verified 2026-07-30.**
+**Partial — implementation updated 2026-08-02; CI verification pending.**
 
 - `TextAnnotation` stores page, normalized position, color, and text.
 - Add Text places an editable note field and updates it through MVI intents.
 - PDFBox writes `/Text` note annotations with contents, icon rectangle, color,
   closed state, and a normal appearance.
-- Newly saved notes participate in editable and flattened save modes.
+- Newly saved notes participate in editable and flattened save modes. Flattened
+  notes render their complete encodable text into a visible note box; notes that
+  cannot be represented without loss remain editable.
 - Existing embedded note loading, selection, editing, and deletion are not
   implemented, and note-specific persistence fixtures are absent.
 
@@ -48,6 +50,7 @@ interaction or losing unsaved note contents during a failed save.
 - `presentation/mvi/PdfReaderViewModel.kt`
 - `presentation/ui/PdfReaderScreen.kt`
 - `data/pdfbox/PdfAnnotationWriter.kt`
+- `data/pdfbox/PdfAnnotationWriterTest.kt`
 
 ## Acceptance criteria
 
@@ -55,8 +58,8 @@ interaction or losing unsaved note contents during a failed save.
   zoom transforms.
 - Editing updates optimistic state without blocking pointer interaction.
 - Editable save/reopen preserves note contents and a usable note icon.
-- Flattened output visibly preserves supported note content according to the
-  defined flattened representation.
+- Flattened output visibly preserves the complete supported note content; an
+  unencodable or oversized note remains editable instead of being discarded.
 - Failed persistence retains the complete pending note.
 - Empty, multiline, Unicode, long, and read-only-provider cases have explicit
   behavior and tests before the feature is marked Verified.
@@ -65,4 +68,4 @@ interaction or losing unsaved note contents during a failed save.
 
 - Embedded note discovery, selection, editing, and deletion.
 - Defined empty-note and long-note UX.
-- Note-specific coordinate, PDF-object, and external-viewer tests.
+- Editable-note, multiline, long-note, coordinate, and external-viewer tests.

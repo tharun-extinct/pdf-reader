@@ -8,14 +8,14 @@ content.
 
 ## Current verified status
 
-**Partial — last verified 2026-07-30.**
+**Partial — implementation updated 2026-08-02; CI verification pending.**
 
 - `FreehandStroke` stores page, tool, color, width, and normalized points.
 - Compose renders the in-progress stroke and committed session overlays.
 - Pen and highlighter palettes are configurable in reader state.
 - The eraser removes matching unsaved strokes along a drag.
 - PDFBox writes vector `/Ink` annotations with normal appearances; newly saved
-  strokes can be flattened.
+  strokes can be flattened with their configured `/BS /W` width.
 - Pressure sensitivity, persisted-stroke reselection, and dedicated gesture or
   PDF-fixture coverage are not implemented.
 
@@ -51,6 +51,7 @@ content.
 - `presentation/ui/PdfReaderScreen.kt`
 - `data/pdfbox/PdfAnnotationWriter.kt`
 - `data/pdfbox/PdfCoordinateMapperTest.kt`
+- `data/pdfbox/PdfAnnotationWriterTest.kt`
 
 ## Acceptance criteria
 
@@ -66,4 +67,4 @@ content.
 
 - Pressure-sensitive geometry and end-to-end persistence.
 - Selection or editing of existing embedded ink.
-- Gesture, width-mapping, PDF-object, and external-viewer tests.
+- Gesture, broader PDF-object, and external-viewer tests.

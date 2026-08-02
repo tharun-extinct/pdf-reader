@@ -243,6 +243,11 @@ Reverse drags normalize to the same result. Preview and persistence use identica
 - **Editable:** preserves new `/Annots` for highlights, ink, and text notes. Highlight normal appearances paint selected quads with the configured opacity.
 - **Flattened:** paints newly created supported annotations into page `/Contents`, then removes only those newly created annotation entries. Existing annotations remain intact. Flattening is irreversible.
 
+An annotation may be removed only after its complete supported payload has been
+represented in page content. If lossless flattening is unavailable for a
+particular payload, keep that annotation editable rather than silently dropping
+user data.
+
 The annotation union rectangle is metadata only and must never be rendered as a solid highlight because it can obscure text between selected lines.
 
 ### Failure handling and invalidation

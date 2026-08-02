@@ -79,12 +79,20 @@ feature-blueprints/ to contain only user-facing feature specifications, with all
 come up with an optimal way for structuring the feature file
 
 
-@skill-creator create a skill that tells the AI Agent on how to update/ create -> `feature-blueprints` and `architecture.md`
+
+
+@skill-creator create a skill that tells the AI Agent on how to update/ create -> `feature-blueprints` and `architecture.md` .
 
 add examples in the references folder of the skill (or where ever it's has to be placed)
 
 
 [Don't build the skill with the current project specific details]
+
+
+After saving, the width of the annotation is increased drastically
+
+- Put annotation color setting in the `settings`
+- Annotation color settings UI (in the PDF reading window) is so worst, I can't even a drag it down. [Don't repeat this]
 
 
 
