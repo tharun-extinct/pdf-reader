@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Draw
@@ -86,13 +87,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pdfreader.app.R
 import com.pdfreader.app.presentation.mvi.AnnotationTool
 import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import com.pdfreader.app.presentation.mvi.FreehandStroke
@@ -145,7 +149,7 @@ fun PdfReaderScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.back),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -153,7 +157,8 @@ fun PdfReaderScreen(
                 title = {
                     Column {
                         Text(
-                            text = state.documentTitle ?: "Document",
+                            text = state.documentTitle?.takeIf { it.isNotBlank() }
+                                ?: stringResource(R.string.document_default_title),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
@@ -161,7 +166,11 @@ fun PdfReaderScreen(
                         )
                         if (state.pageCount > 0) {
                             Text(
-                                text = "Page ${state.currentPageIndex + 1} of ${state.pageCount}",
+                                text = stringResource(
+                                    R.string.page_of_count,
+                                    state.currentPageIndex + 1,
+                                    state.pageCount
+                                ),
                                 style = UiSmStyle.copy(fontSize = 11.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -186,7 +195,15 @@ fun PdfReaderScreen(
                                 viewModel.processIntent(PdfReaderIntent.SetAnnotationSaveMode(mode))
                             }
                         ) {
-                            Text(if (state.annotationSaveMode == AnnotationSaveMode.Editable) "Edit" else "Flat")
+                            Text(
+                                stringResource(
+                                    if (state.annotationSaveMode == AnnotationSaveMode.Editable) {
+                                        R.string.annotation_mode_editable
+                                    } else {
+                                        R.string.annotation_mode_flattened
+                                    }
+                                )
+                            )
                         }
 
                         IconButton(
@@ -202,7 +219,7 @@ fun PdfReaderScreen(
                             } else {
                                 Icon(
                                     imageVector = Icons.Outlined.Save,
-                                    contentDescription = "Save annotations to PDF",
+                                    contentDescription = stringResource(R.string.save_annotations),
                                     tint = if (hasAnnotations)
                                         MaterialTheme.colorScheme.primary
                                     else
@@ -225,9 +242,15 @@ fun PdfReaderScreen(
                                 Icons.Outlined.BookmarkBorder
                             },
                             contentDescription = if (isBookmarked) {
-                                "Remove bookmark from page ${state.currentPageIndex + 1}"
+                                stringResource(
+                                    R.string.remove_page_bookmark,
+                                    state.currentPageIndex + 1
+                                )
                             } else {
-                                "Bookmark page ${state.currentPageIndex + 1}"
+                                stringResource(
+                                    R.string.add_page_bookmark,
+                                    state.currentPageIndex + 1
+                                )
                             },
                             tint = if (isBookmarked) {
                                 MaterialTheme.colorScheme.primary
@@ -260,7 +283,7 @@ fun PdfReaderScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Opening your document…",
+                            text = stringResource(R.string.opening_document),
                             style = UiSmStyle,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -293,7 +316,7 @@ fun PdfReaderScreen(
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     ) {
-                        Text("Open PDF")
+                        Text(stringResource(R.string.open_pdf))
                     }
                 }
             }
@@ -373,7 +396,7 @@ private fun ReaderErrorState(
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "We couldn’t open this PDF",
+                text = stringResource(R.string.open_pdf_error_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 textAlign = TextAlign.Center
@@ -387,7 +410,7 @@ private fun ReaderErrorState(
             )
             Spacer(Modifier.height(16.dp))
             Button(onClick = onChooseAnother) {
-                Text("Choose another PDF")
+                Text(stringResource(R.string.choose_another_pdf))
             }
         }
     }
@@ -415,10 +438,10 @@ fun TtsControlsOverlay(
         ) {
             Text(
                 text = when (ttsState) {
-                    is TtsState.Playing -> "Reading aloud"
-                    is TtsState.Paused -> "Paused"
-                    is TtsState.Error -> "Read aloud unavailable"
-                    TtsState.Idle -> "Read aloud"
+                    is TtsState.Playing -> stringResource(R.string.tts_reading)
+                    is TtsState.Paused -> stringResource(R.string.tts_paused)
+                    is TtsState.Error -> stringResource(R.string.tts_unavailable)
+                    TtsState.Idle -> stringResource(R.string.tts_idle)
                 },
                 style = UiSmStyle.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -429,7 +452,7 @@ fun TtsControlsOverlay(
                     IconButton(onClick = onPlay) {
                         Icon(
                             Icons.Default.PlayArrow,
-                            contentDescription = "Start reading aloud",
+                            contentDescription = stringResource(R.string.tts_start),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
@@ -438,14 +461,14 @@ fun TtsControlsOverlay(
                     IconButton(onClick = onPause) {
                         Icon(
                             Icons.Default.Pause,
-                            contentDescription = "Pause reading aloud",
+                            contentDescription = stringResource(R.string.tts_pause),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                     IconButton(onClick = onStop) {
                         Icon(
                             Icons.Default.Stop,
-                            contentDescription = "Stop reading aloud",
+                            contentDescription = stringResource(R.string.tts_stop),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
@@ -454,14 +477,14 @@ fun TtsControlsOverlay(
                     IconButton(onClick = onResume) {
                         Icon(
                             Icons.Default.PlayArrow,
-                            contentDescription = "Resume reading aloud",
+                            contentDescription = stringResource(R.string.tts_resume),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                     IconButton(onClick = onStop) {
                         Icon(
                             Icons.Default.Stop,
-                            contentDescription = "Stop reading aloud",
+                            contentDescription = stringResource(R.string.tts_stop),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
@@ -508,6 +531,7 @@ private fun FloatingAnnotationToolbar(
                 ) {
                     colors.forEachIndexed { index, color ->
                         val isSelected = index == selectedIdx
+                        val colorDescription = stringResource(R.string.color_number, index + 1)
                         Box(
                             modifier = Modifier
                                 .size(if (isSelected) 32.dp else 28.dp)
@@ -524,6 +548,10 @@ private fun FloatingAnnotationToolbar(
                                     else
                                         onIntent(PdfReaderIntent.SelectHighlighterColor(index))
                                 }
+                                .semantics {
+                                    contentDescription = colorDescription
+                                    selected = isSelected
+                                }
                         )
                     }
                     // Divider
@@ -538,10 +566,10 @@ private fun FloatingAnnotationToolbar(
                         onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.None)) },
                         modifier = Modifier.size(48.dp)
                     ) {
-                        Text(
-                            text = "×",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            contentDescription = stringResource(R.string.close),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -562,39 +590,39 @@ private fun FloatingAnnotationToolbar(
             ) {
                 FloatingToolbarIcon(
                     icon = Icons.Outlined.VolumeUp,
-                    label = "Read aloud",
+                    label = stringResource(R.string.tts_idle),
                     selected = state.activeTool == AnnotationTool.ReadAloud,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.ReadAloud)) }
                 )
                 ToolbarDivider()
                 FloatingToolbarIcon(
                     icon = Icons.Outlined.Draw,
-                    label = "Pen",
+                    label = stringResource(R.string.tool_pen),
                     selected = state.activeTool == AnnotationTool.Pen,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Pen)) }
                 )
                 FloatingToolbarIcon(
                     icon = Icons.Outlined.FormatColorFill,
-                    label = "Highlighter",
+                    label = stringResource(R.string.tool_highlighter),
                     selected = state.activeTool == AnnotationTool.Highlighter,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Highlighter)) }
                 )
                 FloatingToolbarIcon(
                     icon = Icons.Outlined.Delete,
-                    label = "Eraser",
+                    label = stringResource(R.string.tool_eraser),
                     selected = state.activeTool == AnnotationTool.Eraser,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Eraser)) }
                 )
                 FloatingToolbarIcon(
                     icon = Icons.Outlined.TextFields,
-                    label = "Add text",
+                    label = stringResource(R.string.tool_add_text),
                     selected = state.activeTool == AnnotationTool.AddText,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.AddText)) }
                 )
                 ToolbarDivider()
                 FloatingToolbarIcon(
                     icon = Icons.Outlined.Palette,
-                    label = "Customize annotation colors",
+                    label = stringResource(R.string.customize_annotation_colors),
                     selected = false,
                     onClick = { onIntent(PdfReaderIntent.ToggleAnnotationSettings) }
                 )
@@ -622,7 +650,7 @@ private fun FloatingToolbarIcon(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = label,
+            contentDescription = null,
             tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
                    else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp)
@@ -734,7 +762,10 @@ fun PdfPage(
                 Box {
                     Image(
                     bitmap = pageImage.asImageBitmap(),
-                    contentDescription = "Page ${pageIndex + 1}",
+                    contentDescription = stringResource(
+                        R.string.page_content_description,
+                        pageIndex + 1
+                    ),
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer(
@@ -861,7 +892,7 @@ fun PdfPage(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
-                        label = { Text("Note") }
+                        label = { Text(stringResource(R.string.note_label)) }
                     )
                 }
             }
@@ -1133,7 +1164,7 @@ private fun BoxScope.SelectedHighlightOverlay(
         TextButton(onClick = onDelete) {
             Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
-            Text("Delete")
+            Text(stringResource(R.string.delete))
         }
     }
 }
@@ -1156,6 +1187,7 @@ private fun AnnotationSettingsDialog(
         }
     }
     var validationError by remember { mutableStateOf<String?>(null) }
+    val invalidColorsMessage = stringResource(R.string.annotation_colors_invalid)
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -1177,25 +1209,31 @@ private fun AnnotationSettingsDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Annotation colors", style = MaterialTheme.typography.titleLarge)
                         Text(
-                            "Use #RRGGBB or #AARRGGBB.",
+                            stringResource(R.string.annotation_colors_title),
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            stringResource(R.string.annotation_colors_format_hint),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = onDismiss) {
-                        Text("×", style = MaterialTheme.typography.titleLarge)
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            contentDescription = stringResource(R.string.close)
+                        )
                     }
                 }
 
                 ColorPaletteEditor(
-                    label = "Pen",
+                    label = stringResource(R.string.tool_pen),
                     values = penInputs
                 )
 
                 ColorPaletteEditor(
-                    label = "Highlighter",
+                    label = stringResource(R.string.tool_highlighter),
                     values = highlighterInputs
                 )
 
@@ -1208,7 +1246,7 @@ private fun AnnotationSettingsDialog(
                         val penColors = penInputs.mapNotNull { parseHexColor(it) }
                         val highlighterColors = highlighterInputs.mapNotNull { parseHexColor(it) }
                         if (penColors.size != 4 || highlighterColors.size != 4) {
-                            validationError = "All eight colors must be valid hex values."
+                            validationError = invalidColorsMessage
                             return@Button
                         }
 
@@ -1218,7 +1256,7 @@ private fun AnnotationSettingsDialog(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Save colors")
+                    Text(stringResource(R.string.save_colors))
                 }
             }
         }
@@ -1248,7 +1286,7 @@ private fun ColorPaletteEditor(
                     onValueChange = { values[index] = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text("Color ${index + 1}") }
+                    label = { Text(stringResource(R.string.color_number, index + 1)) }
                 )
             }
         }

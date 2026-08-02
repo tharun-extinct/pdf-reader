@@ -2,6 +2,7 @@
 .gradle/
 build/
 app/build/
+macrobenchmark/build/
 
 # IDE
 .idea/
@@ -23,7 +24,6 @@ uidump/
 
 
 # Environment & local config
-skills/
 .env
 gradlew.bat
 local.properties

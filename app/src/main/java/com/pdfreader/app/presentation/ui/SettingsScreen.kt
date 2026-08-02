@@ -49,10 +49,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.pdfreader.app.R
 import com.pdfreader.app.domain.model.ThemeMode
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
@@ -61,7 +64,6 @@ import com.pdfreader.app.presentation.theme.LabelCapsStyle
 import com.pdfreader.app.presentation.theme.NoxReaderTheme
 import com.pdfreader.app.presentation.theme.UiMainStyle
 import com.pdfreader.app.presentation.theme.UiSmStyle
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,13 +87,13 @@ fun SettingsScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(R.string.back)
                         )
                     }
                 },
                 title = {
                     Text(
-                        text = "Settings",
+                        text = stringResource(R.string.settings_title),
                         style = DisplayTitleStyle.copy(fontSize = 24.sp, lineHeight = 28.sp)
                     )
                 }
@@ -118,13 +120,13 @@ fun SettingsScreen(
             ) {
                 item {
                     SettingsSection(
-                        title = "APPEARANCE",
-                        description = "Choose an interface that stays comfortable in any light."
+                        title = stringResource(R.string.settings_appearance_section),
+                        description = stringResource(R.string.settings_appearance_description)
                     ) {
                         SettingTitleRow(
                             icon = Icons.Outlined.Brightness6,
-                            title = "Theme",
-                            subtitle = "Applied across the library and reader"
+                            title = stringResource(R.string.settings_theme_title),
+                            subtitle = stringResource(R.string.settings_theme_description)
                         )
                         Spacer(Modifier.height(14.dp))
                         Row(
@@ -142,9 +144,9 @@ fun SettingsScreen(
                                     label = {
                                         Text(
                                             text = when (mode) {
-                                                ThemeMode.System -> "System"
-                                                ThemeMode.Light -> "Light"
-                                                ThemeMode.Dark -> "Dark"
+                                                ThemeMode.System -> stringResource(R.string.theme_system)
+                                                ThemeMode.Light -> stringResource(R.string.theme_light)
+                                                ThemeMode.Dark -> stringResource(R.string.theme_dark)
                                             },
                                             maxLines = 1
                                         )
@@ -158,13 +160,13 @@ fun SettingsScreen(
 
                 item {
                     SettingsSection(
-                        title = "READING",
-                        description = "Preferences here affect the active reading session."
+                        title = stringResource(R.string.settings_reading_section),
+                        description = stringResource(R.string.settings_reading_description)
                     ) {
                         SettingToggleRow(
                             icon = Icons.Outlined.ScreenLockPortrait,
-                            title = "Keep screen awake",
-                            subtitle = "Prevent the display from sleeping while NoxReader is open",
+                            title = stringResource(R.string.keep_screen_awake_title),
+                            subtitle = stringResource(R.string.keep_screen_awake_description),
                             checked = preferences.keepScreenOn,
                             onCheckedChange = {
                                 viewModel.processIntent(PdfReaderIntent.SetKeepScreenOn(it))
@@ -173,8 +175,11 @@ fun SettingsScreen(
                         SettingsDivider()
                         SettingTitleRow(
                             icon = Icons.Outlined.Headphones,
-                            title = "Read-aloud speed",
-                            subtitle = "${formatSpeechRate(preferences.speechRate)} speed"
+                            title = stringResource(R.string.read_aloud_speed_title),
+                            subtitle = stringResource(
+                                R.string.read_aloud_speed_value,
+                                preferences.speechRate
+                            )
                         )
                         Slider(
                             value = preferences.speechRate,
@@ -191,30 +196,40 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Slower", style = UiSmStyle.copy(fontSize = 11.sp))
-                            Text("Faster", style = UiSmStyle.copy(fontSize = 11.sp))
+                            Text(
+                                stringResource(R.string.speech_rate_slower),
+                                style = UiSmStyle.copy(fontSize = 11.sp)
+                            )
+                            Text(
+                                stringResource(R.string.speech_rate_faster),
+                                style = UiSmStyle.copy(fontSize = 11.sp)
+                            )
                         }
                     }
                 }
 
                 item {
                     SettingsSection(
-                        title = "PRIVACY & STORAGE",
-                        description = "NoxReader keeps your files where you chose them."
+                        title = stringResource(R.string.settings_privacy_section),
+                        description = stringResource(R.string.settings_privacy_description)
                     ) {
                         SettingTitleRow(
                             icon = Icons.Outlined.Lock,
-                            title = "On-device history",
-                            subtitle = "Recent document names, progress, and bookmarks are stored only on this device"
+                            title = stringResource(R.string.on_device_history_title),
+                            subtitle = stringResource(R.string.on_device_history_description)
                         )
                         SettingsDivider()
                         SettingActionRow(
                             icon = Icons.Outlined.DeleteOutline,
-                            title = "Clear recent history",
+                            title = stringResource(R.string.clear_history_title),
                             subtitle = if (state.recentDocuments.isEmpty()) {
-                                "There is no saved history"
+                                stringResource(R.string.no_saved_history)
                             } else {
-                                "Remove ${state.recentDocuments.size} saved document${if (state.recentDocuments.size == 1) "" else "s"}"
+                                pluralStringResource(
+                                    R.plurals.remove_saved_documents,
+                                    state.recentDocuments.size,
+                                    state.recentDocuments.size
+                                )
                             },
                             enabled = state.recentDocuments.isNotEmpty(),
                             onClick = { showClearHistoryDialog = true }
@@ -224,13 +239,13 @@ fun SettingsScreen(
 
                 item {
                     SettingsSection(
-                        title = "ABOUT",
+                        title = stringResource(R.string.settings_about_section),
                         description = null
                     ) {
                         SettingTitleRow(
                             icon = Icons.Outlined.Info,
-                            title = "NoxReader",
-                            subtitle = "Version 1.0 · A focused PDF reader"
+                            title = stringResource(R.string.app_name),
+                            subtitle = stringResource(R.string.about_summary)
                         )
                     }
                 }
@@ -241,10 +256,10 @@ fun SettingsScreen(
     if (showClearHistoryDialog) {
         AlertDialog(
             onDismissRequest = { showClearHistoryDialog = false },
-            title = { Text("Clear recent history?") },
+            title = { Text(stringResource(R.string.clear_history_dialog_title)) },
             text = {
                 Text(
-                    "This removes document names, reading progress, and bookmarks from NoxReader. Your PDF files will not be deleted."
+                    stringResource(R.string.clear_history_dialog_body)
                 )
             },
             confirmButton = {
@@ -254,12 +269,12 @@ fun SettingsScreen(
                         showClearHistoryDialog = false
                     }
                 ) {
-                    Text("Clear")
+                    Text(stringResource(R.string.clear_history_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearHistoryDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -432,6 +447,3 @@ private fun SettingsDivider() {
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
     )
 }
-
-private fun formatSpeechRate(rate: Float): String =
-    String.format(Locale.getDefault(), "%.1f×", rate)

@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.protobuf")
 }
 
 android {
@@ -28,6 +29,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
         }
     }
     
@@ -57,6 +63,9 @@ android {
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.10"
+    }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -88,5 +97,30 @@ dependencies {
     // Navigation component for Jetpack Compose (required for multi-screen architecture)
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
+    // Typed, transactional local metadata with a versioned Protocol Buffer schema.
+    implementation("androidx.datastore:datastore:1.1.7")
+    implementation("com.google.protobuf:protobuf-javalite:3.25.5")
+
+    // Required by Macrobenchmark to reset compilation state and capture profiles.
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
+
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+    testImplementation("androidx.test:core:1.5.0")
+    testImplementation("org.robolectric:robolectric:4.11.1")
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.25.5"
+    }
+    generateProtoTasks {
+        all().configureEach {
+            builtins {
+                maybeCreate("java").apply {
+                    option("lite")
+                }
+            }
+        }
+    }
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintain Feature Blueprints"
+  short_description: "Keep architecture and feature blueprints aligned"
+  default_prompt: "Use $maintain-feature-blueprints to create or update architecture.md and routed feature blueprints."

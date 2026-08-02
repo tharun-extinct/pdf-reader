@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+option java_package = "com.pdfreader.app.data.preferences.proto";
+option java_multiple_files = true;
+
+message ReaderDataProto {
+  uint32 schema_version = 1;
+  repeated RecentDocumentProto recent_documents = 2;
+  ReaderPreferencesProto preferences = 3;
+}
+
+message RecentDocumentProto {
+  string uri = 1;
+  string title = 2;
+  int32 page_count = 3;
+  int32 last_page = 4;
+  int64 last_opened_at = 5;
+  repeated int32 bookmarked_pages = 6;
+}
+
+message ReaderPreferencesProto {
+  ThemeModeProto theme_mode = 1;
+  bool keep_screen_on = 2;
+  float speech_rate = 3;
+}
+
+enum ThemeModeProto {
+  THEME_MODE_UNSPECIFIED = 0;
+  THEME_MODE_SYSTEM = 1;
+  THEME_MODE_LIGHT = 2;
+  THEME_MODE_DARK = 3;
+}

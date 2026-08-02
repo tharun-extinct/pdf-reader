@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pdfreader.app.R
 import com.pdfreader.app.domain.model.ReaderPreferences
 import com.pdfreader.app.domain.model.RecentDocument
 import com.pdfreader.app.domain.repository.LibraryRepository
@@ -343,7 +344,14 @@ class PdfReaderViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val success = syncManager.syncBackToSource(uri, localFile)
             if (!success) {
-                _state.update { it.copy(isSyncing = false, errorMessage = "Failed to sync to cloud provider.") }
+                _state.update {
+                    it.copy(
+                        isSyncing = false,
+                        errorMessage = getApplication<Application>().getString(
+                            R.string.error_sync_provider
+                        )
+                    )
+                }
             } else {
                 _state.update { it.copy(isSyncing = false) }
             }
@@ -392,16 +400,25 @@ class PdfReaderViewModel(
                 val success = syncManager.syncBackToSource(uri, outputFile)
                 if (!success) {
                     _state.update {
-                        it.copy(isSavingAnnotations = false, errorMessage = "Failed to save annotations to source.")
+                        it.copy(
+                            isSavingAnnotations = false,
+                            errorMessage = context.getString(
+                                R.string.error_save_annotations_source
+                            )
+                        )
                     }
                     return@launch
                 }
 
                 // Re-open the document so PDFium renders the embedded annotations
                 val pfd = context.contentResolver.openFileDescriptor(uri, "r")
-                    ?: throw IllegalStateException("Failed to reopen PDF after saving annotations.")
+                    ?: throw IllegalStateException(
+                        context.getString(R.string.error_reopen_after_save)
+                    )
                 val newBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                    ?: throw IllegalStateException("Failed to re-read PDF after saving annotations.")
+                    ?: throw IllegalStateException(
+                        context.getString(R.string.error_reread_after_save)
+                    )
                 pdfEngine.openDocument(pfd, newBytes)
 
                 // Bump renderRevision: PdfPage composables observe this key and will
@@ -423,7 +440,15 @@ class PdfReaderViewModel(
             } catch (e: Exception) {
                 e.printStackTrace()
                 _state.update {
-                    it.copy(isSavingAnnotations = false, errorMessage = "Save failed: ${e.message}")
+                    val context = getApplication<Application>()
+                    it.copy(
+                        isSavingAnnotations = false,
+                        errorMessage = context.getString(
+                            R.string.error_save_annotations,
+                            e.localizedMessage
+                                ?: context.getString(R.string.error_unknown_reason)
+                        )
+                    )
                 }
             } finally {
                 tempFile?.delete()
@@ -441,16 +466,20 @@ class PdfReaderViewModel(
                 
                 if (pfd != null) {
                     val pdfBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                        ?: throw IllegalStateException("Failed to read PDF bytes.")
+                        ?: throw IllegalStateException(
+                            context.getString(R.string.error_read_pdf_bytes)
+                        )
                     pdfEngine.openDocument(pfd, pdfBytes)
                     val pageCount = pdfEngine.getPageCount()
                     if (pageCount <= 0) {
-                        throw IllegalStateException("This PDF does not contain any readable pages.")
+                        throw IllegalStateException(
+                            context.getString(R.string.error_no_readable_pages)
+                        )
                     }
                     
                     // Extract document title from URI
                     val cursor = context.contentResolver.query(uri, null, null, null, null)
-                    var title = "Document"
+                    var title = ""
                     cursor?.use {
                         if (it.moveToFirst()) {
                             val displayNameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
@@ -501,7 +530,12 @@ class PdfReaderViewModel(
                     }
                 } else {
                     _state.update { 
-                        it.copy(isLoading = false, errorMessage = "Failed to open file descriptor.") 
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = context.getString(
+                                R.string.error_open_file_descriptor
+                            )
+                        )
                     }
                 }
             } catch (e: Exception) {
@@ -511,7 +545,10 @@ class PdfReaderViewModel(
                     it.copy(
                         isLoading = false,
                         isPdfLoaded = false,
-                        errorMessage = e.message ?: "Unknown error opening PDF"
+                        errorMessage = e.localizedMessage
+                            ?: getApplication<Application>().getString(
+                                R.string.error_open_pdf_unknown
+                            )
                     )
                 }
             }

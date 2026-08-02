@@ -4,6 +4,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -20,7 +21,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.pdfreader.app.data.pdfium.PdfiumEngine
-import com.pdfreader.app.data.preferences.SharedPreferencesLibraryRepository
+import com.pdfreader.app.data.preferences.ProtoLibraryRepository
 import com.pdfreader.app.data.sync.SafPdfSyncManager
 import com.pdfreader.app.domain.model.ThemeMode
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
@@ -39,7 +40,7 @@ class MainActivity : ComponentActivity() {
             if (modelClass.isAssignableFrom(PdfReaderViewModel::class.java)) {
                 val pdfEngine = PdfiumEngine(applicationContext)
                 val syncManager = SafPdfSyncManager(applicationContext)
-                val libraryRepository = SharedPreferencesLibraryRepository(applicationContext)
+                val libraryRepository = ProtoLibraryRepository(applicationContext)
                 @Suppress("UNCHECKED_CAST")
                 return PdfReaderViewModel(
                     application,
@@ -85,6 +86,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val state by viewModel.state.collectAsState()
+            ReportDrawnWhen { !state.isLibraryLoading }
             val darkTheme = when (state.preferences.themeMode) {
                 ThemeMode.System -> androidx.compose.foundation.isSystemInDarkTheme()
                 ThemeMode.Light -> false

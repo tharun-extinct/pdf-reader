@@ -72,7 +72,7 @@ why can we use JDK 21 -- is also stable as JDK 17? The Java Home is set to JDK 2
 
 *Edited relevant file*
 
-*Viewed [technical-audit.md](file:///x:/AI_and_Automation/pdf-reader/implementation-files/technical-audit.md) *
+*Viewed [technical-audit.md](technical-audit.md) *
 
 ### User Input
 
@@ -241,13 +241,13 @@ Does gradle is a build tool like maven? So why can we use maven instead?
 what is current compatible run time environment for this android project? make sure it's same in the release of github workflow.
 
 
-*Listed directory [.github](file:///x:/AI_and_Automation/pdf-reader/.github) *
+*Listed directory [.github](../.github) *
 
-*Listed directory [workflows](file:///x:/AI_and_Automation/pdf-reader/.github/workflows) *
+*Listed directory [workflows](../.github/workflows) *
 
-*Viewed [build.yml](file:///x:/AI_and_Automation/pdf-reader/.github/workflows/build.yml) *
+*Viewed [build.yml](../.github/workflows/build.yml) *
 
-*Viewed [gh-release.yml](file:///x:/AI_and_Automation/pdf-reader/.github/workflows/gh-release.yml) *
+*Viewed [gh-release.yml](../.github/workflows/gh-release.yml) *
 
 ### Planner Response
 

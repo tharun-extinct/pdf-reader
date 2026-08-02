@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-
     <application
         android:allowBackup="true"
-        android:label="NoxReader"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.NoxReader">
+        <profileable android:shell="true" />
         <!--
             NOTE: `preloaded_fonts` meta-data intentionally removed.
             The XML font files reference Google Play Services as a Downloadable

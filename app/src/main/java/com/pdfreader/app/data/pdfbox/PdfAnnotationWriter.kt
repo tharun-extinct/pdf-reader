@@ -4,12 +4,15 @@ import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
 import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
+import com.tom_roush.pdfbox.cos.COSDictionary
+import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB
+import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotation
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationMarkup
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationText
@@ -151,9 +154,9 @@ object PdfAnnotationWriter {
             annot.setConstantOpacity(((stroke.color ushr 24) and 0xFF).toFloat() / 255f)
 
             // Store the stroke width in the border style array so viewers honour it
-            val bs = com.tom_roush.pdfbox.cos.COSDictionary()
-            bs.setInt(com.tom_roush.pdfbox.cos.COSName.W, stroke.strokeWidth.toInt().coerceAtLeast(1))
-            annot.cosObject.setItem(com.tom_roush.pdfbox.cos.COSName.BS, bs)
+            val bs = COSDictionary()
+            bs.setFloat(COSName.W, stroke.strokeWidth.coerceAtLeast(MIN_INK_STROKE_WIDTH))
+            annot.cosObject.setItem(COSName.BS, bs)
             annot.constructAppearances(document)
 
             annotations.add(annot)
@@ -219,8 +222,16 @@ object PdfAnnotationWriter {
             if (saveMode == AnnotationSaveMode.Flattened) {
                 val page = document.getPage(pageIndex)
                 val newAnnotations = page.annotations.drop(annotationCountBeforeWrite)
-                flattenAnnotations(document, page, newAnnotations)
-                page.annotations = page.annotations.dropLast(newAnnotations.size).toMutableList()
+                val flattenedAnnotations = flattenAnnotations(document, page, newAnnotations)
+                page.annotations = page.annotations
+                    // PDFBox materializes fresh annotation wrapper objects every time
+                    // `page.annotations` is read, so Kotlin object identity cannot
+                    // identify the entries that were just flattened. The COS dictionary
+                    // is the stable backing object shared by those wrappers.
+                    .filterNot { annotation ->
+                        flattenedAnnotations.any { it.cosObject === annotation.cosObject }
+                    }
+                    .toMutableList()
             }
         }
     }
@@ -252,9 +263,18 @@ object PdfAnnotationWriter {
         }.toMutableList()
     }
 
-    /** Paints supported annotations into page contents before removing their /Annots entries. */
-    private fun flattenAnnotations(document: PDDocument, page: PDPage, annotations: List<PDAnnotation>) {
-        if (annotations.isEmpty()) return
+    /**
+     * Paints supported annotations into page contents and returns only the annotations
+     * that were represented without dropping payload. A note that cannot be encoded or
+     * fitted remains editable instead of being silently removed.
+     */
+    private fun flattenAnnotations(
+        document: PDDocument,
+        page: PDPage,
+        annotations: List<PDAnnotation>
+    ): Set<PDAnnotation> {
+        if (annotations.isEmpty()) return emptySet()
+        val flattened = mutableSetOf<PDAnnotation>()
         PDPageContentStream(
             document,
             page,
@@ -270,8 +290,9 @@ object PdfAnnotationWriter {
                     nonStrokingAlphaConstant = opacity
                     strokingAlphaConstant = opacity
                 })
-                when (annotation) {
+                val wasFlattened = when (annotation) {
                     is PDAnnotationTextMarkup -> {
+                        var paintedQuad = false
                         annotation.quadPoints?.asList()?.chunked(8)?.forEach quadLoop@{ quad ->
                             if (quad.size != 8) return@quadLoop
                             stream.setNonStrokingColor(color)
@@ -281,30 +302,142 @@ object PdfAnnotationWriter {
                             stream.lineTo(quad[4], quad[5])
                             stream.closePath()
                             stream.fill()
+                            paintedQuad = true
                         }
+                        paintedQuad
                     }
+                    is PDAnnotationText -> flattenTextNote(stream, page, annotation, color)
                     is PDAnnotationMarkup -> {
-                        if (annotation.subtype != PDAnnotationMarkup.SUB_TYPE_INK) return@forEach
-                        stream.setStrokingColor(color)
-                        stream.setLineWidth(2f)
-                        annotation.getInkList().forEach pathLoop@{ path ->
-                            if (path.size < 4) return@pathLoop
-                            stream.moveTo(path[0], path[1])
-                            path.asList().chunked(2).drop(1).forEach { point ->
-                                if (point.size == 2) stream.lineTo(point[0], point[1])
+                        if (annotation.subtype != PDAnnotationMarkup.SUB_TYPE_INK) {
+                            false
+                        } else {
+                            var paintedPath = false
+                            stream.setStrokingColor(color)
+                            stream.setLineWidth(annotation.inkStrokeWidth())
+                            annotation.getInkList().forEach pathLoop@{ path ->
+                                if (path.size < 4) return@pathLoop
+                                stream.moveTo(path[0], path[1])
+                                path.asList().chunked(2).drop(1).forEach { point ->
+                                    if (point.size == 2) stream.lineTo(point[0], point[1])
+                                }
+                                stream.stroke()
+                                paintedPath = true
                             }
-                            stream.stroke()
+                            paintedPath
                         }
                     }
-                    is PDAnnotationText -> {
-                        val rect = annotation.rectangle
-                        stream.setNonStrokingColor(color)
-                        stream.addRect(rect.lowerLeftX, rect.lowerLeftY, rect.width, rect.height)
-                        stream.fill()
-                    }
+                    else -> false
                 }
                 stream.restoreGraphicsState()
+                if (wasFlattened) flattened += annotation
             }
+        }
+        return flattened
+    }
+
+    private fun PDAnnotationMarkup.inkStrokeWidth(): Float {
+        val borderStyle = cosObject.getDictionaryObject(COSName.BS) as? COSDictionary
+        return borderStyle
+            ?.getFloat(COSName.W, DEFAULT_INK_STROKE_WIDTH)
+            ?.coerceAtLeast(MIN_INK_STROKE_WIDTH)
+            ?: DEFAULT_INK_STROKE_WIDTH
+    }
+
+    /** Paints a readable, popup-like note box containing the complete note payload. */
+    private fun flattenTextNote(
+        stream: PDPageContentStream,
+        page: PDPage,
+        annotation: PDAnnotationText,
+        accentColor: PDColor
+    ): Boolean {
+        val contents = annotation.contents?.takeIf { it.isNotBlank() } ?: return false
+        val pageBox = page.cropBox ?: page.mediaBox
+        val availableWidth = pageBox.width - NOTE_PAGE_MARGIN * 2
+        val availableHeight = pageBox.height - NOTE_PAGE_MARGIN * 2
+        if (availableWidth < NOTE_MIN_BOX_WIDTH || availableHeight < NOTE_LINE_HEIGHT + NOTE_PADDING * 2) {
+            return false
+        }
+
+        val boxWidth = minOf(NOTE_MAX_BOX_WIDTH, availableWidth)
+        val textWidth = boxWidth - NOTE_PADDING * 2
+        val lines = wrapNoteText(contents, textWidth) ?: return false
+        val boxHeight = NOTE_PADDING * 2 + NOTE_HEADER_HEIGHT + lines.size * NOTE_LINE_HEIGHT
+        if (boxHeight > availableHeight) return false
+
+        val rect = annotation.rectangle ?: return false
+        val minX = pageBox.lowerLeftX + NOTE_PAGE_MARGIN
+        val maxX = pageBox.upperRightX - NOTE_PAGE_MARGIN - boxWidth
+        val minY = pageBox.lowerLeftY + NOTE_PAGE_MARGIN
+        val maxY = pageBox.upperRightY - NOTE_PAGE_MARGIN - boxHeight
+        val boxX = (rect.upperRightX + NOTE_ANCHOR_GAP).coerceIn(minX, maxX)
+        val boxY = (rect.upperRightY - boxHeight).coerceIn(minY, maxY)
+
+        stream.setNonStrokingColor(NOTE_BACKGROUND_COLOR)
+        stream.addRect(boxX, boxY, boxWidth, boxHeight)
+        stream.fill()
+
+        stream.setStrokingColor(accentColor)
+        stream.setLineWidth(NOTE_BORDER_WIDTH)
+        stream.addRect(boxX, boxY, boxWidth, boxHeight)
+        stream.stroke()
+
+        stream.setNonStrokingColor(accentColor)
+        stream.addRect(
+            boxX,
+            boxY + boxHeight - NOTE_HEADER_HEIGHT,
+            boxWidth,
+            NOTE_HEADER_HEIGHT
+        )
+        stream.fill()
+
+        stream.setNonStrokingColor(NOTE_TEXT_COLOR)
+        stream.beginText()
+        stream.setFont(NOTE_FONT, NOTE_FONT_SIZE)
+        stream.newLineAtOffset(
+            boxX + NOTE_PADDING,
+            boxY + boxHeight - NOTE_HEADER_HEIGHT - NOTE_PADDING - NOTE_FONT_SIZE
+        )
+        lines.forEachIndexed { index, line ->
+            if (index > 0) stream.newLineAtOffset(0f, -NOTE_LINE_HEIGHT)
+            stream.showText(line)
+        }
+        stream.endText()
+        return true
+    }
+
+    /**
+     * Wraps by glyph so every encodable character is retained. Unsupported glyphs or
+     * a single glyph wider than the box return null, causing the editable note to stay.
+     */
+    private fun wrapNoteText(contents: String, maxWidth: Float): List<String>? {
+        return try {
+            val lines = mutableListOf<String>()
+            val paragraphs = contents.replace("\r\n", "\n").replace('\r', '\n').split('\n')
+            paragraphs.forEach { paragraph ->
+                if (paragraph.isEmpty()) {
+                    lines += ""
+                    return@forEach
+                }
+
+                val currentLine = StringBuilder()
+                var currentWidth = 0f
+                paragraph.forEach { character ->
+                    val glyph = if (character == '\t') "    " else character.toString()
+                    val glyphWidth = NOTE_FONT.getStringWidth(glyph) / 1000f * NOTE_FONT_SIZE
+                    if (glyphWidth > maxWidth) return null
+                    if (currentLine.isNotEmpty() && currentWidth + glyphWidth > maxWidth) {
+                        lines += currentLine.toString()
+                        currentLine.clear()
+                        currentWidth = 0f
+                    }
+                    currentLine.append(glyph)
+                    currentWidth += glyphWidth
+                }
+                lines += currentLine.toString()
+            }
+            lines
+        } catch (_: IllegalArgumentException) {
+            null
         }
     }
 
@@ -333,5 +466,20 @@ object PdfAnnotationWriter {
         dictionary.setNormalAppearance(appearanceStream)
         setAppearance(dictionary)
     }
+
+    private val NOTE_FONT = PDType1Font.HELVETICA
+    private val NOTE_BACKGROUND_COLOR = PDColor(floatArrayOf(1f, 1f, 1f), PDDeviceRGB.INSTANCE)
+    private val NOTE_TEXT_COLOR = PDColor(floatArrayOf(0f, 0f, 0f), PDDeviceRGB.INSTANCE)
+    private const val DEFAULT_INK_STROKE_WIDTH = 2f
+    private const val MIN_INK_STROKE_WIDTH = 0.5f
+    private const val NOTE_FONT_SIZE = 9f
+    private const val NOTE_LINE_HEIGHT = 11f
+    private const val NOTE_PADDING = 6f
+    private const val NOTE_HEADER_HEIGHT = 5f
+    private const val NOTE_BORDER_WIDTH = 1f
+    private const val NOTE_PAGE_MARGIN = 8f
+    private const val NOTE_ANCHOR_GAP = 4f
+    private const val NOTE_MIN_BOX_WIDTH = 72f
+    private const val NOTE_MAX_BOX_WIDTH = 180f
 
 }
