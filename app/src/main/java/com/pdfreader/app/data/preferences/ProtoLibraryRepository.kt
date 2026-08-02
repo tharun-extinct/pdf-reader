@@ -117,7 +117,7 @@ class ProtoLibraryRepository internal constructor(
 
     private fun RecentDocumentProto.toDomain(): RecentDocument = RecentDocument(
         uri = uri,
-        title = title.ifBlank { "Document" },
+        title = title,
         pageCount = pageCount.coerceAtLeast(0),
         lastPage = lastPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0)),
         lastOpenedAt = lastOpenedAt,
@@ -128,7 +128,7 @@ class ProtoLibraryRepository internal constructor(
         val safePageCount = pageCount.coerceAtLeast(0)
         return RecentDocumentProto.newBuilder()
             .setUri(uri)
-            .setTitle(title.ifBlank { "Document" })
+            .setTitle(title)
             .setPageCount(safePageCount)
             .setLastPage(lastPage.coerceIn(0, (safePageCount - 1).coerceAtLeast(0)))
             .setLastOpenedAt(lastOpenedAt)

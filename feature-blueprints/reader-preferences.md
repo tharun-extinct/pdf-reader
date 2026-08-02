@@ -21,6 +21,12 @@ clear local-data controls whose effects are immediate, bounded, and private.
   `updateData` writes; legacy SharedPreferences values migrate once.
 - Settings explains on-device metadata and confirms before clearing recent
   document names, progress, and bookmarks without deleting PDFs.
+- User-facing library, reader, settings, accessibility, and error copy is backed
+  by Android string and plural resources; malformed encoding literals have been
+  replaced with valid Unicode.
+- Android backup rules exclude the shared Proto file and legacy preference file.
+  This protects document metadata and URI strings, while also excluding the
+  co-located theme, keep-awake, and speech-rate values.
 - No recorded GitHub Actions run includes the Proto DataStore commit `7186d8a`
   or the Macrobenchmark workflow, so both remain source-inspected rather than
   CI-verified.
@@ -59,6 +65,9 @@ clear local-data controls whose effects are immediate, bounded, and private.
 
 - Preferences and recent-document metadata remain device-local in one private
   Proto DataStore file.
+- The shared Proto file and legacy migration source are excluded from Android
+  cloud backup and device transfer. If preferences later need cross-device
+  restore, they must move to storage with a separate retention policy.
 - Clear history removes recent metadata only. Preference values and source PDFs
   remain unchanged unless a separate control explicitly says otherwise.
 - Privacy copy must distinguish metadata retention from SAF file access and from
@@ -104,6 +113,11 @@ clear local-data controls whose effects are immediate, bounded, and private.
   initial load, optimistic updates, debounced save, and TTS rate propagation.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/SettingsScreen.kt` -
   settings controls and clear-history confirmation.
+- `app/src/main/res/values/strings.xml` - localized UI, accessibility, plural,
+  formatting, and user-visible error resources.
+- `app/src/main/res/xml/backup_rules.xml` and
+  `app/src/main/res/xml/data_extraction_rules.xml` - current and legacy store
+  exclusions for cloud backup and device transfer.
 - `app/src/main/java/com/pdfreader/app/MainActivity.kt` - root theme and window
   flag effects.
 - `app/src/test/java/com/pdfreader/app/data/preferences/ProtoLibraryRepositoryTest.kt` -
@@ -126,6 +140,10 @@ clear local-data controls whose effects are immediate, bounded, and private.
   change has an idempotent version-to-version migration test.
 - [ ] Clear history requires confirmation, removes only recent metadata, and
   leaves preferences and PDF files unchanged.
+- [ ] UI and accessibility copy comes from Android resources and remains free of
+  malformed character-encoding sequences.
+- [ ] Backup and device transfer exclude the shared store while it contains
+  document history and persisted URI strings.
 - [ ] Storage failures are observable or have an explicit recovery policy.
 
 ## Remaining gaps

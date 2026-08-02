@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="file" path="datastore/reader_data.pb" />
+    <exclude domain="sharedpref" path="nox_reader_preferences.xml" />
+</full-backup-content>

@@ -4,6 +4,7 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.compose.ui.geometry.Rect
+import com.pdfreader.app.R
 import com.pdfreader.app.presentation.mvi.PdfTextBox
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
 class TtsManager(context: Context) : TextToSpeech.OnInitListener {
+
+    private val appContext = context.applicationContext
 
     private var tts: TextToSpeech? = null
     private var isInitialized = false
@@ -25,21 +28,25 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
     private var speechRate = 1f
 
     init {
-        tts = TextToSpeech(context, this)
+        tts = TextToSpeech(appContext, this)
     }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             val result = tts?.setLanguage(Locale.US)
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                _ttsState.value = TtsState.Error("Language not supported")
+                _ttsState.value = TtsState.Error(
+                    appContext.getString(R.string.tts_error_language_not_supported)
+                )
             } else {
                 isInitialized = true
                 tts?.setSpeechRate(speechRate)
                 setupProgressListener()
             }
         } else {
-            _ttsState.value = TtsState.Error("Initialization failed")
+            _ttsState.value = TtsState.Error(
+                appContext.getString(R.string.tts_error_initialization)
+            )
         }
     }
 
@@ -60,7 +67,9 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
             }
 
             override fun onError(utteranceId: String?) {
-                _ttsState.value = TtsState.Error("Playback error")
+                _ttsState.value = TtsState.Error(
+                    appContext.getString(R.string.tts_error_playback)
+                )
             }
 
             override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {

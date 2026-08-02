@@ -107,7 +107,7 @@ internal object ReaderDataMigrations {
                     add(
                         RecentDocumentProto.newBuilder()
                             .setUri(uri)
-                            .setTitle(item.optString("title", "Document"))
+                            .setTitle(item.optString("title", ""))
                             .setPageCount(pageCount)
                             .setLastPage(lastPage)
                             .setLastOpenedAt(item.optLong("lastOpenedAt", 0L))

@@ -219,6 +219,15 @@ read-transform-write operation transactional and durable before it returns.
 Malformed Proto data is replaced with versioned defaults; source PDFs remain
 unaffected.
 
+The Proto file and its legacy SharedPreferences migration source contain
+document names, reading history, bookmarks, and SAF URI strings. They must be
+excluded from Android cloud backup and device-to-device transfer. Persisted URI
+grants are provider- and installation-scoped capabilities, not portable account
+data; restoring their string values without valid grants would create unusable
+or misleading recent-document entries. Because preferences currently share the
+same Proto root, theme, keep-awake, and speech-rate values are excluded with the
+sensitive metadata until storage is split by retention policy.
+
 PDF contents stay at their selected SAF location. The file provider determines whether save-back is available; read-only sources may open but cannot be updated.
 
 ## Performance and lifecycle

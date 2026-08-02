@@ -59,4 +59,17 @@ class ReaderDataMigrationsTest {
         )
         assertEquals(migrated, retriedLegacyMigration)
     }
+
+    @Test
+    fun legacyDocumentWithoutTitleRemainsBlankForLocalizedPresentation() {
+        val migrated = ReaderDataMigrations.migrateLegacyData(
+            currentData = ReaderDataProto.getDefaultInstance(),
+            recentDocumentsJson = """[{"uri":"content://documents/untitled.pdf"}]""",
+            themeMode = null,
+            keepScreenOn = false,
+            speechRate = 1f
+        )
+
+        assertEquals("", migrated.recentDocumentsList.single().title)
+    }
 }

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NoxReader</string>
+    <string name="document_default_title">Document</string>
+    <string name="back">Back</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+
+    <!-- Library -->
+    <string name="library_tagline">Your quiet reading space</string>
+    <string name="open_settings">Open settings</string>
+    <string name="open_pdf">Open PDF</string>
+    <string name="recent_documents">RECENT DOCUMENTS</string>
+    <plurals name="saved_document_count">
+        <item quantity="one">%1$d saved</item>
+        <item quantity="other">%1$d saved</item>
+    </plurals>
+    <string name="preparing_library">Preparing your library</string>
+    <string name="empty_library_title">A focused place for every page.</string>
+    <string name="empty_library_body">Open a PDF from your device or cloud provider. NoxReader remembers your place without moving the original file.</string>
+    <string name="choose_pdf">Choose a PDF</string>
+    <string name="feature_read_aloud_title">Read aloud</string>
+    <string name="feature_read_aloud_body">Listen with synchronized page highlighting.</string>
+    <string name="feature_keep_place_title">Keep your place</string>
+    <string name="feature_keep_place_body">Reading progress and bookmarks stay on this device.</string>
+    <string name="feature_cloud_title">Cloud-friendly</string>
+    <string name="feature_cloud_body">Open files through Android’s secure document picker.</string>
+    <string name="continue_reading">CONTINUE READING</string>
+    <string name="ready_to_read">Ready to read</string>
+    <string name="page_of_count">Page %1$d of %2$d</string>
+    <plurals name="bookmark_count">
+        <item quantity="one">%1$d bookmark</item>
+        <item quantity="other">%1$d bookmarks</item>
+    </plurals>
+    <string name="local_history_note">Recent history is stored only on this device. Your PDFs remain in their original location.</string>
+
+    <!-- Reader -->
+    <string name="annotation_mode_editable">Edit</string>
+    <string name="annotation_mode_flattened">Flat</string>
+    <string name="save_annotations">Save annotations to PDF</string>
+    <string name="remove_page_bookmark">Remove bookmark from page %1$d</string>
+    <string name="add_page_bookmark">Bookmark page %1$d</string>
+    <string name="opening_document">Opening your document…</string>
+    <string name="open_pdf_error_title">We couldn’t open this PDF</string>
+    <string name="choose_another_pdf">Choose another PDF</string>
+    <string name="tts_reading">Reading aloud</string>
+    <string name="tts_paused">Paused</string>
+    <string name="tts_unavailable">Read aloud unavailable</string>
+    <string name="tts_idle">Read aloud</string>
+    <string name="tts_start">Start reading aloud</string>
+    <string name="tts_pause">Pause reading aloud</string>
+    <string name="tts_stop">Stop reading aloud</string>
+    <string name="tts_resume">Resume reading aloud</string>
+    <string name="tool_pen">Pen</string>
+    <string name="tool_highlighter">Highlighter</string>
+    <string name="tool_eraser">Eraser</string>
+    <string name="tool_add_text">Add text</string>
+    <string name="customize_annotation_colors">Customize annotation colors</string>
+    <string name="page_content_description">Page %1$d</string>
+    <string name="note_label">Note</string>
+    <string name="close">Close</string>
+    <string name="annotation_colors_title">Annotation colors</string>
+    <string name="annotation_colors_format_hint">Use #RRGGBB or #AARRGGBB.</string>
+    <string name="annotation_colors_invalid">All eight colors must be valid hex values.</string>
+    <string name="save_colors">Save colors</string>
+    <string name="color_number">Color %1$d</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_appearance_section">APPEARANCE</string>
+    <string name="settings_appearance_description">Choose an interface that stays comfortable in any light.</string>
+    <string name="settings_theme_title">Theme</string>
+    <string name="settings_theme_description">Applied across the library and reader</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="settings_reading_section">READING</string>
+    <string name="settings_reading_description">Preferences here affect the active reading session.</string>
+    <string name="keep_screen_awake_title">Keep screen awake</string>
+    <string name="keep_screen_awake_description">Prevent the display from sleeping while NoxReader is open</string>
+    <string name="read_aloud_speed_title">Read-aloud speed</string>
+    <string name="read_aloud_speed_value">%1$.1f× speed</string>
+    <string name="speech_rate_slower">Slower</string>
+    <string name="speech_rate_faster">Faster</string>
+    <string name="settings_privacy_section">PRIVACY &amp; STORAGE</string>
+    <string name="settings_privacy_description">NoxReader keeps your files where you chose them.</string>
+    <string name="on_device_history_title">On-device history</string>
+    <string name="on_device_history_description">Recent document names, progress, and bookmarks are stored only on this device</string>
+    <string name="clear_history_title">Clear recent history</string>
+    <string name="no_saved_history">There is no saved history</string>
+    <plurals name="remove_saved_documents">
+        <item quantity="one">Remove %1$d saved document</item>
+        <item quantity="other">Remove %1$d saved documents</item>
+    </plurals>
+    <string name="settings_about_section">ABOUT</string>
+    <string name="about_summary">Version 1.0 · A focused PDF reader</string>
+    <string name="clear_history_dialog_title">Clear recent history?</string>
+    <string name="clear_history_dialog_body">This removes document names, reading progress, and bookmarks from NoxReader. Your PDF files will not be deleted.</string>
+    <string name="clear_history_confirm">Clear</string>
+
+    <!-- User-visible failures -->
+    <string name="error_sync_provider">Failed to sync to cloud provider.</string>
+    <string name="error_save_annotations_source">Failed to save annotations to source.</string>
+    <string name="error_reopen_after_save">Failed to reopen PDF after saving annotations.</string>
+    <string name="error_reread_after_save">Failed to re-read PDF after saving annotations.</string>
+    <string name="error_save_annotations">Save failed: %1$s</string>
+    <string name="error_read_pdf_bytes">Failed to read PDF bytes.</string>
+    <string name="error_no_readable_pages">This PDF does not contain any readable pages.</string>
+    <string name="error_open_file_descriptor">Failed to open file descriptor.</string>
+    <string name="error_open_pdf_unknown">Unknown error opening PDF</string>
+    <string name="error_unknown_reason">Unknown error</string>
+    <string name="tts_error_language_not_supported">Language not supported</string>
+    <string name="tts_error_initialization">Initialization failed</string>
+    <string name="tts_error_playback">Playback error</string>
+</resources>

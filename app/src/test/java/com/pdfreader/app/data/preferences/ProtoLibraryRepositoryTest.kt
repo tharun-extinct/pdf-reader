@@ -65,6 +65,16 @@ class ProtoLibraryRepositoryTest {
             repository.clearRecentDocuments()
             assertTrue(repository.getRecentDocuments().isEmpty())
             assertEquals(preferences, repository.getPreferences())
+
+            repository.recordDocument(
+                RecentDocument(
+                    uri = "content://documents/untitled.pdf",
+                    title = "",
+                    pageCount = 1,
+                    lastOpenedAt = 100L
+                )
+            )
+            assertEquals("", repository.getRecentDocuments().single().title)
         } finally {
             dataStoreScope.cancel()
         }

@@ -52,11 +52,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.pdfreader.app.R
 import com.pdfreader.app.domain.model.RecentDocument
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
@@ -95,12 +98,12 @@ fun BookshelfScreen(
                 title = {
                     Column {
                         Text(
-                            text = "NoxReader",
+                            text = stringResource(R.string.app_name),
                             style = DisplayTitleStyle.copy(fontSize = 24.sp, lineHeight = 28.sp),
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "Your quiet reading space",
+                            text = stringResource(R.string.library_tagline),
                             style = UiSmStyle.copy(fontSize = 12.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -110,7 +113,7 @@ fun BookshelfScreen(
                     IconButton(onClick = { navController.navigate("settings") }) {
                         Icon(
                             imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Open settings",
+                            contentDescription = stringResource(R.string.open_settings),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -127,7 +130,7 @@ fun BookshelfScreen(
                             contentDescription = null
                         )
                     },
-                    text = { Text("Open PDF") },
+                    text = { Text(stringResource(R.string.open_pdf)) },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
@@ -206,13 +209,17 @@ fun BookshelfScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "RECENT DOCUMENTS",
+                                    text = stringResource(R.string.recent_documents),
                                     style = LabelCapsStyle,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    text = "${state.recentDocuments.size} saved",
+                                    text = pluralStringResource(
+                                        R.plurals.saved_document_count,
+                                        state.recentDocuments.size,
+                                        state.recentDocuments.size
+                                    ),
                                     style = UiSmStyle.copy(fontSize = 12.sp),
                                     color = MaterialTheme.colorScheme.outline
                                 )
@@ -256,7 +263,7 @@ private fun LibraryLoadingState() {
         )
         Spacer(Modifier.height(14.dp))
         Text(
-            text = "Preparing your library",
+            text = stringResource(R.string.preparing_library),
             style = UiSmStyle,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -308,13 +315,13 @@ private fun EmptyLibrary(
                     }
                     Spacer(Modifier.height(28.dp))
                     Text(
-                        text = "A focused place for every page.",
+                        text = stringResource(R.string.empty_library_title),
                         style = HeadlineLgMobileStyle.copy(fontSize = 28.sp, lineHeight = 34.sp),
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        text = "Open a PDF from your device or cloud provider. NoxReader remembers your place without moving the original file.",
+                        text = stringResource(R.string.empty_library_body),
                         style = UiMainStyle.copy(fontWeight = FontWeight.Normal),
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
                     )
@@ -332,7 +339,7 @@ private fun EmptyLibrary(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Choose a PDF")
+                        Text(stringResource(R.string.choose_pdf))
                     }
                 }
             }
@@ -342,18 +349,18 @@ private fun EmptyLibrary(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 FeatureRow(
                     icon = Icons.Outlined.Headphones,
-                    title = "Read aloud",
-                    body = "Listen with synchronized page highlighting."
+                    title = stringResource(R.string.feature_read_aloud_title),
+                    body = stringResource(R.string.feature_read_aloud_body)
                 )
                 FeatureRow(
                     icon = Icons.Outlined.BookmarkBorder,
-                    title = "Keep your place",
-                    body = "Reading progress and bookmarks stay on this device."
+                    title = stringResource(R.string.feature_keep_place_title),
+                    body = stringResource(R.string.feature_keep_place_body)
                 )
                 FeatureRow(
                     icon = Icons.Outlined.CloudDone,
-                    title = "Cloud-friendly",
-                    body = "Open files through Android’s secure document picker."
+                    title = stringResource(R.string.feature_cloud_title),
+                    body = stringResource(R.string.feature_cloud_body)
                 )
             }
         }
@@ -389,13 +396,15 @@ private fun ContinueReadingCard(
         ) {
             Column(modifier = Modifier.padding(22.dp)) {
                 Text(
-                    text = "CONTINUE READING",
+                    text = stringResource(R.string.continue_reading),
                     style = LabelCapsStyle,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f)
                 )
                 Spacer(Modifier.height(18.dp))
                 Text(
-                    text = document.title,
+                    text = document.title.ifBlank {
+                        stringResource(R.string.document_default_title)
+                    },
                     style = HeadlineLgMobileStyle,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     maxLines = 2,
@@ -457,7 +466,9 @@ private fun RecentDocumentRow(
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = document.title,
+                    text = document.title.ifBlank {
+                        stringResource(R.string.document_default_title)
+                    },
                     style = UiMainStyle.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -472,7 +483,11 @@ private fun RecentDocumentRow(
                 if (document.bookmarkedPages.isNotEmpty()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "${document.bookmarkedPages.size} bookmark${if (document.bookmarkedPages.size == 1) "" else "s"}",
+                        text = pluralStringResource(
+                            R.plurals.bookmark_count,
+                            document.bookmarkedPages.size,
+                            document.bookmarkedPages.size
+                        ),
                         style = UiSmStyle.copy(fontSize = 11.sp),
                         color = MaterialTheme.colorScheme.tertiary
                     )
@@ -556,7 +571,7 @@ private fun ErrorBanner(
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     )
                 ) {
-                    Text("Dismiss")
+                    Text(stringResource(R.string.dismiss))
                 }
             }
         }
@@ -566,14 +581,19 @@ private fun ErrorBanner(
 @Composable
 private fun StorageNote() {
     Text(
-        text = "Recent history is stored only on this device. Your PDFs remain in their original location.",
+        text = stringResource(R.string.local_history_note),
         style = UiSmStyle.copy(fontSize = 12.sp),
         color = MaterialTheme.colorScheme.outline,
         modifier = Modifier.padding(horizontal = 6.dp, vertical = 18.dp)
     )
 }
 
+@Composable
 private fun pageLabel(document: RecentDocument): String {
-    if (document.pageCount <= 0) return "Ready to read"
-    return "Page ${(document.lastPage + 1).coerceAtMost(document.pageCount)} of ${document.pageCount}"
+    if (document.pageCount <= 0) return stringResource(R.string.ready_to_read)
+    return stringResource(
+        R.string.page_of_count,
+        (document.lastPage + 1).coerceAtMost(document.pageCount),
+        document.pageCount
+    )
 }

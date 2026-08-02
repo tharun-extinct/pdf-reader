@@ -20,6 +20,10 @@ document contents.
 - Opening a recent item clamps and restores its last page; page changes are
   saved after a 500 ms debounce.
 - Bookmarks are page-index sets stored with each recent document.
+- Android cloud backup and device transfer exclude both the Proto DataStore file
+  and its legacy SharedPreferences migration source, so document names, history,
+  bookmarks, and persisted URI strings are not restored without valid SAF
+  grants.
 - The library renders loading, empty, opening, populated, and recoverable error
   states; clearing history is exposed through Settings.
 - No recorded GitHub Actions run includes the Proto DataStore commit `7186d8a`
@@ -60,6 +64,9 @@ document contents.
   and bookmarked page indices; it does not store PDF bytes.
 - Clearing history removes those metadata records only. It must never delete or
   rewrite a selected PDF.
+- Backup and device-transfer rules exclude the current and legacy metadata
+  stores because stored URI strings do not recreate installation-scoped SAF
+  grants.
 - A persisted read grant may keep a recent document openable when write access is
   unavailable; save-back capability is a separate persistence concern.
 
@@ -101,6 +108,9 @@ document contents.
   transactional ordering, 20-item limit, bookmarks, progress, and domain maps.
 - `app/src/main/java/com/pdfreader/app/data/preferences/ReaderDataMigrations.kt` -
   legacy JSON import and ordered schema upgrade.
+- `app/src/main/res/xml/backup_rules.xml` and
+  `app/src/main/res/xml/data_extraction_rules.xml` - exclude current and legacy
+  document metadata from cloud backup and device transfer.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderViewModel.kt` -
   open, resume, progress debounce, bookmark, clear, and close flows.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/BookshelfScreen.kt` -
@@ -126,6 +136,8 @@ document contents.
 - [ ] Existing SharedPreferences history and bookmarks migrate exactly once and
   future schema versions preserve all still-supported fields.
 - [ ] Clearing history removes metadata but leaves every source PDF untouched.
+- [ ] Cloud backup and device transfer do not restore recent-document metadata
+  or persisted URI strings without corresponding SAF grants.
 - [ ] Read-only access remains useful for reading and produces an explicit save
   limitation when a write is requested.
 
