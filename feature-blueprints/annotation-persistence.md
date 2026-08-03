@@ -13,11 +13,17 @@ work on write, provider-sync, or reopen failure.
 - `AnnotationSaveMode` exposes `Editable` and `Flattened`.
 - PDFBox writes highlights, `/Ink` strokes, and `/Text` notes with normal
   appearances.
+- Highlight appearance streams initialize their own PDF resource dictionaries,
+  so opacity state can be written even when the source page has no `/Resources`.
 - Flattening is implemented to paint newly created supported annotations into
   page content and remove only those new annotation entries. The JVM regression
   tests await CI verification after fixing PDFBox wrapper-identity removal.
 - Flattened ink reads the stroke width stored in `/BS /W` instead of substituting
   a fixed width.
+- Ink width is converted from normalized displayed-page width to PDF points, so
+  save and reopen preserve the preview thickness across page sizes and rotation.
+- Editable `/Ink` gets an explicit rounded, width-exact normal appearance, and
+  flattened ink uses the same rounded spline instead of coarse viewer defaults.
 - Flattened text notes render their complete encodable contents in a visible
   note box. Notes that cannot fit or cannot be encoded remain editable rather
   than losing their payload.
@@ -101,7 +107,8 @@ work on write, provider-sync, or reopen failure.
 - `app/src/main/java/com/pdfreader/app/data/pdfbox/PdfCoordinateMapper.kt` -
   normalized-display to PDF-space conversion boundary.
 - `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriterTest.kt` -
-  flattened note retention and configured ink-width behavior. The source exists,
+  resource-less-page highlight saving, flattened note retention, flattened ink
+  width, and editable ink appearance width/cap/join behavior. The source exists,
   but no recorded CI run has executed this test revision.
 
 ## Acceptance criteria

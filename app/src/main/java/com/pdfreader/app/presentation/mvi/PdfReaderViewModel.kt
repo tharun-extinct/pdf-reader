@@ -81,7 +81,6 @@ class PdfReaderViewModel(
             is PdfReaderIntent.SelectTool -> selectTool(intent.tool)
             is PdfReaderIntent.SelectPenColor -> selectPenColor(intent.index)
             is PdfReaderIntent.SelectHighlighterColor -> selectHighlighterColor(intent.index)
-            is PdfReaderIntent.ToggleAnnotationSettings -> toggleAnnotationSettings()
             is PdfReaderIntent.SavePenColors -> savePenColors(intent.colors)
             is PdfReaderIntent.SaveHighlighterColors -> saveHighlighterColors(intent.colors)
             is PdfReaderIntent.AddStroke -> addStroke(intent.stroke)
@@ -96,6 +95,8 @@ class PdfReaderViewModel(
             is PdfReaderIntent.PlayTts -> playTts(intent.pageIndex, intent.textBoxes)
             is PdfReaderIntent.PauseTts -> ttsManager.pause()
             is PdfReaderIntent.ResumeTts -> ttsManager.resume()
+            is PdfReaderIntent.PreviousTtsParagraph -> ttsManager.previousParagraph()
+            is PdfReaderIntent.NextTtsParagraph -> ttsManager.nextParagraph()
             is PdfReaderIntent.StopTts -> ttsManager.stop()
             is PdfReaderIntent.SaveAnnotations -> saveAnnotations()
         }
@@ -181,9 +182,7 @@ class PdfReaderViewModel(
         if (nextTool != AnnotationTool.ReadAloud) {
             ttsManager.stop()
         }
-        _state.update { state ->
-            state.copy(activeTool = nextTool, isAnnotationSettingsOpen = false)
-        }
+        _state.update { state -> state.copy(activeTool = nextTool) }
     }
 
     private fun selectPenColor(index: Int) {
@@ -200,25 +199,19 @@ class PdfReaderViewModel(
         }
     }
 
-    private fun toggleAnnotationSettings() {
-        _state.update { it.copy(isAnnotationSettingsOpen = !it.isAnnotationSettingsOpen) }
-    }
-
     private fun savePenColors(colors: List<Long>) {
         if (colors.size != 4) return
+        updatePreferences { it.copy(penColors = colors) }
         _state.update { state ->
-            state.copy(
-                penPalette = AnnotationPalette(colors),
-                selectedPenColorIndex = state.selectedPenColorIndex.coerceIn(0, colors.lastIndex)
-            )
+            state.copy(selectedPenColorIndex = state.selectedPenColorIndex.coerceIn(0, colors.lastIndex))
         }
     }
 
     private fun saveHighlighterColors(colors: List<Long>) {
         if (colors.size != 4) return
+        updatePreferences { it.copy(highlighterColors = colors) }
         _state.update { state ->
             state.copy(
-                highlighterPalette = AnnotationPalette(colors),
                 selectedHighlighterColorIndex = state.selectedHighlighterColorIndex.coerceIn(0, colors.lastIndex)
             )
         }
@@ -457,6 +450,7 @@ class PdfReaderViewModel(
     }
 
     private fun openPdf(uri: Uri) {
+        ttsManager.stop()
         _state.update { it.copy(isLoading = true, errorMessage = null) }
         
         viewModelScope.launch(Dispatchers.IO) {

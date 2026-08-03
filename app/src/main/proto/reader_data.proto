@@ -22,6 +22,8 @@ message ReaderPreferencesProto {
   ThemeModeProto theme_mode = 1;
   bool keep_screen_on = 2;
   float speech_rate = 3;
+  repeated fixed64 pen_colors = 4;
+  repeated fixed64 highlighter_colors = 5;
 }
 
 enum ThemeModeProto {

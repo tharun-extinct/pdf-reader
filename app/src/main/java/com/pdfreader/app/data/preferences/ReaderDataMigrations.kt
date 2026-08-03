@@ -7,6 +7,8 @@ import com.pdfreader.app.data.preferences.proto.ReaderDataProto
 import com.pdfreader.app.data.preferences.proto.ReaderPreferencesProto
 import com.pdfreader.app.data.preferences.proto.RecentDocumentProto
 import com.pdfreader.app.data.preferences.proto.ThemeModeProto
+import com.pdfreader.app.domain.model.DEFAULT_HIGHLIGHTER_COLORS
+import com.pdfreader.app.domain.model.DEFAULT_PEN_COLORS
 import org.json.JSONArray
 
 internal object ReaderDataSchema {
@@ -21,6 +23,8 @@ internal object ReaderDataSchema {
     fun defaultPreferences(): ReaderPreferencesProto = ReaderPreferencesProto.newBuilder()
         .setThemeMode(ThemeModeProto.THEME_MODE_SYSTEM)
         .setSpeechRate(1f)
+        .addAllPenColors(DEFAULT_PEN_COLORS)
+        .addAllHighlighterColors(DEFAULT_HIGHLIGHTER_COLORS)
         .build()
 }
 
@@ -134,7 +138,7 @@ internal object ReaderDataV0ToV1Migration : DataMigration<ReaderDataProto> {
 
     override suspend fun migrate(currentData: ReaderDataProto): ReaderDataProto {
         val preferences = if (currentData.hasPreferences()) {
-            currentData.preferences.toBuilder()
+            val builder = currentData.preferences.toBuilder()
                 .setThemeMode(
                     currentData.preferences.themeMode.takeUnless {
                         it == ThemeModeProto.THEME_MODE_UNSPECIFIED ||
@@ -146,7 +150,13 @@ internal object ReaderDataV0ToV1Migration : DataMigration<ReaderDataProto> {
                         .takeIf { it in 0.6f..1.6f }
                         ?: 1f
                 )
-                .build()
+            if (currentData.preferences.penColorsCount != DEFAULT_PEN_COLORS.size) {
+                builder.clearPenColors().addAllPenColors(DEFAULT_PEN_COLORS)
+            }
+            if (currentData.preferences.highlighterColorsCount != DEFAULT_HIGHLIGHTER_COLORS.size) {
+                builder.clearHighlighterColors().addAllHighlighterColors(DEFAULT_HIGHLIGHTER_COLORS)
+            }
+            builder.build()
         } else {
             ReaderDataSchema.defaultPreferences()
         }

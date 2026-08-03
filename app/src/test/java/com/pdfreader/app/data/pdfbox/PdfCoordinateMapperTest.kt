@@ -36,4 +36,17 @@ class PdfCoordinateMapperTest {
             assertEquals(displayPoint.y, roundTrip.y, 0.001f)
         }
     }
+
+    @Test
+    fun strokeWidthUsesDisplayedPageWidthForRotation() {
+        PDDocument().use { document ->
+            val page = PDPage(PDRectangle(200f, 100f))
+            document.addPage(page)
+
+            assertEquals(2f, PdfCoordinateMapper.toPdfStrokeWidth(page, 0.01f), 0.001f)
+
+            page.rotation = 90
+            assertEquals(1f, PdfCoordinateMapper.toPdfStrokeWidth(page, 0.01f), 0.001f)
+        }
+    }
 }

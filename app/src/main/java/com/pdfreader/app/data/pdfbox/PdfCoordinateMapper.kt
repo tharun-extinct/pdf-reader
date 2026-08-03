@@ -10,6 +10,16 @@ import com.tom_roush.pdfbox.pdmodel.PDPage
  * use the CropBox and a bottom-left origin.
  */
 object PdfCoordinateMapper {
+    /** Maps a width normalized against the displayed page width into PDF points. */
+    fun toPdfStrokeWidth(page: PDPage, normalizedWidth: Float): Float {
+        val box = page.cropBox
+        val displayedWidth = when (page.normalizedRotation()) {
+            90, 270 -> box.height
+            else -> box.width
+        }
+        return normalizedWidth.coerceAtLeast(0f) * displayedWidth
+    }
+
     fun toPdfPoint(page: PDPage, point: Offset): Offset {
         val box = page.cropBox
         val x = point.x.coerceIn(0f, 1f)

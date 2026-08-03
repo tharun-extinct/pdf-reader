@@ -24,11 +24,8 @@ data class PdfReaderState(
     val bookmarkedPages: Set<Int> = emptySet(),
     val preferences: ReaderPreferences = ReaderPreferences(),
     val activeTool: AnnotationTool = AnnotationTool.None,
-    val penPalette: AnnotationPalette = defaultPenPalette(),
-    val highlighterPalette: AnnotationPalette = defaultHighlighterPalette(),
     val selectedPenColorIndex: Int = 0,
     val selectedHighlighterColorIndex: Int = 0,
-    val isAnnotationSettingsOpen: Boolean = false,
     val annotationSaveMode: AnnotationSaveMode = AnnotationSaveMode.Editable,
     val strokesByPage: Map<Int, List<FreehandStroke>> = emptyMap(),
     val highlightsByPage: Map<Int, List<TextHighlight>> = emptyMap(),
@@ -45,4 +42,10 @@ data class PdfReaderState(
      * bitmaps so the embedded annotations become visible in the rendered output.
      */
     val renderRevision: Int = 0
-)
+) {
+    val penPalette: AnnotationPalette
+        get() = AnnotationPalette(preferences.penColors)
+
+    val highlighterPalette: AnnotationPalette
+        get() = AnnotationPalette(preferences.highlighterColors)
+}

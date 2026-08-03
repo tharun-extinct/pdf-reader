@@ -8,16 +8,24 @@ content.
 
 ## Current verified status
 
-**Status: Partial - code and test sources inspected 2026-08-03.**
+**Status: Partial - implementation updated 2026-08-03; CI verification pending.**
 
-- `FreehandStroke` stores page, tool, color, width, and normalized points.
-- Compose renders the in-progress stroke and committed session overlays.
-- Pen and highlighter palettes are configurable in reader state.
-- The floating toolbar exposes Pen, Highlighter, and Eraser with 48 dp semantic
-  controls; Pen and Highlighter show the active contextual palette.
+- `FreehandStroke` stores page, tool, color, normalized width, and normalized
+  points.
+- Compose invalidates a stable snapshot point list throughout the drag, so pen
+  and freehand-highlighter marks appear under the pointer before touch-up.
+- In-progress and committed overlays use the same midpoint spline with round
+  caps and joins; editable and flattened PDF appearances mirror that curve.
+- Pen and highlighter palettes are persisted preferences edited from the
+  scrollable Settings screen; the reader keeps compact palette selection chips.
+- The floating toolbar exposes recognizable pen, marker, and eraser symbols in
+  48 dp semantic controls; Pen and Highlighter show the active contextual palette.
+- Palette taps restart gesture capture with the selected color, preventing a
+  prior pointer-input closure from writing the previous color.
 - The eraser removes matching unsaved strokes along a drag.
-- PDFBox writes vector `/Ink` annotations with normal appearances; newly saved
-  strokes can be flattened with their configured `/BS /W` width.
+- PDFBox converts normalized display width to PDF points and supplies a
+  width-exact rounded `/Ink` appearance instead of delegating appearance shape
+  and thickness to viewer defaults.
 - The [Android Build run for `30240c2`](https://github.com/tharun-extinct/pdf-reader/actions/runs/30745995096)
   compiled this implementation, but the writer and mapper test sources were not
   executed by that workflow revision.
@@ -37,8 +45,8 @@ content.
 
 - Capture and render points in the same normalized page space used by the page
   overlay; never store raw screen pixels as durable geometry.
-- Map stroke width consistently between display space, PDF points, `/Ink`
-  metadata, normal appearance, and flattened output.
+- Store width relative to displayed page width and map it consistently between
+  Compose, PDF points, `/Ink` metadata, normal appearance, and flattened output.
 
 ### Rendering and overlay model
 
@@ -68,6 +76,8 @@ content.
 
 - [Annotation persistence](annotation-persistence.md) when `/Ink`, appearance,
   flattening, or save behavior changes.
+- [Reader preferences](reader-preferences.md) when palette defaults, storage, or
+  Settings ownership changes.
 - [Text highlighting](text-highlighting.md) when the shared Highlighter tool's
   text-selection versus freehand fallback behavior changes.
 
@@ -80,15 +90,16 @@ content.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderViewModel.kt` -
   immutable pending-stroke state and page-scoped erase policy.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/PdfReaderScreen.kt` -
-  drag capture, preview, palettes, tool semantics, and fixed pen/highlighter
-  widths.
+  drag capture, normalized-width preview, palette selection, and tool semantics.
+- `app/src/main/java/com/pdfreader/app/presentation/ui/SettingsScreen.kt` -
+  scrollable pen and highlighter palette editor.
 - `app/src/main/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriter.kt` -
   `/Ink`, `/BS /W`, normal appearance, and flattened paths.
 - `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfCoordinateMapperTest.kt` -
   partial coordinate evidence shared with annotation persistence.
 - `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriterTest.kt` -
-  configured flattened ink width. No gesture, editable `/Ink`, opacity, or
-  external-viewer test currently exists.
+  configured flattened ink width plus editable `/Ink` width and rounded normal
+  appearance operators. No gesture, opacity, or external-viewer test currently exists.
 
 ## Acceptance criteria
 
@@ -105,4 +116,4 @@ content.
 - Pressure-sensitive geometry and end-to-end persistence.
 - Selection or editing of existing embedded ink.
 - Gesture, broader PDF-object, and external-viewer tests.
-- Palette edits are session-only and reset when the ViewModel is recreated.
+- CI execution is pending for normalized-width and palette-persistence tests.

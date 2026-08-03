@@ -1,4 +1,4 @@
-How could we possible
+How could we possible achieve Adobe Acrobat-level annotations (high-fidelity rendering, seamless ink drawing, standard PDF object highlighting, standard annotation flattening)
 
 
 
@@ -32,7 +32,7 @@ Read Aloud:
 
 - 
 
-## Text to Speech
+## Text to Speech features
 
 - Back to the previous paragraph
 
@@ -40,12 +40,14 @@ Read Aloud:
 
 - Speed selection
 
-- 
+- Auto page scroll (option)
 
-<!-- - Black out other content than the  -->
+
 
 the read aloud isn't syncing with the line text highlight.
+<!-- - Black out other content than the  -->
 
+## Home UI
 
 - Add to Favorites
 
@@ -56,6 +58,18 @@ the read aloud isn't syncing with the line text highlight.
 - Collections
 
 - More options (Move to trash, Edit (Title, Author, Series, Annotation))
+
+## Annotations
+
+After saving, the width of the annotation is increased drastically
+
+- Put annotation color setting in the `settings`
+- Annotation color settings UI (in the PDF reading window) is so worst, I can't even a drag it down. [Don't repeat this]
+
+
+
+
+
 
 
 Accorlite 
@@ -129,10 +143,11 @@ add examples in the references folder of the skill (or where ever it's has to be
 [Don't build the skill with the current project specific details]
 
 
-After saving, the width of the annotation is increased drastically
 
-- Put annotation color setting in the `settings`
-- Annotation color settings UI (in the PDF reading window) is so worst, I can't even a drag it down. [Don't repeat this]
+
+
+
+
 
 
 
@@ -149,3 +164,33 @@ Archive or remove stale implementation-files/ documents. Several contain obsolet
 
 After those foundations, the strongest product additions would be document search, outline navigation, thumbnails/scrubber, undo/redo, automatic draft recovery, “Save a copy” for read-only providers, and editing existing ink and notes.
 My recommended next milestone is Safe Save and Recovery: fix SAF success detection, preserve flattened note content and ink width, guard unsaved navigation, serialize document operations, and add PDF/provider failure fixtures. No files were changed during this audit.
+
+
+
+
+---
+
+## Tool bar 
+
+
+- tool bar icon doesn't  look good (assets\tool-bar.jpg)
+
+
+- Annotation and highlighter ain't instantly marking up in the PDF. Its only imprinting after taking the hand off the screen (assets\annotation-boxy-appearance.jpg)
+
+
+- And the annotation is increasing the width of the ink, after saving it. But when drawing its thinner
+
+
+- I can't able to switch color, when I enter into Annotation or Highlighter
+
+
+- After drawing, the annotations isn't smooth at all, it's kinda boxy (assets\annotation-boxy-appearance.jpg)
+
+
+- And I can't able to reselect or delete the Annotations Ink after saving it
+
+
+
+
+Zoom in and lock layout - pdf specific feature

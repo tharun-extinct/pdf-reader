@@ -57,7 +57,9 @@ class ProtoLibraryRepositoryTest {
             val preferences = ReaderPreferences(
                 themeMode = ThemeMode.Dark,
                 keepScreenOn = true,
-                speechRate = 1.4f
+                speechRate = 1.4f,
+                penColors = listOf(1L, 2L, 3L, 4L),
+                highlighterColors = listOf(5L, 6L, 7L, 8L)
             )
             repository.savePreferences(preferences)
             assertEquals(preferences, repository.getPreferences())

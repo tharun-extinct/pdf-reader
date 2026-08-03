@@ -9,6 +9,7 @@ import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.PDPage
+import com.tom_roush.pdfbox.pdmodel.PDResources
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB
@@ -118,6 +119,7 @@ object PdfAnnotationWriter {
 
         for (stroke in strokes) {
             if (stroke.points.size < 2) continue
+            val strokeWidth = PdfCoordinateMapper.toPdfStrokeWidth(page, stroke.normalizedStrokeWidth)
 
             var minX = Float.MAX_VALUE
             var minY = Float.MAX_VALUE
@@ -138,7 +140,7 @@ object PdfAnnotationWriter {
 
             // Add a small margin around the bounding box to ensure the stroke cap
             // is fully inside the annotation rectangle
-            val margin = (stroke.strokeWidth / 2f).coerceAtLeast(2f)
+            val margin = (strokeWidth / 2f).coerceAtLeast(2f)
 
             // PdfBox-Android 2.x represents ink with the generic markup annotation.
             // The dedicated PDAnnotationInk class was added in newer upstream PDFBox versions.
@@ -155,9 +157,9 @@ object PdfAnnotationWriter {
 
             // Store the stroke width in the border style array so viewers honour it
             val bs = COSDictionary()
-            bs.setFloat(COSName.W, stroke.strokeWidth.coerceAtLeast(MIN_INK_STROKE_WIDTH))
+            bs.setFloat(COSName.W, strokeWidth.coerceAtLeast(MIN_INK_STROKE_WIDTH))
             annot.cosObject.setItem(COSName.BS, bs)
-            annot.constructAppearances(document)
+            annot.createInkAppearance(document, path, strokeWidth)
 
             annotations.add(annot)
         }
@@ -314,12 +316,11 @@ object PdfAnnotationWriter {
                             var paintedPath = false
                             stream.setStrokingColor(color)
                             stream.setLineWidth(annotation.inkStrokeWidth())
+                            stream.setLineCapStyle(1)
+                            stream.setLineJoinStyle(1)
                             annotation.getInkList().forEach pathLoop@{ path ->
                                 if (path.size < 4) return@pathLoop
-                                stream.moveTo(path[0], path[1])
-                                path.asList().chunked(2).drop(1).forEach { point ->
-                                    if (point.size == 2) stream.lineTo(point[0], point[1])
-                                }
+                                stream.addSmoothInkPath(path)
                                 stream.stroke()
                                 paintedPath = true
                             }
@@ -341,6 +342,64 @@ object PdfAnnotationWriter {
             ?.getFloat(COSName.W, DEFAULT_INK_STROKE_WIDTH)
             ?.coerceAtLeast(MIN_INK_STROKE_WIDTH)
             ?: DEFAULT_INK_STROKE_WIDTH
+    }
+
+    /** Supplies a width-exact, rounded normal appearance instead of viewer-specific defaults. */
+    private fun PDAnnotationMarkup.createInkAppearance(
+        document: PDDocument,
+        path: FloatArray,
+        strokeWidth: Float
+    ) {
+        val rect = rectangle ?: return
+        if (path.size < 4) return
+        val appearanceStream = PDAppearanceStream(document).apply {
+            bBox = PDRectangle(0f, 0f, rect.width, rect.height)
+            resources = PDResources()
+        }
+        PDPageContentStream(document, appearanceStream).use { stream ->
+            stream.setGraphicsStateParameters(PDExtendedGraphicsState().apply {
+                strokingAlphaConstant = constantOpacity
+            })
+            stream.setStrokingColor(color ?: return@use)
+            stream.setLineWidth(strokeWidth)
+            stream.setLineCapStyle(1)
+            stream.setLineJoinStyle(1)
+            stream.addSmoothInkPath(path, rect.lowerLeftX, rect.lowerLeftY)
+            stream.stroke()
+        }
+        setAppearance(PDAppearanceDictionary().apply { setNormalAppearance(appearanceStream) })
+    }
+
+    /** Mirrors the Compose midpoint spline using cubic PDF path operators. */
+    private fun PDPageContentStream.addSmoothInkPath(
+        path: FloatArray,
+        offsetX: Float = 0f,
+        offsetY: Float = 0f
+    ) {
+        val pointCount = path.size / 2
+        if (pointCount == 0) return
+        var currentX = path[0] - offsetX
+        var currentY = path[1] - offsetY
+        moveTo(currentX, currentY)
+        for (index in 1 until pointCount - 1) {
+            val controlX = path[index * 2] - offsetX
+            val controlY = path[index * 2 + 1] - offsetY
+            val nextX = path[(index + 1) * 2] - offsetX
+            val nextY = path[(index + 1) * 2 + 1] - offsetY
+            val endX = (controlX + nextX) / 2f
+            val endY = (controlY + nextY) / 2f
+            curveTo(
+                currentX + (controlX - currentX) * 2f / 3f,
+                currentY + (controlY - currentY) * 2f / 3f,
+                endX + (controlX - endX) * 2f / 3f,
+                endY + (controlY - endY) * 2f / 3f,
+                endX,
+                endY
+            )
+            currentX = endX
+            currentY = endY
+        }
+        lineTo(path[(pointCount - 1) * 2] - offsetX, path[(pointCount - 1) * 2 + 1] - offsetY)
     }
 
     /** Paints a readable, popup-like note box containing the complete note payload. */
@@ -446,6 +505,10 @@ object PdfAnnotationWriter {
         val rect = rectangle ?: return
         val appearanceStream = PDAppearanceStream(document)
         appearanceStream.bBox = PDRectangle(0f, 0f, rect.width, rect.height)
+        // PDFBox Android does not create a resource dictionary for a fresh
+        // appearance stream. Opacity is stored as an ExtGState resource, so
+        // setGraphicsStateParameters would otherwise dereference null.
+        appearanceStream.resources = PDResources()
         PDPageContentStream(document, appearanceStream).use { stream ->
             val color = color ?: return@use
             stream.setGraphicsStateParameters(PDExtendedGraphicsState().apply {

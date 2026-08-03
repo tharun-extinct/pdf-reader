@@ -31,5 +31,15 @@ enum class ThemeMode {
 data class ReaderPreferences(
     val themeMode: ThemeMode = ThemeMode.System,
     val keepScreenOn: Boolean = false,
-    val speechRate: Float = 1f
+    val speechRate: Float = 1f,
+    val penColors: List<Long> = DEFAULT_PEN_COLORS,
+    val highlighterColors: List<Long> = DEFAULT_HIGHLIGHTER_COLORS
+)
+
+val DEFAULT_PEN_COLORS = listOf(
+    0xFFE53935L, 0xFF1E88E5L, 0xFF43A047L, 0xFFFDD835L
+)
+
+val DEFAULT_HIGHLIGHTER_COLORS = listOf(
+    0x66FFEB3BL, 0x668E24AAL, 0x664CAF50L, 0x66FB8C00L
 )
