@@ -48,7 +48,7 @@ internal object TtsTextNavigator {
             val line = lines.firstOrNull { isSameLine(it.first(), box.bounds) }
             if (line == null) lines += mutableListOf(box.bounds) else line += box.bounds
         }
-        return lines.map { line -> line.reduce(Rect::union) }
+        return lines.map { line -> line.reduce { bounds, rect -> bounds.union(rect) } }
     }
 
     private fun paragraphIndices(textBoxes: List<PdfTextBox>): IntArray {
@@ -138,7 +138,9 @@ internal object TtsTextNavigator {
     }
 
     private fun unionBounds(textBoxes: List<PdfTextBox>, start: Int, endExclusive: Int): Rect =
-        textBoxes.subList(start, endExclusive).map { it.bounds }.reduce(Rect::union)
+        textBoxes.subList(start, endExclusive)
+            .map { it.bounds }
+            .reduce { bounds, rect -> bounds.union(rect) }
 
     private fun isSameLine(first: Rect, second: Rect): Boolean {
         val firstCenter = (first.top + first.bottom) / 2f

@@ -7,11 +7,11 @@ highlighting while releasing Android TextToSpeech resources when reading ends.
 
 ## Current verified status
 
-**Status: Partial - code and test tree inspected 2026-08-03; pure navigation
+**Status: Partial - code and test tree inspected 2026-08-04; pure navigation
 tests added but not run locally because GitHub Actions is the build authority.**
 
 - `TtsManager` initializes Android TextToSpeech with `Locale.US` and publishes
-  Idle, Playing, Paused, and Error states through `StateFlow`.
+  Idle, Playing, Paused, PageCompleted, and Error states through `StateFlow`.
 - Playback infers paragraphs from extracted text-box line geometry and caps every
   engine utterance at 3000 characters, including an unusually large single box.
 - Character-range callbacks are matched to unique utterance IDs, map spoken
@@ -123,8 +123,9 @@ tests added but not run locally because GitHub Actions is the build authority.**
 - [x] Speech-rate changes affect active and subsequent playback within the
   configured bounds.
 - [x] TTS never mutates PDF contents or persistent annotation state.
-- [ ] Previous/next controls navigate inferred paragraphs, and completion turns
-  the page and continues narration until the document ends.
+- [x] Previous/next controls navigate inferred paragraphs, and completion turns
+  the page and continues narration until the document ends; automated
+  ViewModel/page-turn coverage remains outstanding.
 
 ## Remaining gaps
 
