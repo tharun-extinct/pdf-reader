@@ -139,6 +139,11 @@ text geometry, hit-testing, annotation rectangles, quad points, ink paths, and
 note anchors. Portrait, landscape, cropped, rotated, and non-standard pages
 must remain covered by mapper tests.
 
+Freehand stroke width is stored as a fraction of displayed page width. Compose
+multiplies it by the fitted page width for preview and overlays, while
+`PdfCoordinateMapper` converts it to PDF points using the rotated displayed-page
+width. Screen pixels must never be written directly as `/Ink` border width.
+
 ### Rendering and overlay model
 
 PDFium owns the static page-bitmap layer. Compose owns pending annotations,
@@ -204,7 +209,7 @@ identity and must invalidate affected entries only after commit succeeds.
 - page count and last page;
 - last-opened timestamp;
 - bookmarked page indices;
-- theme, keep-awake, and speech-rate preferences.
+- theme, keep-awake, speech-rate, and annotation-palette preferences.
 
 The root message carries an explicit `schema_version`. Protobuf field numbers
 must never be reused, and compatible fields are added with safe defaults.
@@ -225,8 +230,9 @@ excluded from Android cloud backup and device-to-device transfer. Persisted URI
 grants are provider- and installation-scoped capabilities, not portable account
 data; restoring their string values without valid grants would create unusable
 or misleading recent-document entries. Because preferences currently share the
-same Proto root, theme, keep-awake, and speech-rate values are excluded with the
-sensitive metadata until storage is split by retention policy.
+same Proto root, theme, keep-awake, speech-rate, and annotation-palette values
+are excluded with the sensitive metadata until storage is split by retention
+policy.
 
 PDF contents stay at their selected SAF location. The file provider determines whether save-back is available; read-only sources may open but cannot be updated.
 

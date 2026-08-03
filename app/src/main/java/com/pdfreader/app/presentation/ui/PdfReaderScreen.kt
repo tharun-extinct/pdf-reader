@@ -41,7 +41,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Draw
 import androidx.compose.material.icons.outlined.FormatColorFill
-import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.VolumeUp
@@ -112,8 +111,6 @@ import com.pdfreader.app.presentation.mvi.TextHighlight
 import com.pdfreader.app.presentation.mvi.TextHighlightSelector
 import com.pdfreader.app.domain.tts.TtsState
 import androidx.compose.ui.text.style.TextOverflow
-import com.pdfreader.app.presentation.mvi.formatHexColor
-import com.pdfreader.app.presentation.mvi.parseHexColor
 import com.pdfreader.app.presentation.theme.UiSmStyle
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.roundToInt
@@ -393,14 +390,6 @@ fun PdfReaderScreen(
                 }
             }
 
-            if (state.isAnnotationSettingsOpen) {
-                AnnotationSettingsDialog(
-                    state = state,
-                    onDismiss = { viewModel.processIntent(PdfReaderIntent.ToggleAnnotationSettings) },
-                    onSavePenColors = { viewModel.processIntent(PdfReaderIntent.SavePenColors(it)) },
-                    onSaveHighlighterColors = { viewModel.processIntent(PdfReaderIntent.SaveHighlighterColors(it)) }
-                )
-            }
         }
     }
 }
@@ -721,13 +710,6 @@ private fun FloatingAnnotationToolbar(
                     selected = state.activeTool == AnnotationTool.AddText,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.AddText)) }
                 )
-                ToolbarDivider()
-                FloatingToolbarIcon(
-                    icon = Icons.Outlined.Palette,
-                    label = stringResource(R.string.customize_annotation_colors),
-                    selected = false,
-                    onClick = { onIntent(PdfReaderIntent.ToggleAnnotationSettings) }
-                )
             }
         }
     }
@@ -922,7 +904,7 @@ fun PdfPage(
                         path = path,
                         color = Color(stroke.color),
                         style = Stroke(
-                            width = stroke.strokeWidth,
+                            width = stroke.normalizedStrokeWidth * contentBounds.width,
                             cap = androidx.compose.ui.graphics.StrokeCap.Round,
                             join = androidx.compose.ui.graphics.StrokeJoin.Round
                         )
@@ -1141,7 +1123,9 @@ private fun BoxScope.AnnotationGestureLayer(
                                                     pageIndex = pageIndex,
                                                     tool = activeTool,
                                                     color = if (activeTool == AnnotationTool.Pen) penColor else highlighterColor,
-                                                    strokeWidth = if (activeTool == AnnotationTool.Pen) 6f else 22f,
+                                                    normalizedStrokeWidth = (
+                                                        if (activeTool == AnnotationTool.Pen) 6f else 22f
+                                                    ) / contentBounds.width.coerceAtLeast(1f),
                                                     points = currentStrokePoints.toList()
                                                 )
                                             )
@@ -1267,131 +1251,6 @@ private fun BoxScope.SelectedHighlightOverlay(
             Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
             Text(stringResource(R.string.delete))
-        }
-    }
-}
-
-@Composable
-private fun AnnotationSettingsDialog(
-    state: PdfReaderState,
-    onDismiss: () -> Unit,
-    onSavePenColors: (List<Long>) -> Unit,
-    onSaveHighlighterColors: (List<Long>) -> Unit
-) {
-    val penInputs = remember(state.penPalette.colors) {
-        mutableStateListOf<String>().apply {
-            addAll(state.penPalette.colors.map { formatHexColor(it) })
-        }
-    }
-    val highlighterInputs = remember(state.highlighterPalette.colors) {
-        mutableStateListOf<String>().apply {
-            addAll(state.highlighterPalette.colors.map { formatHexColor(it) })
-        }
-    }
-
-    var validationError by remember { mutableStateOf<String?>(null) }
-    val invalidColorsMessage = stringResource(R.string.annotation_colors_invalid)
-
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Surface(
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            tonalElevation = 6.dp,
-            shadowElevation = 14.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            stringResource(R.string.annotation_colors_title),
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            stringResource(R.string.annotation_colors_format_hint),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Outlined.Close,
-                            contentDescription = stringResource(R.string.close)
-                        )
-                    }
-                }
-
-                ColorPaletteEditor(
-                    label = stringResource(R.string.tool_pen),
-                    values = penInputs
-                )
-
-                ColorPaletteEditor(
-                    label = stringResource(R.string.tool_highlighter),
-                    values = highlighterInputs
-                )
-
-                validationError?.let {
-                    Text(text = it, color = MaterialTheme.colorScheme.error)
-                }
-
-                Button(
-                    onClick = {
-                        val penColors = penInputs.mapNotNull { parseHexColor(it) }
-                        val highlighterColors = highlighterInputs.mapNotNull { parseHexColor(it) }
-                        if (penColors.size != 4 || highlighterColors.size != 4) {
-                            validationError = invalidColorsMessage
-                            return@Button
-                        }
-
-                        onSavePenColors(penColors)
-                        onSaveHighlighterColors(highlighterColors)
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.save_colors))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ColorPaletteEditor(
-    label: String,
-    values: MutableList<String>
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, style = MaterialTheme.typography.titleMedium)
-        values.forEachIndexed { index, value ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .background(Color(parseHexColor(value) ?: 0x00000000), CircleShape)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                )
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = { values[index] = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.color_number, index + 1)) }
-                )
-            }
         }
     }
 }

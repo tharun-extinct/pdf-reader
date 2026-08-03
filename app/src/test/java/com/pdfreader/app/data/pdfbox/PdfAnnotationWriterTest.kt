@@ -1,11 +1,13 @@
 package com.pdfreader.app.data.pdfbox
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.test.core.app.ApplicationProvider
 import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import com.pdfreader.app.presentation.mvi.AnnotationTool
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
+import com.pdfreader.app.presentation.mvi.TextHighlight
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
@@ -24,6 +26,39 @@ class PdfAnnotationWriterTest {
     @Before
     fun initializePdfBoxResources() {
         PDFBoxResourceLoader.init(ApplicationProvider.getApplicationContext())
+    }
+
+    @Test
+    fun editableHighlightSavesOnPageWithoutResources() {
+        PDDocument().use { document ->
+            document.addPage(PDPage(PDRectangle.LETTER))
+
+            PdfAnnotationWriter.writeAll(
+                document = document,
+                strokesByPage = emptyMap(),
+                highlightsByPage = mapOf(
+                    0 to listOf(
+                        TextHighlight(
+                            id = 1L,
+                            pageIndex = 0,
+                            color = 0x80FFEB3BL,
+                            rects = listOf(Rect(0.1f, 0.1f, 0.4f, 0.15f))
+                        )
+                    )
+                ),
+                textAnnotationsByPage = emptyMap(),
+                deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                saveMode = AnnotationSaveMode.Editable
+            )
+
+            val savedPdf = ByteArrayOutputStream().use { output ->
+                document.save(output)
+                output.toByteArray()
+            }
+            PDDocument.load(savedPdf).use { reopened ->
+                assertEquals(1, reopened.getPage(0).annotations.size)
+            }
+        }
     }
 
     @Test
@@ -74,7 +109,7 @@ class PdfAnnotationWriterTest {
                             pageIndex = 0,
                             tool = AnnotationTool.Pen,
                             color = 0xFF1E88E5L,
-                            strokeWidth = 7.5f,
+                            normalizedStrokeWidth = 0.01f,
                             points = listOf(Offset(0.1f, 0.1f), Offset(0.3f, 0.3f))
                         )
                     )
@@ -91,7 +126,7 @@ class PdfAnnotationWriterTest {
                 .findAll(content)
                 .map { it.groupValues[1].toFloat() }
                 .toList()
-            assertEquals(listOf(7.5f), lineWidths)
+            assertEquals(6.12f, lineWidths.single(), 0.001f)
         }
     }
 

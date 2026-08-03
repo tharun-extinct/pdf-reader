@@ -9,6 +9,7 @@ import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.PDPage
+import com.tom_roush.pdfbox.pdmodel.PDResources
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB
@@ -118,6 +119,7 @@ object PdfAnnotationWriter {
 
         for (stroke in strokes) {
             if (stroke.points.size < 2) continue
+            val strokeWidth = PdfCoordinateMapper.toPdfStrokeWidth(page, stroke.normalizedStrokeWidth)
 
             var minX = Float.MAX_VALUE
             var minY = Float.MAX_VALUE
@@ -138,7 +140,7 @@ object PdfAnnotationWriter {
 
             // Add a small margin around the bounding box to ensure the stroke cap
             // is fully inside the annotation rectangle
-            val margin = (stroke.strokeWidth / 2f).coerceAtLeast(2f)
+            val margin = (strokeWidth / 2f).coerceAtLeast(2f)
 
             // PdfBox-Android 2.x represents ink with the generic markup annotation.
             // The dedicated PDAnnotationInk class was added in newer upstream PDFBox versions.
@@ -155,7 +157,7 @@ object PdfAnnotationWriter {
 
             // Store the stroke width in the border style array so viewers honour it
             val bs = COSDictionary()
-            bs.setFloat(COSName.W, stroke.strokeWidth.coerceAtLeast(MIN_INK_STROKE_WIDTH))
+            bs.setFloat(COSName.W, strokeWidth.coerceAtLeast(MIN_INK_STROKE_WIDTH))
             annot.cosObject.setItem(COSName.BS, bs)
             annot.constructAppearances(document)
 
@@ -446,6 +448,10 @@ object PdfAnnotationWriter {
         val rect = rectangle ?: return
         val appearanceStream = PDAppearanceStream(document)
         appearanceStream.bBox = PDRectangle(0f, 0f, rect.width, rect.height)
+        // PDFBox Android does not create a resource dictionary for a fresh
+        // appearance stream. Opacity is stored as an ExtGState resource, so
+        // setGraphicsStateParameters would otherwise dereference null.
+        appearanceStream.resources = PDResources()
         PDPageContentStream(document, appearanceStream).use { stream ->
             val color = color ?: return@use
             stream.setGraphicsStateParameters(PDExtendedGraphicsState().apply {

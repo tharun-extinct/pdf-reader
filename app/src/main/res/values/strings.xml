@@ -61,7 +61,6 @@
     <string name="tool_highlighter">Highlighter</string>
     <string name="tool_eraser">Eraser</string>
     <string name="tool_add_text">Add text</string>
-    <string name="customize_annotation_colors">Customize annotation colors</string>
     <string name="page_content_description">Page %1$d</string>
     <string name="note_label">Note</string>
     <string name="close">Close</string>
@@ -74,6 +73,8 @@
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_appearance_section">APPEARANCE</string>
+    <string name="settings_annotations_section">ANNOTATIONS</string>
+    <string name="settings_annotations_description">Choose the pen and highlighter colors shown in the reader.</string>
     <string name="settings_appearance_description">Choose an interface that stays comfortable in any light.</string>
     <string name="settings_theme_title">Theme</string>
     <string name="settings_theme_description">Applied across the library and reader</string>

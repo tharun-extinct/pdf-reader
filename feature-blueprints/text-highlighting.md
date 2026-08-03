@@ -21,6 +21,8 @@ and persisted geometry aligned.
   embedded highlight; an outside tap clears the selection.
 - Deleting a session highlight updates state immediately; embedded deletion is
   recorded for the next save.
+- Persisted highlight appearances own a resource dictionary, allowing opacity
+  graphics state to be emitted for source pages that omit `/Resources`.
 - Color-change and comment actions, tile-aware transforms, and broad device or
   external-viewer validation remain incomplete.
 
@@ -92,6 +94,9 @@ and persisted geometry aligned.
 - `app/src/test/java/com/pdfreader/app/presentation/mvi/HighlightHitTesterTest.kt` -
   smallest overlapping candidate. No ViewModel deletion, embedded PDF fixture,
   or device-level overlay test currently exists.
+- `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriterTest.kt` -
+  verifies that an editable highlight saves and reopens on a page without an
+  existing resource dictionary.
 
 ## Acceptance criteria
 

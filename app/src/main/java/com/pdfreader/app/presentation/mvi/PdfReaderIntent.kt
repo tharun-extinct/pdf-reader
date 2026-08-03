@@ -60,8 +60,6 @@ sealed class PdfReaderIntent {
 
     data class SelectHighlighterColor(val index: Int) : PdfReaderIntent()
 
-    object ToggleAnnotationSettings : PdfReaderIntent()
-
     data class SavePenColors(val colors: List<Long>) : PdfReaderIntent()
 
     data class SaveHighlighterColors(val colors: List<Long>) : PdfReaderIntent()

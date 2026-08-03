@@ -1,4 +1,4 @@
-How could we possible
+How could we possible achieve Adobe Acrobat-level annotations (high-fidelity rendering, seamless ink drawing, standard PDF object highlighting, standard annotation flattening)
 
 
 
@@ -47,6 +47,8 @@ Read Aloud:
 the read aloud isn't syncing with the line text highlight.
 <!-- - Black out other content than the  -->
 
+## Home UI
+
 - Add to Favorites
 
 - Add to read
@@ -56,6 +58,18 @@ the read aloud isn't syncing with the line text highlight.
 - Collections
 
 - More options (Move to trash, Edit (Title, Author, Series, Annotation))
+
+## Annotations
+
+After saving, the width of the annotation is increased drastically
+
+- Put annotation color setting in the `settings`
+- Annotation color settings UI (in the PDF reading window) is so worst, I can't even a drag it down. [Don't repeat this]
+
+
+
+
+
 
 
 Accorlite 
@@ -133,10 +147,7 @@ add examples in the references folder of the skill (or where ever it's has to be
 
 
 
-After saving, the width of the annotation is increased drastically
 
-- Put annotation color setting in the `settings`
-- Annotation color settings UI (in the PDF reading window) is so worst, I can't even a drag it down. [Don't repeat this]
 
 
 

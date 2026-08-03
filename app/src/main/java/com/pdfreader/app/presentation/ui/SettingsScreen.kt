@@ -1,6 +1,8 @@
 package com.pdfreader.app.presentation.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,14 +26,17 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.ScreenLockPortrait
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -43,11 +48,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -59,6 +66,8 @@ import com.pdfreader.app.R
 import com.pdfreader.app.domain.model.ThemeMode
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
+import com.pdfreader.app.presentation.mvi.formatHexColor
+import com.pdfreader.app.presentation.mvi.parseHexColor
 import com.pdfreader.app.presentation.theme.DisplayTitleStyle
 import com.pdfreader.app.presentation.theme.LabelCapsStyle
 import com.pdfreader.app.presentation.theme.NoxReaderTheme
@@ -75,6 +84,17 @@ fun SettingsScreen(
     val preferences = state.preferences
     val spacing = NoxReaderTheme.spacing
     var showClearHistoryDialog by remember { mutableStateOf(false) }
+    val penColorInputs = remember(preferences.penColors) {
+        mutableStateListOf<String>().apply {
+            addAll(preferences.penColors.map(::formatHexColor))
+        }
+    }
+    val highlighterColorInputs = remember(preferences.highlighterColors) {
+        mutableStateListOf<String>().apply {
+            addAll(preferences.highlighterColors.map(::formatHexColor))
+        }
+    }
+    var annotationColorError by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -154,6 +174,54 @@ fun SettingsScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                             }
+                        }
+                    }
+                }
+
+                item {
+                    SettingsSection(
+                        title = stringResource(R.string.settings_annotations_section),
+                        description = stringResource(R.string.settings_annotations_description)
+                    ) {
+                        SettingTitleRow(
+                            icon = Icons.Outlined.Palette,
+                            title = stringResource(R.string.annotation_colors_title),
+                            subtitle = stringResource(R.string.annotation_colors_format_hint)
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        ColorPaletteEditor(
+                            label = stringResource(R.string.tool_pen),
+                            values = penColorInputs
+                        )
+                        SettingsDivider()
+                        ColorPaletteEditor(
+                            label = stringResource(R.string.tool_highlighter),
+                            values = highlighterColorInputs
+                        )
+                        if (annotationColorError) {
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                text = stringResource(R.string.annotation_colors_invalid),
+                                color = MaterialTheme.colorScheme.error,
+                                style = UiSmStyle
+                            )
+                        }
+                        Spacer(Modifier.height(14.dp))
+                        Button(
+                            onClick = {
+                                val penColors = penColorInputs.mapNotNull(::parseHexColor)
+                                val highlighterColors = highlighterColorInputs.mapNotNull(::parseHexColor)
+                                annotationColorError = penColors.size != 4 || highlighterColors.size != 4
+                                if (!annotationColorError) {
+                                    viewModel.processIntent(PdfReaderIntent.SavePenColors(penColors))
+                                    viewModel.processIntent(
+                                        PdfReaderIntent.SaveHighlighterColors(highlighterColors)
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.save_colors))
                         }
                     }
                 }
@@ -446,4 +514,35 @@ private fun SettingsDivider() {
         modifier = Modifier.padding(vertical = 16.dp),
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
     )
+}
+
+@Composable
+private fun ColorPaletteEditor(
+    label: String,
+    values: MutableList<String>
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, style = MaterialTheme.typography.titleMedium)
+        values.forEachIndexed { index, value ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(Color(parseHexColor(value) ?: 0x00000000), CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { values[index] = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.color_number, index + 1)) }
+                )
+            }
+        }
+    }
 }
