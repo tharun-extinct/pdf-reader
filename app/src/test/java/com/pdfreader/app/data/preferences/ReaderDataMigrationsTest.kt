@@ -2,6 +2,8 @@ package com.pdfreader.app.data.preferences
 
 import com.pdfreader.app.data.preferences.proto.ReaderDataProto
 import com.pdfreader.app.data.preferences.proto.ThemeModeProto
+import com.pdfreader.app.domain.model.DEFAULT_HIGHLIGHTER_COLORS
+import com.pdfreader.app.domain.model.DEFAULT_PEN_COLORS
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,6 +41,8 @@ class ReaderDataMigrationsTest {
         assertEquals(ThemeModeProto.THEME_MODE_DARK, migrated.preferences.themeMode)
         assertEquals(true, migrated.preferences.keepScreenOn)
         assertEquals(1.4f, migrated.preferences.speechRate)
+        assertEquals(DEFAULT_PEN_COLORS, migrated.preferences.penColorsList)
+        assertEquals(DEFAULT_HIGHLIGHTER_COLORS, migrated.preferences.highlighterColorsList)
     }
 
     @Test
@@ -48,6 +52,8 @@ class ReaderDataMigrationsTest {
         assertEquals(ReaderDataSchema.CURRENT_VERSION, migrated.schemaVersion)
         assertEquals(ThemeModeProto.THEME_MODE_SYSTEM, migrated.preferences.themeMode)
         assertEquals(1f, migrated.preferences.speechRate)
+        assertEquals(DEFAULT_PEN_COLORS, migrated.preferences.penColorsList)
+        assertEquals(DEFAULT_HIGHLIGHTER_COLORS, migrated.preferences.highlighterColorsList)
         assertFalse(ReaderDataV0ToV1Migration.shouldMigrate(migrated))
 
         val retriedLegacyMigration = ReaderDataMigrations.migrateLegacyData(

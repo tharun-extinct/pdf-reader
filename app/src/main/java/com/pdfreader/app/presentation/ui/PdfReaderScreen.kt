@@ -36,12 +36,12 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Backspace
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Draw
-import androidx.compose.material.icons.outlined.FormatColorFill
-import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Highlight
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.VolumeUp
@@ -49,9 +49,13 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -104,12 +108,8 @@ import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderState
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
-import com.pdfreader.app.presentation.mvi.TextHighlight
-import com.pdfreader.app.presentation.mvi.TextHighlightSelector
 import com.pdfreader.app.domain.tts.TtsState
 import androidx.compose.ui.text.style.TextOverflow
-import com.pdfreader.app.presentation.mvi.formatHexColor
-import com.pdfreader.app.presentation.mvi.parseHexColor
 import com.pdfreader.app.presentation.theme.UiSmStyle
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.roundToInt
@@ -135,6 +135,26 @@ fun PdfReaderScreen(
             .collect { pageIndex ->
                 viewModel.processIntent(PdfReaderIntent.PageChanged(pageIndex))
             }
+    }
+
+    LaunchedEffect(state.ttsState, state.pageCount) {
+        if (state.activeTool != AnnotationTool.ReadAloud) return@LaunchedEffect
+        val completed = state.ttsState as? TtsState.PageCompleted ?: return@LaunchedEffect
+        val nextPage = completed.pageIndex + 1
+        if (nextPage >= state.pageCount) {
+            viewModel.processIntent(PdfReaderIntent.StopTts)
+            return@LaunchedEffect
+        }
+
+        pagerState.animateScrollToPage(nextPage)
+        val cachedBoxes = state.textBoxesByPage[nextPage]
+        if (cachedBoxes != null) {
+            viewModel.processIntent(PdfReaderIntent.PlayTts(nextPage, cachedBoxes))
+        } else {
+            viewModel.processIntent(PdfReaderIntent.RequestPageText(nextPage) { boxes ->
+                viewModel.processIntent(PdfReaderIntent.PlayTts(nextPage, boxes))
+            })
+        }
     }
 
     Scaffold(
@@ -333,6 +353,7 @@ fun PdfReaderScreen(
                     if (state.activeTool == AnnotationTool.ReadAloud) {
                         TtsControlsOverlay(
                             ttsState = state.ttsState,
+                            speechRate = state.preferences.speechRate,
                             onPlay = { 
                                 // We need to get the text from the current page.
                                 val pageIndex = pagerState.currentPage
@@ -348,6 +369,15 @@ fun PdfReaderScreen(
                             },
                             onPause = { viewModel.processIntent(PdfReaderIntent.PauseTts) },
                             onResume = { viewModel.processIntent(PdfReaderIntent.ResumeTts) },
+                            onPreviousParagraph = {
+                                viewModel.processIntent(PdfReaderIntent.PreviousTtsParagraph)
+                            },
+                            onNextParagraph = {
+                                viewModel.processIntent(PdfReaderIntent.NextTtsParagraph)
+                            },
+                            onSpeechRateSelected = {
+                                viewModel.processIntent(PdfReaderIntent.SetSpeechRate(it))
+                            },
                             onStop = { viewModel.processIntent(PdfReaderIntent.StopTts) }
                         )
                     }
@@ -359,14 +389,6 @@ fun PdfReaderScreen(
                 }
             }
 
-            if (state.isAnnotationSettingsOpen) {
-                AnnotationSettingsDialog(
-                    state = state,
-                    onDismiss = { viewModel.processIntent(PdfReaderIntent.ToggleAnnotationSettings) },
-                    onSavePenColors = { viewModel.processIntent(PdfReaderIntent.SavePenColors(it)) },
-                    onSaveHighlighterColors = { viewModel.processIntent(PdfReaderIntent.SaveHighlighterColors(it)) }
-                )
-            }
         }
     }
 }
@@ -419,52 +441,117 @@ private fun ReaderErrorState(
 @Composable
 fun TtsControlsOverlay(
     ttsState: TtsState,
+    speechRate: Float,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
+    onPreviousParagraph: () -> Unit,
+    onNextParagraph: () -> Unit,
+    onSpeechRateSelected: (Float) -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isSpeedMenuExpanded by remember { mutableStateOf(false) }
+    val paragraphIndex = when (ttsState) {
+        is TtsState.Playing -> ttsState.paragraphIndex
+        is TtsState.Paused -> ttsState.paragraphIndex
+        else -> null
+    }
+    val paragraphCount = when (ttsState) {
+        is TtsState.Playing -> ttsState.paragraphCount
+        is TtsState.Paused -> ttsState.paragraphCount
+        else -> null
+    }
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.primaryContainer,
         shadowElevation = 4.dp
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
-                text = when (ttsState) {
-                    is TtsState.Playing -> stringResource(R.string.tts_reading)
-                    is TtsState.Paused -> stringResource(R.string.tts_paused)
-                    is TtsState.Error -> stringResource(R.string.tts_unavailable)
-                    TtsState.Idle -> stringResource(R.string.tts_idle)
-                },
-                style = UiSmStyle.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.padding(start = 6.dp)
-            )
-            when (ttsState) {
-                is TtsState.Idle, is TtsState.Error -> {
-                    IconButton(onClick = onPlay) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = when (ttsState) {
+                        is TtsState.Playing -> stringResource(R.string.tts_reading)
+                        is TtsState.Paused -> stringResource(R.string.tts_paused)
+                        is TtsState.PageCompleted -> stringResource(R.string.tts_turning_page)
+                        is TtsState.Error -> stringResource(R.string.tts_unavailable)
+                        TtsState.Idle -> stringResource(R.string.tts_idle)
+                    },
+                    style = UiSmStyle.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                if (paragraphIndex != null && paragraphCount != null && paragraphCount > 0) {
+                    Text(
+                        text = stringResource(
+                            R.string.tts_paragraph_progress,
+                            paragraphIndex + 1,
+                            paragraphCount
+                        ),
+                        style = UiSmStyle,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f),
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (ttsState is TtsState.Playing || ttsState is TtsState.Paused) {
+                    IconButton(onClick = onPreviousParagraph) {
                         Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = stringResource(R.string.tts_start),
+                            Icons.Default.SkipPrevious,
+                            contentDescription = stringResource(R.string.tts_previous_paragraph),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
-                is TtsState.Playing -> {
-                    IconButton(onClick = onPause) {
+                when (ttsState) {
+                    is TtsState.Idle, is TtsState.Error -> {
+                        IconButton(onClick = onPlay) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.tts_start),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    is TtsState.Playing -> {
+                        IconButton(onClick = onPause) {
+                            Icon(
+                                Icons.Default.Pause,
+                                contentDescription = stringResource(R.string.tts_pause),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    is TtsState.Paused -> {
+                        IconButton(onClick = onResume) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.tts_resume),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    is TtsState.PageCompleted -> Unit
+                }
+                if (ttsState is TtsState.Playing || ttsState is TtsState.Paused) {
+                    IconButton(onClick = onNextParagraph) {
                         Icon(
-                            Icons.Default.Pause,
-                            contentDescription = stringResource(R.string.tts_pause),
+                            Icons.Default.SkipNext,
+                            contentDescription = stringResource(R.string.tts_next_paragraph),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
+                }
+                if (ttsState !is TtsState.Idle && ttsState !is TtsState.Error) {
                     IconButton(onClick = onStop) {
                         Icon(
                             Icons.Default.Stop,
@@ -473,20 +560,23 @@ fun TtsControlsOverlay(
                         )
                     }
                 }
-                is TtsState.Paused -> {
-                    IconButton(onClick = onResume) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = stringResource(R.string.tts_resume),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                Box {
+                    TextButton(onClick = { isSpeedMenuExpanded = true }) {
+                        Text(stringResource(R.string.tts_speed_format, speechRate))
                     }
-                    IconButton(onClick = onStop) {
-                        Icon(
-                            Icons.Default.Stop,
-                            contentDescription = stringResource(R.string.tts_stop),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                    DropdownMenu(
+                        expanded = isSpeedMenuExpanded,
+                        onDismissRequest = { isSpeedMenuExpanded = false }
+                    ) {
+                        listOf(0.75f, 1f, 1.25f, 1.5f).forEach { rate ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.tts_speed_format, rate)) },
+                                onClick = {
+                                    isSpeedMenuExpanded = false
+                                    onSpeechRateSelected(rate)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -596,19 +686,19 @@ private fun FloatingAnnotationToolbar(
                 )
                 ToolbarDivider()
                 FloatingToolbarIcon(
-                    icon = Icons.Outlined.Draw,
+                    icon = Icons.Outlined.Edit,
                     label = stringResource(R.string.tool_pen),
                     selected = state.activeTool == AnnotationTool.Pen,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Pen)) }
                 )
                 FloatingToolbarIcon(
-                    icon = Icons.Outlined.FormatColorFill,
+                    icon = Icons.Outlined.Highlight,
                     label = stringResource(R.string.tool_highlighter),
                     selected = state.activeTool == AnnotationTool.Highlighter,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Highlighter)) }
                 )
                 FloatingToolbarIcon(
-                    icon = Icons.Outlined.Delete,
+                    icon = Icons.Outlined.Backspace,
                     label = stringResource(R.string.tool_eraser),
                     selected = state.activeTool == AnnotationTool.Eraser,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Eraser)) }
@@ -618,13 +708,6 @@ private fun FloatingAnnotationToolbar(
                     label = stringResource(R.string.tool_add_text),
                     selected = state.activeTool == AnnotationTool.AddText,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.AddText)) }
-                )
-                ToolbarDivider()
-                FloatingToolbarIcon(
-                    icon = Icons.Outlined.Palette,
-                    label = stringResource(R.string.customize_annotation_colors),
-                    selected = false,
-                    onClick = { onIntent(PdfReaderIntent.ToggleAnnotationSettings) }
                 )
             }
         }
@@ -806,21 +889,14 @@ fun PdfPage(
                     }
 
                     val path = Path().apply {
-                        stroke.points.forEachIndexed { index, point ->
-                            val mapped = point.toDisplayOffset(contentBounds)
-                            if (index == 0) {
-                                moveTo(mapped.x, mapped.y)
-                            } else {
-                                lineTo(mapped.x, mapped.y)
-                            }
-                        }
+                        addSmoothStroke(stroke.points) { it.toDisplayOffset(contentBounds) }
                     }
 
                     drawPath(
                         path = path,
                         color = Color(stroke.color),
                         style = Stroke(
-                            width = stroke.strokeWidth,
+                            width = stroke.normalizedStrokeWidth * contentBounds.width,
                             cap = androidx.compose.ui.graphics.StrokeCap.Round,
                             join = androidx.compose.ui.graphics.StrokeJoin.Round
                         )
@@ -849,7 +925,6 @@ fun PdfPage(
                 pageIndex = pageIndex,
                 state = state,
                 contentBounds = contentBounds,
-                textBoxes = pageTextBoxes,
                 scale = scale,
                 onIntent = onIntent
             )
@@ -972,22 +1047,13 @@ private fun BoxScope.AnnotationGestureLayer(
     pageIndex: Int,
     state: PdfReaderState,
     contentBounds: Rect,
-    textBoxes: List<PdfTextBox>,
     scale: Float,
     onIntent: (PdfReaderIntent) -> Unit
 ) {
     val activeTool = state.activeTool
     val penColor = state.penPalette.colors.getOrNull(state.selectedPenColorIndex) ?: state.penPalette.colors.first()
     val highlighterColor = state.highlighterPalette.colors.getOrNull(state.selectedHighlighterColorIndex) ?: state.highlighterPalette.colors.first()
-    var currentStrokePoints = remember { mutableStateListOf<Offset>() }
-    var dragStart by remember { mutableStateOf<Offset?>(null) }
-    val textSelectionPreview = if (activeTool == AnnotationTool.Highlighter) {
-        val start = dragStart
-        val end = currentStrokePoints.lastOrNull()
-        if (start != null && end != null) TextHighlightSelector.select(textBoxes, start, end) else emptyList()
-    } else {
-        emptyList()
-    }
+    val currentStrokePoints = remember(pageIndex, activeTool) { mutableStateListOf<Offset>() }
 
     Box(
         modifier = Modifier
@@ -996,11 +1062,10 @@ private fun BoxScope.AnnotationGestureLayer(
             .then(
                 when (activeTool) {
                     AnnotationTool.Pen, AnnotationTool.Highlighter -> {
-                        Modifier.pointerInput(activeTool, contentBounds, textBoxes) {
+                        Modifier.pointerInput(activeTool, contentBounds, penColor, highlighterColor) {
                             detectDragGestures(
                                 onDragStart = { start ->
-                                    currentStrokePoints = mutableStateListOf()
-                                    dragStart = toNormalizedIfInside(start, contentBounds)
+                                    currentStrokePoints.clear()
                                     toNormalizedIfInside(start, contentBounds)?.let { currentStrokePoints.add(it) }
                                 },
                                 onDrag = { change, _ ->
@@ -1008,30 +1073,7 @@ private fun BoxScope.AnnotationGestureLayer(
                                     toNormalizedIfInside(change.position, contentBounds)?.let { currentStrokePoints.add(it) }
                                 },
                                 onDragEnd = {
-                                    val start = dragStart
-                                    val end = currentStrokePoints.lastOrNull()
-                                    val highlightedText = if (activeTool == AnnotationTool.Highlighter && start != null && end != null) {
-                                        val selectedRects = TextHighlightSelector.select(textBoxes, start, end)
-                                        if (selectedRects.isNotEmpty()) {
-                                            onIntent(
-                                                PdfReaderIntent.AddTextHighlight(
-                                                    TextHighlight(
-                                                        id = System.currentTimeMillis(),
-                                                        pageIndex = pageIndex,
-                                                        color = highlighterColor,
-                                                        rects = selectedRects
-                                                    )
-                                                )
-                                            )
-                                            true
-                                        } else {
-                                            false
-                                        }
-                                    } else {
-                                        false
-                                    }
-
-                                    if (!highlightedText && currentStrokePoints.size >= 2) {
+                                    if (currentStrokePoints.size >= 2) {
                                         onIntent(
                                             PdfReaderIntent.AddStroke(
                                                 FreehandStroke(
@@ -1039,15 +1081,18 @@ private fun BoxScope.AnnotationGestureLayer(
                                                     pageIndex = pageIndex,
                                                     tool = activeTool,
                                                     color = if (activeTool == AnnotationTool.Pen) penColor else highlighterColor,
-                                                    strokeWidth = if (activeTool == AnnotationTool.Pen) 6f else 22f,
+                                                    normalizedStrokeWidth = (
+                                                        if (activeTool == AnnotationTool.Pen) PEN_STROKE_WIDTH_PX
+                                                        else HIGHLIGHTER_STROKE_WIDTH_PX
+                                                    ) / contentBounds.width.coerceAtLeast(1f),
                                                     points = currentStrokePoints.toList()
                                                 )
                                             )
                                         )
                                     }
-                                    currentStrokePoints = mutableStateListOf()
-                                    dragStart = null
-                                }
+                                    currentStrokePoints.clear()
+                                },
+                                onDragCancel = { currentStrokePoints.clear() }
                             )
                         }
                     }
@@ -1086,28 +1131,15 @@ private fun BoxScope.AnnotationGestureLayer(
     ) {
         if (currentStrokePoints.isNotEmpty()) {
             Canvas(modifier = Modifier.matchParentSize()) {
-                if (activeTool == AnnotationTool.Highlighter && textSelectionPreview.isNotEmpty()) {
-                    textSelectionPreview.forEach { rect ->
-                        drawRect(
-                            color = Color(highlighterColor),
-                            topLeft = rect.topLeft.toDisplayOffset(contentBounds),
-                            size = androidx.compose.ui.geometry.Size(
-                                width = rect.width * contentBounds.width,
-                                height = rect.height * contentBounds.height
-                            )
-                        )
-                    }
-                    return@Canvas
-                }
                 val previewPath = Path().apply {
-                    currentStrokePoints.forEachIndexed { index, point ->
-                        val displayPoint = point.toDisplayOffset(contentBounds)
-                        if (index == 0) moveTo(displayPoint.x, displayPoint.y)
-                        else lineTo(displayPoint.x, displayPoint.y)
-                    }
+                    addSmoothStroke(currentStrokePoints) { it.toDisplayOffset(contentBounds) }
                 }
                 val previewColor = if (activeTool == AnnotationTool.Pen) penColor else highlighterColor
-                val previewWidth = if (activeTool == AnnotationTool.Pen) 6f else 22f
+                val previewWidth = if (activeTool == AnnotationTool.Pen) {
+                    PEN_STROKE_WIDTH_PX
+                } else {
+                    HIGHLIGHTER_STROKE_WIDTH_PX
+                }
                 drawPath(
                     path = previewPath,
                     color = Color(previewColor),
@@ -1121,6 +1153,32 @@ private fun BoxScope.AnnotationGestureLayer(
         }
     }
 }
+
+/** Builds a midpoint quadratic spline while retaining the captured points as durable geometry. */
+private inline fun Path.addSmoothStroke(
+    points: List<Offset>,
+    transform: (Offset) -> Offset
+) {
+    if (points.isEmpty()) return
+    val first = transform(points.first())
+    moveTo(first.x, first.y)
+    if (points.size == 1) return
+    for (index in 1 until points.lastIndex) {
+        val control = transform(points[index])
+        val next = transform(points[index + 1])
+        quadraticBezierTo(
+            control.x,
+            control.y,
+            (control.x + next.x) / 2f,
+            (control.y + next.y) / 2f
+        )
+    }
+    val last = transform(points.last())
+    lineTo(last.x, last.y)
+}
+
+private const val PEN_STROKE_WIDTH_PX = 6f
+private const val HIGHLIGHTER_STROKE_WIDTH_PX = 22f
 
 @Composable
 private fun BoxScope.SelectedHighlightOverlay(
@@ -1165,130 +1223,6 @@ private fun BoxScope.SelectedHighlightOverlay(
             Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
             Text(stringResource(R.string.delete))
-        }
-    }
-}
-
-@Composable
-private fun AnnotationSettingsDialog(
-    state: PdfReaderState,
-    onDismiss: () -> Unit,
-    onSavePenColors: (List<Long>) -> Unit,
-    onSaveHighlighterColors: (List<Long>) -> Unit
-) {
-    val penInputs = remember(state.penPalette.colors) {
-        mutableStateListOf<String>().apply {
-            addAll(state.penPalette.colors.map { formatHexColor(it) })
-        }
-    }
-    val highlighterInputs = remember(state.highlighterPalette.colors) {
-        mutableStateListOf<String>().apply {
-            addAll(state.highlighterPalette.colors.map { formatHexColor(it) })
-        }
-    }
-    var validationError by remember { mutableStateOf<String?>(null) }
-    val invalidColorsMessage = stringResource(R.string.annotation_colors_invalid)
-
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Surface(
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            tonalElevation = 6.dp,
-            shadowElevation = 14.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            stringResource(R.string.annotation_colors_title),
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            stringResource(R.string.annotation_colors_format_hint),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Outlined.Close,
-                            contentDescription = stringResource(R.string.close)
-                        )
-                    }
-                }
-
-                ColorPaletteEditor(
-                    label = stringResource(R.string.tool_pen),
-                    values = penInputs
-                )
-
-                ColorPaletteEditor(
-                    label = stringResource(R.string.tool_highlighter),
-                    values = highlighterInputs
-                )
-
-                validationError?.let {
-                    Text(text = it, color = MaterialTheme.colorScheme.error)
-                }
-
-                Button(
-                    onClick = {
-                        val penColors = penInputs.mapNotNull { parseHexColor(it) }
-                        val highlighterColors = highlighterInputs.mapNotNull { parseHexColor(it) }
-                        if (penColors.size != 4 || highlighterColors.size != 4) {
-                            validationError = invalidColorsMessage
-                            return@Button
-                        }
-
-                        onSavePenColors(penColors)
-                        onSaveHighlighterColors(highlighterColors)
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.save_colors))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ColorPaletteEditor(
-    label: String,
-    values: MutableList<String>
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, style = MaterialTheme.typography.titleMedium)
-        values.forEachIndexed { index, value ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .background(Color(parseHexColor(value) ?: 0x00000000), CircleShape)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                )
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = { values[index] = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.color_number, index + 1)) }
-                )
-            }
         }
     }
 }

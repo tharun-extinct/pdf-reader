@@ -9,6 +9,8 @@ import com.pdfreader.app.data.preferences.proto.ThemeModeProto
 import com.pdfreader.app.domain.model.ReaderPreferences
 import com.pdfreader.app.domain.model.RecentDocument
 import com.pdfreader.app.domain.model.ThemeMode
+import com.pdfreader.app.domain.model.DEFAULT_HIGHLIGHTER_COLORS
+import com.pdfreader.app.domain.model.DEFAULT_PEN_COLORS
 import com.pdfreader.app.domain.repository.LibraryRepository
 import kotlinx.coroutines.flow.first
 import java.io.IOException
@@ -143,7 +145,10 @@ class ProtoLibraryRepository internal constructor(
             else -> ThemeMode.System
         },
         keepScreenOn = keepScreenOn,
-        speechRate = speechRate.takeIf { it in 0.6f..1.6f } ?: 1f
+        speechRate = speechRate.takeIf { it in 0.6f..1.6f } ?: 1f,
+        penColors = penColorsList.takeIf { it.size == PALETTE_SIZE } ?: DEFAULT_PEN_COLORS,
+        highlighterColors = highlighterColorsList.takeIf { it.size == PALETTE_SIZE }
+            ?: DEFAULT_HIGHLIGHTER_COLORS
     )
 
     private fun ReaderPreferences.toProto(): ReaderPreferencesProto =
@@ -157,5 +162,13 @@ class ProtoLibraryRepository internal constructor(
             )
             .setKeepScreenOn(keepScreenOn)
             .setSpeechRate(speechRate.coerceIn(0.6f, 1.6f))
+            .addAllPenColors(penColors.takeIf { it.size == PALETTE_SIZE } ?: DEFAULT_PEN_COLORS)
+            .addAllHighlighterColors(
+                highlighterColors.takeIf { it.size == PALETTE_SIZE } ?: DEFAULT_HIGHLIGHTER_COLORS
+            )
             .build()
+
+    private companion object {
+        const val PALETTE_SIZE = 4
+    }
 }

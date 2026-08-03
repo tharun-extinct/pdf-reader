@@ -13,8 +13,11 @@ clear local-data controls whose effects are immediate, bounded, and private.
   theme root.
 - Keep screen awake adds or clears `FLAG_KEEP_SCREEN_ON` while the app activity is
   active.
-- Read-aloud rate is clamped to `0.6f..1.6f`, persisted, and immediately applied
-  to `TtsManager`.
+- Read-aloud rate is clamped to `0.6f..1.6f`, persisted, immediately applied to
+  `TtsManager`, and selectable from both Settings and the reader playback panel.
+- Four pen and four highlighter colors are edited in the scrollable Settings
+  route, persisted in Proto DataStore, and immediately feed the reader palette.
+  The former non-scrollable reader editor has been removed.
 - Preference updates change immutable UI state immediately and save after a
   250 ms debounce on the IO dispatcher.
 - Durable values use the versioned `ReaderDataProto` schema and transactional
@@ -49,6 +52,8 @@ clear local-data controls whose effects are immediate, bounded, and private.
   replacing the current metadata state.
 - Theme selection applies consistently to library, reader, and settings chrome;
   annotation colors and rendered PDF pixels are not rewritten as theme colors.
+- Annotation color editing belongs to Settings; the reader exposes only compact
+  palette selection for the active annotation tool.
 - Settings groups appearance, reading, privacy/storage, and about information in
   a bounded, scrollable layout with accessible controls.
 
@@ -63,8 +68,8 @@ clear local-data controls whose effects are immediate, bounded, and private.
 
 ### Local data and privacy
 
-- Preferences and recent-document metadata remain device-local in one private
-  Proto DataStore file.
+- Preferences, including annotation palettes, and recent-document metadata
+  remain device-local in one private Proto DataStore file.
 - The shared Proto file and legacy migration source are excluded from Android
   cloud backup and device transfer. If preferences later need cross-device
   restore, they must move to storage with a separate retention policy.
@@ -99,7 +104,7 @@ clear local-data controls whose effects are immediate, bounded, and private.
 ## Relevant implementation and tests
 
 - `app/src/main/java/com/pdfreader/app/domain/model/LibraryModels.kt` - theme
-  modes, defaults, keep-awake flag, and speech-rate value.
+  modes, defaults, keep-awake flag, speech rate, and palette values.
 - `app/src/main/java/com/pdfreader/app/domain/repository/LibraryRepository.kt` -
   preference persistence boundary and history-clearing operation.
 - `app/src/main/proto/reader_data.proto` - versioned typed schema.
@@ -112,7 +117,7 @@ clear local-data controls whose effects are immediate, bounded, and private.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderViewModel.kt` -
   initial load, optimistic updates, debounced save, and TTS rate propagation.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/SettingsScreen.kt` -
-  settings controls and clear-history confirmation.
+  settings controls, scrollable palette editor, and clear-history confirmation.
 - `app/src/main/res/values/strings.xml` - localized UI, accessibility, plural,
   formatting, and user-visible error resources.
 - `app/src/main/res/xml/backup_rules.xml` and
@@ -133,6 +138,8 @@ clear local-data controls whose effects are immediate, bounded, and private.
 - [ ] Keep screen awake adds and clears the activity flag exactly when requested.
 - [ ] Speech rate remains within `0.6f..1.6f`, survives recreation, and updates
   active and future narration.
+- [ ] Valid pen and highlighter palettes survive recreation and update reader
+  selection chips without a reader-window editor.
 - [ ] Rapid preference changes persist the final accepted value without blocking
   the main thread.
 - [ ] Invalid or unknown stored values fall back to documented defaults.

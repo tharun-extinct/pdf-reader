@@ -32,7 +32,8 @@ data class FreehandStroke(
     val pageIndex: Int,
     val tool: AnnotationTool,
     val color: Long,
-    val strokeWidth: Float,
+    /** Stroke width as a fraction of the displayed page width. */
+    val normalizedStrokeWidth: Float,
     val points: List<Offset>
 )
 
@@ -74,24 +75,6 @@ data class SelectedHighlight(
     val color: Long,
     val rects: List<Rect>
 )
-
-private val DefaultPenColors = listOf(
-    0xFFE53935L,
-    0xFF1E88E5L,
-    0xFF43A047L,
-    0xFFFDD835L
-)
-
-private val DefaultHighlighterColors = listOf(
-    0x66FFEB3BL,
-    0x668E24AAL,
-    0x664CAF50L,
-    0x66FB8C00L
-)
-
-fun defaultPenPalette(): AnnotationPalette = AnnotationPalette(DefaultPenColors)
-
-fun defaultHighlighterPalette(): AnnotationPalette = AnnotationPalette(DefaultHighlighterColors)
 
 fun parseHexColor(hex: String): Long? {
     val normalized = hex.trim().removePrefix("#")

@@ -116,7 +116,7 @@ document contents.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/BookshelfScreen.kt` -
   loading, empty, opening, populated, and error presentation.
 - `app/src/test/java/com/pdfreader/app/data/preferences/ProtoLibraryRepositoryTest.kt` -
-  bounded history, bookmark, preference, and clear-history transactions.
+  bounded history, bookmark, palette preference, and clear-history transactions.
 - `app/src/test/java/com/pdfreader/app/data/preferences/ReaderDataMigrationsTest.kt` -
   legacy history conversion, defaults, and idempotence.
 - `macrobenchmark/src/main/java/com/pdfreader/macrobenchmark/NoxReaderMacrobenchmark.kt` -

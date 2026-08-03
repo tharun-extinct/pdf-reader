@@ -52,11 +52,15 @@
     <string name="tts_pause">Pause reading aloud</string>
     <string name="tts_stop">Stop reading aloud</string>
     <string name="tts_resume">Resume reading aloud</string>
+    <string name="tts_previous_paragraph">Back to previous paragraph</string>
+    <string name="tts_next_paragraph">Fast forward to next paragraph</string>
+    <string name="tts_turning_page">Turning page</string>
+    <string name="tts_paragraph_progress">Paragraph %1$d of %2$d</string>
+    <string name="tts_speed_format">%1$.2f×</string>
     <string name="tool_pen">Pen</string>
     <string name="tool_highlighter">Highlighter</string>
     <string name="tool_eraser">Eraser</string>
     <string name="tool_add_text">Add text</string>
-    <string name="customize_annotation_colors">Customize annotation colors</string>
     <string name="page_content_description">Page %1$d</string>
     <string name="note_label">Note</string>
     <string name="close">Close</string>
@@ -69,6 +73,8 @@
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_appearance_section">APPEARANCE</string>
+    <string name="settings_annotations_section">ANNOTATIONS</string>
+    <string name="settings_annotations_description">Choose the pen and highlighter colors shown in the reader.</string>
     <string name="settings_appearance_description">Choose an interface that stays comfortable in any light.</string>
     <string name="settings_theme_title">Theme</string>
     <string name="settings_theme_description">Applied across the library and reader</string>
