@@ -52,6 +52,11 @@
     <string name="tts_pause">Pause reading aloud</string>
     <string name="tts_stop">Stop reading aloud</string>
     <string name="tts_resume">Resume reading aloud</string>
+    <string name="tts_previous_paragraph">Back to previous paragraph</string>
+    <string name="tts_next_paragraph">Fast forward to next paragraph</string>
+    <string name="tts_turning_page">Turning page</string>
+    <string name="tts_paragraph_progress">Paragraph %1$d of %2$d</string>
+    <string name="tts_speed_format">%1$.2f×</string>
     <string name="tool_pen">Pen</string>
     <string name="tool_highlighter">Highlighter</string>
     <string name="tool_eraser">Eraser</string>

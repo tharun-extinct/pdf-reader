@@ -13,8 +13,8 @@ clear local-data controls whose effects are immediate, bounded, and private.
   theme root.
 - Keep screen awake adds or clears `FLAG_KEEP_SCREEN_ON` while the app activity is
   active.
-- Read-aloud rate is clamped to `0.6f..1.6f`, persisted, and immediately applied
-  to `TtsManager`.
+- Read-aloud rate is clamped to `0.6f..1.6f`, persisted, immediately applied to
+  `TtsManager`, and selectable from both Settings and the reader playback panel.
 - Preference updates change immutable UI state immediately and save after a
   250 ms debounce on the IO dispatcher.
 - Durable values use the versioned `ReaderDataProto` schema and transactional

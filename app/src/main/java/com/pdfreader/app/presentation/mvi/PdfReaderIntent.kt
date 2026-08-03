@@ -84,6 +84,8 @@ sealed class PdfReaderIntent {
     data class PlayTts(val pageIndex: Int, val textBoxes: List<PdfTextBox>) : PdfReaderIntent()
     object PauseTts : PdfReaderIntent()
     object ResumeTts : PdfReaderIntent()
+    object PreviousTtsParagraph : PdfReaderIntent()
+    object NextTtsParagraph : PdfReaderIntent()
     object StopTts : PdfReaderIntent()
 
     /**

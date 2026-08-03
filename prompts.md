@@ -32,7 +32,7 @@ Read Aloud:
 
 - 
 
-## Text to Speech
+## Text to Speech features
 
 - Back to the previous paragraph
 
@@ -40,12 +40,12 @@ Read Aloud:
 
 - Speed selection
 
-- 
+- Auto page scroll (option)
 
-<!-- - Black out other content than the  -->
+
 
 the read aloud isn't syncing with the line text highlight.
-
+<!-- - Black out other content than the  -->
 
 - Add to Favorites
 
@@ -127,6 +127,10 @@ add examples in the references folder of the skill (or where ever it's has to be
 
 
 [Don't build the skill with the current project specific details]
+
+
+
+
 
 
 After saving, the width of the annotation is increased drastically

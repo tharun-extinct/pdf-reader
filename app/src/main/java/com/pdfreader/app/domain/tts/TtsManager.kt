@@ -26,6 +26,8 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
     private var chunks: List<TtsChunk> = emptyList()
     private var currentChunkIndex = 0
     private var speechRate = 1f
+    private var playbackSession = 0
+    private var activeUtteranceId: String? = null
 
     init {
         tts = TextToSpeech(appContext, this)
@@ -53,29 +55,32 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
     private fun setupProgressListener() {
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
-                // We emit the first rect of the chunk when it starts.
-                val chunk = chunks.getOrNull(currentChunkIndex)
+                val chunk = currentChunkFor(utteranceId)
                 if (chunk != null) {
                     val firstBoxIndex = chunk.textToBoxIndices.firstOrNull { it >= 0 }
-                    val rect = if (firstBoxIndex != null) listOf(currentTextBoxes[firstBoxIndex].bounds) else emptyList()
-                    _ttsState.value = TtsState.Playing(currentPageIndex, rect)
+                    val rects = if (firstBoxIndex != null) {
+                        TtsTextNavigator.lineHighlightRects(currentTextBoxes, setOf(firstBoxIndex))
+                    } else emptyList()
+                    _ttsState.value = playingState(rects)
                 }
             }
 
             override fun onDone(utteranceId: String?) {
-                playNextChunk()
+                if (currentChunkFor(utteranceId) != null) playNextChunk()
             }
 
             override fun onError(utteranceId: String?) {
-                _ttsState.value = TtsState.Error(
-                    appContext.getString(R.string.tts_error_playback)
-                )
+                if (currentChunkFor(utteranceId) != null) {
+                    _ttsState.value = TtsState.Error(
+                        appContext.getString(R.string.tts_error_playback)
+                    )
+                }
             }
 
             override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {
                 super.onRangeStart(utteranceId, start, end, frame)
                 
-                val chunk = chunks.getOrNull(currentChunkIndex) ?: return
+                val chunk = currentChunkFor(utteranceId) ?: return
                 if (start < 0 || start >= chunk.textToBoxIndices.size) return
                 
                 // Find all unique text boxes that overlap with this word's character range
@@ -89,22 +94,33 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
                     }
                 }
                 
-                val rects = activeBoxIndices.map { currentTextBoxes[it].bounds }
+                val rects = TtsTextNavigator.lineHighlightRects(currentTextBoxes, activeBoxIndices)
                 if (rects.isNotEmpty()) {
-                    _ttsState.value = TtsState.Playing(currentPageIndex, rects)
+                    _ttsState.value = playingState(rects)
                 }
             }
         })
     }
 
     fun play(pageIndex: Int, textBoxes: List<PdfTextBox>) {
-        if (!isInitialized || textBoxes.isEmpty()) return
+        if (!isInitialized) return
+        if (textBoxes.isEmpty()) {
+            _ttsState.value = TtsState.PageCompleted(pageIndex)
+            return
+        }
         
         currentPageIndex = pageIndex
         currentTextBoxes = textBoxes
         
-        // Build chunks. For simplicity, we chunk by sentences (split by ". ")
-        chunks = buildChunks(textBoxes)
+        playbackSession++
+        chunks = TtsTextNavigator.buildChunks(textBoxes).mapIndexed { index, draft ->
+            TtsChunk(
+                utteranceId = "tts_${playbackSession}_$index",
+                text = draft.text,
+                textToBoxIndices = draft.textToBoxIndices,
+                paragraphIndex = draft.paragraphIndex
+            )
+        }
         currentChunkIndex = 0
         
         if (chunks.isNotEmpty()) {
@@ -119,60 +135,19 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         }
     }
 
-    private fun buildChunks(textBoxes: List<PdfTextBox>): List<TtsChunk> {
-        val result = mutableListOf<TtsChunk>()
-        
-        var currentChunkBuilder = StringBuilder()
-        var currentIndices = mutableListOf<Int>()
-        var chunkIndex = 0
-        
-        for (i in textBoxes.indices) {
-            val box = textBoxes[i]
-            val text = box.text
-            
-            // Append the text
-            for (char in text) {
-                currentChunkBuilder.append(char)
-                currentIndices.add(i)
-            }
-            
-            // Add a space between boxes if needed
-            currentChunkBuilder.append(" ")
-            currentIndices.add(-1)
-            
-            // If the text ends with a period, question mark, or exclamation point, treat it as a sentence boundary
-            if (text.endsWith(".") || text.endsWith("?") || text.endsWith("!")) {
-                val chunkStr = currentChunkBuilder.toString().trimEnd()
-                if (chunkStr.isNotBlank()) {
-                    result.add(TtsChunk("chunk_$chunkIndex", chunkStr, currentIndices.toList()))
-                    chunkIndex++
-                }
-                currentChunkBuilder.clear()
-                currentIndices.clear()
-            } else if (currentChunkBuilder.length > 3000) {
-                // Fallback for extremely long sentences without punctuation to prevent TTS engine failure
-                val chunkStr = currentChunkBuilder.toString()
-                result.add(TtsChunk("chunk_$chunkIndex", chunkStr, currentIndices.toList()))
-                chunkIndex++
-                currentChunkBuilder.clear()
-                currentIndices.clear()
-            }
-        }
-        
-        if (currentChunkBuilder.isNotBlank()) {
-            val chunkStr = currentChunkBuilder.toString().trimEnd()
-            result.add(TtsChunk("chunk_$chunkIndex", chunkStr, currentIndices.toList()))
-        }
-        
-        return result
-    }
-
     fun pause() {
         if (tts?.isSpeaking == true) {
+            activeUtteranceId = null
             tts?.stop()
             val currentState = _ttsState.value
             val rects = if (currentState is TtsState.Playing) currentState.highlightRects else emptyList()
-            _ttsState.value = TtsState.Paused(currentPageIndex, rects)
+            val chunk = chunks.getOrNull(currentChunkIndex)
+            _ttsState.value = TtsState.Paused(
+                currentPageIndex,
+                rects,
+                chunk?.paragraphIndex ?: 0,
+                paragraphCount()
+            )
         }
     }
 
@@ -183,6 +158,8 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
     }
 
     fun stop() {
+        activeUtteranceId = null
+        playbackSession++
         tts?.stop()
         chunks = emptyList()
         currentChunkIndex = 0
@@ -192,17 +169,56 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
     }
 
     private fun playNextChunk() {
+        activeUtteranceId = null
         currentChunkIndex++
         if (currentChunkIndex < chunks.size) {
             speakCurrentChunk()
         } else {
-            _ttsState.value = TtsState.Idle
+            _ttsState.value = TtsState.PageCompleted(currentPageIndex)
+        }
+    }
+
+    fun previousParagraph() = moveToParagraph(-1)
+
+    fun nextParagraph() = moveToParagraph(1)
+
+    private fun moveToParagraph(offset: Int) {
+        val current = chunks.getOrNull(currentChunkIndex) ?: return
+        val targetParagraph = current.paragraphIndex + offset
+        val targetChunkIndex = chunks.indexOfFirst { it.paragraphIndex == targetParagraph }
+        if (targetChunkIndex >= 0) {
+            activeUtteranceId = null
+            tts?.stop()
+            currentChunkIndex = targetChunkIndex
+            speakCurrentChunk()
+        } else if (offset > 0) {
+            activeUtteranceId = null
+            tts?.stop()
+            _ttsState.value = TtsState.PageCompleted(currentPageIndex)
         }
     }
 
     private fun speakCurrentChunk() {
         val chunk = chunks.getOrNull(currentChunkIndex) ?: return
+        activeUtteranceId = chunk.utteranceId
         tts?.speak(chunk.text, TextToSpeech.QUEUE_FLUSH, null, chunk.utteranceId)
+    }
+
+    private fun currentChunkFor(utteranceId: String?): TtsChunk? {
+        if (utteranceId == null || utteranceId != activeUtteranceId) return null
+        return chunks.getOrNull(currentChunkIndex)?.takeIf { it.utteranceId == utteranceId }
+    }
+
+    private fun paragraphCount(): Int = chunks.maxOfOrNull { it.paragraphIndex + 1 } ?: 0
+
+    private fun playingState(rects: List<Rect>): TtsState.Playing {
+        val chunk = chunks.getOrNull(currentChunkIndex)
+        return TtsState.Playing(
+            currentPageIndex,
+            rects,
+            chunk?.paragraphIndex ?: 0,
+            paragraphCount()
+        )
     }
 
     fun shutdown() {
@@ -214,12 +230,24 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
 data class TtsChunk(
     val utteranceId: String,
     val text: String,
-    val textToBoxIndices: List<Int>
+    val textToBoxIndices: List<Int>,
+    val paragraphIndex: Int
 )
 
 sealed class TtsState {
     object Idle : TtsState()
-    data class Playing(val pageIndex: Int, val highlightRects: List<Rect>) : TtsState()
-    data class Paused(val pageIndex: Int, val highlightRects: List<Rect>) : TtsState()
+    data class Playing(
+        val pageIndex: Int,
+        val highlightRects: List<Rect>,
+        val paragraphIndex: Int,
+        val paragraphCount: Int
+    ) : TtsState()
+    data class Paused(
+        val pageIndex: Int,
+        val highlightRects: List<Rect>,
+        val paragraphIndex: Int,
+        val paragraphCount: Int
+    ) : TtsState()
+    data class PageCompleted(val pageIndex: Int) : TtsState()
     data class Error(val message: String) : TtsState()
 }

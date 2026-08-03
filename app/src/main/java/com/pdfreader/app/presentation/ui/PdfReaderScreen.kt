@@ -49,9 +49,13 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -135,6 +139,26 @@ fun PdfReaderScreen(
             .collect { pageIndex ->
                 viewModel.processIntent(PdfReaderIntent.PageChanged(pageIndex))
             }
+    }
+
+    LaunchedEffect(state.ttsState, state.pageCount) {
+        if (state.activeTool != AnnotationTool.ReadAloud) return@LaunchedEffect
+        val completed = state.ttsState as? TtsState.PageCompleted ?: return@LaunchedEffect
+        val nextPage = completed.pageIndex + 1
+        if (nextPage >= state.pageCount) {
+            viewModel.processIntent(PdfReaderIntent.StopTts)
+            return@LaunchedEffect
+        }
+
+        pagerState.animateScrollToPage(nextPage)
+        val cachedBoxes = state.textBoxesByPage[nextPage]
+        if (cachedBoxes != null) {
+            viewModel.processIntent(PdfReaderIntent.PlayTts(nextPage, cachedBoxes))
+        } else {
+            viewModel.processIntent(PdfReaderIntent.RequestPageText(nextPage) { boxes ->
+                viewModel.processIntent(PdfReaderIntent.PlayTts(nextPage, boxes))
+            })
+        }
     }
 
     Scaffold(
@@ -333,6 +357,7 @@ fun PdfReaderScreen(
                     if (state.activeTool == AnnotationTool.ReadAloud) {
                         TtsControlsOverlay(
                             ttsState = state.ttsState,
+                            speechRate = state.preferences.speechRate,
                             onPlay = { 
                                 // We need to get the text from the current page.
                                 val pageIndex = pagerState.currentPage
@@ -348,6 +373,15 @@ fun PdfReaderScreen(
                             },
                             onPause = { viewModel.processIntent(PdfReaderIntent.PauseTts) },
                             onResume = { viewModel.processIntent(PdfReaderIntent.ResumeTts) },
+                            onPreviousParagraph = {
+                                viewModel.processIntent(PdfReaderIntent.PreviousTtsParagraph)
+                            },
+                            onNextParagraph = {
+                                viewModel.processIntent(PdfReaderIntent.NextTtsParagraph)
+                            },
+                            onSpeechRateSelected = {
+                                viewModel.processIntent(PdfReaderIntent.SetSpeechRate(it))
+                            },
                             onStop = { viewModel.processIntent(PdfReaderIntent.StopTts) }
                         )
                     }
@@ -419,52 +453,117 @@ private fun ReaderErrorState(
 @Composable
 fun TtsControlsOverlay(
     ttsState: TtsState,
+    speechRate: Float,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
+    onPreviousParagraph: () -> Unit,
+    onNextParagraph: () -> Unit,
+    onSpeechRateSelected: (Float) -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isSpeedMenuExpanded by remember { mutableStateOf(false) }
+    val paragraphIndex = when (ttsState) {
+        is TtsState.Playing -> ttsState.paragraphIndex
+        is TtsState.Paused -> ttsState.paragraphIndex
+        else -> null
+    }
+    val paragraphCount = when (ttsState) {
+        is TtsState.Playing -> ttsState.paragraphCount
+        is TtsState.Paused -> ttsState.paragraphCount
+        else -> null
+    }
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.primaryContainer,
         shadowElevation = 4.dp
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
-                text = when (ttsState) {
-                    is TtsState.Playing -> stringResource(R.string.tts_reading)
-                    is TtsState.Paused -> stringResource(R.string.tts_paused)
-                    is TtsState.Error -> stringResource(R.string.tts_unavailable)
-                    TtsState.Idle -> stringResource(R.string.tts_idle)
-                },
-                style = UiSmStyle.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.padding(start = 6.dp)
-            )
-            when (ttsState) {
-                is TtsState.Idle, is TtsState.Error -> {
-                    IconButton(onClick = onPlay) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = when (ttsState) {
+                        is TtsState.Playing -> stringResource(R.string.tts_reading)
+                        is TtsState.Paused -> stringResource(R.string.tts_paused)
+                        is TtsState.PageCompleted -> stringResource(R.string.tts_turning_page)
+                        is TtsState.Error -> stringResource(R.string.tts_unavailable)
+                        TtsState.Idle -> stringResource(R.string.tts_idle)
+                    },
+                    style = UiSmStyle.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                if (paragraphIndex != null && paragraphCount != null && paragraphCount > 0) {
+                    Text(
+                        text = stringResource(
+                            R.string.tts_paragraph_progress,
+                            paragraphIndex + 1,
+                            paragraphCount
+                        ),
+                        style = UiSmStyle,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f),
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (ttsState is TtsState.Playing || ttsState is TtsState.Paused) {
+                    IconButton(onClick = onPreviousParagraph) {
                         Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = stringResource(R.string.tts_start),
+                            Icons.Default.SkipPrevious,
+                            contentDescription = stringResource(R.string.tts_previous_paragraph),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
-                is TtsState.Playing -> {
-                    IconButton(onClick = onPause) {
+                when (ttsState) {
+                    is TtsState.Idle, is TtsState.Error -> {
+                        IconButton(onClick = onPlay) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.tts_start),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    is TtsState.Playing -> {
+                        IconButton(onClick = onPause) {
+                            Icon(
+                                Icons.Default.Pause,
+                                contentDescription = stringResource(R.string.tts_pause),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    is TtsState.Paused -> {
+                        IconButton(onClick = onResume) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.tts_resume),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    is TtsState.PageCompleted -> Unit
+                }
+                if (ttsState is TtsState.Playing || ttsState is TtsState.Paused) {
+                    IconButton(onClick = onNextParagraph) {
                         Icon(
-                            Icons.Default.Pause,
-                            contentDescription = stringResource(R.string.tts_pause),
+                            Icons.Default.SkipNext,
+                            contentDescription = stringResource(R.string.tts_next_paragraph),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
+                }
+                if (ttsState !is TtsState.Idle && ttsState !is TtsState.Error) {
                     IconButton(onClick = onStop) {
                         Icon(
                             Icons.Default.Stop,
@@ -473,20 +572,23 @@ fun TtsControlsOverlay(
                         )
                     }
                 }
-                is TtsState.Paused -> {
-                    IconButton(onClick = onResume) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = stringResource(R.string.tts_resume),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                Box {
+                    TextButton(onClick = { isSpeedMenuExpanded = true }) {
+                        Text(stringResource(R.string.tts_speed_format, speechRate))
                     }
-                    IconButton(onClick = onStop) {
-                        Icon(
-                            Icons.Default.Stop,
-                            contentDescription = stringResource(R.string.tts_stop),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                    DropdownMenu(
+                        expanded = isSpeedMenuExpanded,
+                        onDismissRequest = { isSpeedMenuExpanded = false }
+                    ) {
+                        listOf(0.75f, 1f, 1.25f, 1.5f).forEach { rate ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.tts_speed_format, rate)) },
+                                onClick = {
+                                    isSpeedMenuExpanded = false
+                                    onSpeechRateSelected(rate)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -1186,6 +1288,7 @@ private fun AnnotationSettingsDialog(
             addAll(state.highlighterPalette.colors.map { formatHexColor(it) })
         }
     }
+
     var validationError by remember { mutableStateOf<String?>(null) }
     val invalidColorsMessage = stringResource(R.string.annotation_colors_invalid)
 

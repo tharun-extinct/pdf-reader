@@ -96,6 +96,8 @@ class PdfReaderViewModel(
             is PdfReaderIntent.PlayTts -> playTts(intent.pageIndex, intent.textBoxes)
             is PdfReaderIntent.PauseTts -> ttsManager.pause()
             is PdfReaderIntent.ResumeTts -> ttsManager.resume()
+            is PdfReaderIntent.PreviousTtsParagraph -> ttsManager.previousParagraph()
+            is PdfReaderIntent.NextTtsParagraph -> ttsManager.nextParagraph()
             is PdfReaderIntent.StopTts -> ttsManager.stop()
             is PdfReaderIntent.SaveAnnotations -> saveAnnotations()
         }
@@ -457,6 +459,7 @@ class PdfReaderViewModel(
     }
 
     private fun openPdf(uri: Uri) {
+        ttsManager.stop()
         _state.update { it.copy(isLoading = true, errorMessage = null) }
         
         viewModelScope.launch(Dispatchers.IO) {
