@@ -21,6 +21,9 @@ and persisted geometry aligned.
   embedded highlight; an outside tap clears the selection.
 - Deleting a session highlight updates state immediately; embedded deletion is
   recorded for the next save.
+- The toolbar Highlighter is now an always-freehand marker for immediate ink;
+  the text-range selector remains implemented but has no creation gesture in
+  the reader while these tool semantics are active.
 - Persisted highlight appearances own a resource dictionary, allowing opacity
   graphics state to be emitted for source pages that omit `/Resources`.
 - Color-change and comment actions, tile-aware transforms, and broad device or
@@ -86,7 +89,8 @@ and persisted geometry aligned.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderViewModel.kt` -
   merged selection candidates and pending session/embedded deletion state.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/PdfReaderScreen.kt` -
-  drag preview, fitted overlay, selection boundary, and Delete action.
+  fitted highlight overlays, selection boundary, and Delete action; new text
+  highlight creation is not currently wired to the Highlighter gesture.
 - `app/src/main/java/com/pdfreader/app/data/pdfium/PdfiumEngine.kt` - text and
   embedded `/Highlight` extraction caches.
 - `app/src/test/java/com/pdfreader/app/presentation/mvi/TextHighlightSelectorTest.kt` -
@@ -112,6 +116,8 @@ and persisted geometry aligned.
 ## Remaining gaps
 
 - Change-color and defined comment actions.
+- A dedicated gesture or command for creating text-range highlights, separate
+  from the freehand Highlighter tool.
 - Tile-aware transforms and complete zoom/pan validation.
 - Device and external-viewer verification for selection and persisted geometry.
 - `PdfiumEngine` currently normalizes extracted text with MediaBox dimensions

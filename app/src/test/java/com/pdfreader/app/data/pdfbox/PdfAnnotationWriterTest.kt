@@ -9,6 +9,8 @@ import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.cos.COSDictionary
+import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
@@ -127,6 +129,44 @@ class PdfAnnotationWriterTest {
                 .map { it.groupValues[1].toFloat() }
                 .toList()
             assertEquals(6.12f, lineWidths.single(), 0.001f)
+        }
+    }
+
+    @Test
+    fun editableInkKeepsConfiguredWidthAndRoundedAppearance() {
+        PDDocument().use { document ->
+            document.addPage(PDPage(PDRectangle.LETTER))
+            PdfAnnotationWriter.writeAll(
+                document = document,
+                strokesByPage = mapOf(
+                    0 to listOf(
+                        FreehandStroke(
+                            id = 1L,
+                            pageIndex = 0,
+                            tool = AnnotationTool.Pen,
+                            color = 0xFF1E88E5L,
+                            normalizedStrokeWidth = 0.01f,
+                            points = listOf(
+                                Offset(0.1f, 0.1f), Offset(0.2f, 0.25f), Offset(0.3f, 0.1f)
+                            )
+                        )
+                    )
+                ),
+                highlightsByPage = emptyMap(),
+                textAnnotationsByPage = emptyMap(),
+                deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                saveMode = AnnotationSaveMode.Editable
+            )
+
+            val annotation = document.getPage(0).annotations.single()
+            val borderStyle = annotation.cosObject.getDictionaryObject(COSName.BS) as COSDictionary
+            assertEquals(6.12f, borderStyle.getFloat(COSName.W), 0.001f)
+            val appearance = requireNotNull(annotation.normalAppearanceStream)
+            val content = appearance.cosObject.createInputStream()
+                .bufferedReader(Charsets.ISO_8859_1)
+                .use { it.readText() }
+            assertTrue(content.contains("1 J"))
+            assertTrue(content.contains("1 j"))
         }
     }
 

@@ -12,15 +12,20 @@ content.
 
 - `FreehandStroke` stores page, tool, color, normalized width, and normalized
   points.
-- Compose renders the in-progress stroke and committed session overlays.
+- Compose invalidates a stable snapshot point list throughout the drag, so pen
+  and freehand-highlighter marks appear under the pointer before touch-up.
+- In-progress and committed overlays use the same midpoint spline with round
+  caps and joins; editable and flattened PDF appearances mirror that curve.
 - Pen and highlighter palettes are persisted preferences edited from the
   scrollable Settings screen; the reader keeps compact palette selection chips.
-- The floating toolbar exposes Pen, Highlighter, and Eraser with 48 dp semantic
-  controls; Pen and Highlighter show the active contextual palette.
+- The floating toolbar exposes recognizable pen, marker, and eraser symbols in
+  48 dp semantic controls; Pen and Highlighter show the active contextual palette.
+- Palette taps restart gesture capture with the selected color, preventing a
+  prior pointer-input closure from writing the previous color.
 - The eraser removes matching unsaved strokes along a drag.
-- PDFBox converts normalized display width to PDF points before writing vector
-  `/Ink` appearances or flattened content, preventing saved strokes from
-  becoming wider than their Compose previews.
+- PDFBox converts normalized display width to PDF points and supplies a
+  width-exact rounded `/Ink` appearance instead of delegating appearance shape
+  and thickness to viewer defaults.
 - The [Android Build run for `30240c2`](https://github.com/tharun-extinct/pdf-reader/actions/runs/30745995096)
   compiled this implementation, but the writer and mapper test sources were not
   executed by that workflow revision.
@@ -93,8 +98,8 @@ content.
 - `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfCoordinateMapperTest.kt` -
   partial coordinate evidence shared with annotation persistence.
 - `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriterTest.kt` -
-  configured flattened ink width. No gesture, editable `/Ink`, opacity, or
-  external-viewer test currently exists.
+  configured flattened ink width plus editable `/Ink` width and rounded normal
+  appearance operators. No gesture, opacity, or external-viewer test currently exists.
 
 ## Acceptance criteria
 

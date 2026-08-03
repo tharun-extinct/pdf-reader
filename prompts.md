@@ -164,3 +164,33 @@ Archive or remove stale implementation-files/ documents. Several contain obsolet
 
 After those foundations, the strongest product additions would be document search, outline navigation, thumbnails/scrubber, undo/redo, automatic draft recovery, “Save a copy” for read-only providers, and editing existing ink and notes.
 My recommended next milestone is Safe Save and Recovery: fix SAF success detection, preserve flattened note content and ink width, guard unsaved navigation, serialize document operations, and add PDF/provider failure fixtures. No files were changed during this audit.
+
+
+
+
+---
+
+## Tool bar 
+
+
+- tool bar icon doesn't  look good (assets\tool-bar.jpg)
+
+
+- Annotation and highlighter ain't instantly marking up in the PDF. Its only imprinting after taking the hand off the screen (assets\annotation-boxy-appearance.jpg)
+
+
+- And the annotation is increasing the width of the ink, after saving it. But when drawing its thinner
+
+
+- I can't able to switch color, when I enter into Annotation or Highlighter
+
+
+- After drawing, the annotations isn't smooth at all, it's kinda boxy (assets\annotation-boxy-appearance.jpg)
+
+
+- And I can't able to reselect or delete the Annotations Ink after saving it
+
+
+
+
+Zoom in and lock layout - pdf specific feature

@@ -36,11 +36,11 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Backspace
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Draw
-import androidx.compose.material.icons.outlined.FormatColorFill
+import androidx.compose.material.icons.outlined.Highlight
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.VolumeUp
@@ -107,8 +107,6 @@ import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderState
 import com.pdfreader.app.presentation.mvi.PdfReaderViewModel
-import com.pdfreader.app.presentation.mvi.TextHighlight
-import com.pdfreader.app.presentation.mvi.TextHighlightSelector
 import com.pdfreader.app.domain.tts.TtsState
 import androidx.compose.ui.text.style.TextOverflow
 import com.pdfreader.app.presentation.theme.UiSmStyle
@@ -687,19 +685,19 @@ private fun FloatingAnnotationToolbar(
                 )
                 ToolbarDivider()
                 FloatingToolbarIcon(
-                    icon = Icons.Outlined.Draw,
+                    icon = Icons.Outlined.Edit,
                     label = stringResource(R.string.tool_pen),
                     selected = state.activeTool == AnnotationTool.Pen,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Pen)) }
                 )
                 FloatingToolbarIcon(
-                    icon = Icons.Outlined.FormatColorFill,
+                    icon = Icons.Outlined.Highlight,
                     label = stringResource(R.string.tool_highlighter),
                     selected = state.activeTool == AnnotationTool.Highlighter,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Highlighter)) }
                 )
                 FloatingToolbarIcon(
-                    icon = Icons.Outlined.Delete,
+                    icon = Icons.Outlined.Backspace,
                     label = stringResource(R.string.tool_eraser),
                     selected = state.activeTool == AnnotationTool.Eraser,
                     onClick = { onIntent(PdfReaderIntent.SelectTool(AnnotationTool.Eraser)) }
@@ -890,14 +888,7 @@ fun PdfPage(
                     }
 
                     val path = Path().apply {
-                        stroke.points.forEachIndexed { index, point ->
-                            val mapped = point.toDisplayOffset(contentBounds)
-                            if (index == 0) {
-                                moveTo(mapped.x, mapped.y)
-                            } else {
-                                lineTo(mapped.x, mapped.y)
-                            }
-                        }
+                        addSmoothStroke(stroke.points) { it.toDisplayOffset(contentBounds) }
                     }
 
                     drawPath(
@@ -933,7 +924,6 @@ fun PdfPage(
                 pageIndex = pageIndex,
                 state = state,
                 contentBounds = contentBounds,
-                textBoxes = pageTextBoxes,
                 scale = scale,
                 onIntent = onIntent
             )
@@ -1056,22 +1046,13 @@ private fun BoxScope.AnnotationGestureLayer(
     pageIndex: Int,
     state: PdfReaderState,
     contentBounds: Rect,
-    textBoxes: List<PdfTextBox>,
     scale: Float,
     onIntent: (PdfReaderIntent) -> Unit
 ) {
     val activeTool = state.activeTool
     val penColor = state.penPalette.colors.getOrNull(state.selectedPenColorIndex) ?: state.penPalette.colors.first()
     val highlighterColor = state.highlighterPalette.colors.getOrNull(state.selectedHighlighterColorIndex) ?: state.highlighterPalette.colors.first()
-    var currentStrokePoints = remember { mutableStateListOf<Offset>() }
-    var dragStart by remember { mutableStateOf<Offset?>(null) }
-    val textSelectionPreview = if (activeTool == AnnotationTool.Highlighter) {
-        val start = dragStart
-        val end = currentStrokePoints.lastOrNull()
-        if (start != null && end != null) TextHighlightSelector.select(textBoxes, start, end) else emptyList()
-    } else {
-        emptyList()
-    }
+    val currentStrokePoints = remember(pageIndex, activeTool) { mutableStateListOf<Offset>() }
 
     Box(
         modifier = Modifier
@@ -1080,11 +1061,10 @@ private fun BoxScope.AnnotationGestureLayer(
             .then(
                 when (activeTool) {
                     AnnotationTool.Pen, AnnotationTool.Highlighter -> {
-                        Modifier.pointerInput(activeTool, contentBounds, textBoxes) {
+                        Modifier.pointerInput(activeTool, contentBounds, penColor, highlighterColor) {
                             detectDragGestures(
                                 onDragStart = { start ->
-                                    currentStrokePoints = mutableStateListOf()
-                                    dragStart = toNormalizedIfInside(start, contentBounds)
+                                    currentStrokePoints.clear()
                                     toNormalizedIfInside(start, contentBounds)?.let { currentStrokePoints.add(it) }
                                 },
                                 onDrag = { change, _ ->
@@ -1092,30 +1072,7 @@ private fun BoxScope.AnnotationGestureLayer(
                                     toNormalizedIfInside(change.position, contentBounds)?.let { currentStrokePoints.add(it) }
                                 },
                                 onDragEnd = {
-                                    val start = dragStart
-                                    val end = currentStrokePoints.lastOrNull()
-                                    val highlightedText = if (activeTool == AnnotationTool.Highlighter && start != null && end != null) {
-                                        val selectedRects = TextHighlightSelector.select(textBoxes, start, end)
-                                        if (selectedRects.isNotEmpty()) {
-                                            onIntent(
-                                                PdfReaderIntent.AddTextHighlight(
-                                                    TextHighlight(
-                                                        id = System.currentTimeMillis(),
-                                                        pageIndex = pageIndex,
-                                                        color = highlighterColor,
-                                                        rects = selectedRects
-                                                    )
-                                                )
-                                            )
-                                            true
-                                        } else {
-                                            false
-                                        }
-                                    } else {
-                                        false
-                                    }
-
-                                    if (!highlightedText && currentStrokePoints.size >= 2) {
+                                    if (currentStrokePoints.size >= 2) {
                                         onIntent(
                                             PdfReaderIntent.AddStroke(
                                                 FreehandStroke(
@@ -1124,16 +1081,17 @@ private fun BoxScope.AnnotationGestureLayer(
                                                     tool = activeTool,
                                                     color = if (activeTool == AnnotationTool.Pen) penColor else highlighterColor,
                                                     normalizedStrokeWidth = (
-                                                        if (activeTool == AnnotationTool.Pen) 6f else 22f
+                                                        if (activeTool == AnnotationTool.Pen) PEN_STROKE_WIDTH_PX
+                                                        else HIGHLIGHTER_STROKE_WIDTH_PX
                                                     ) / contentBounds.width.coerceAtLeast(1f),
                                                     points = currentStrokePoints.toList()
                                                 )
                                             )
                                         )
                                     }
-                                    currentStrokePoints = mutableStateListOf()
-                                    dragStart = null
-                                }
+                                    currentStrokePoints.clear()
+                                },
+                                onDragCancel = { currentStrokePoints.clear() }
                             )
                         }
                     }
@@ -1172,28 +1130,15 @@ private fun BoxScope.AnnotationGestureLayer(
     ) {
         if (currentStrokePoints.isNotEmpty()) {
             Canvas(modifier = Modifier.matchParentSize()) {
-                if (activeTool == AnnotationTool.Highlighter && textSelectionPreview.isNotEmpty()) {
-                    textSelectionPreview.forEach { rect ->
-                        drawRect(
-                            color = Color(highlighterColor),
-                            topLeft = rect.topLeft.toDisplayOffset(contentBounds),
-                            size = androidx.compose.ui.geometry.Size(
-                                width = rect.width * contentBounds.width,
-                                height = rect.height * contentBounds.height
-                            )
-                        )
-                    }
-                    return@Canvas
-                }
                 val previewPath = Path().apply {
-                    currentStrokePoints.forEachIndexed { index, point ->
-                        val displayPoint = point.toDisplayOffset(contentBounds)
-                        if (index == 0) moveTo(displayPoint.x, displayPoint.y)
-                        else lineTo(displayPoint.x, displayPoint.y)
-                    }
+                    addSmoothStroke(currentStrokePoints) { it.toDisplayOffset(contentBounds) }
                 }
                 val previewColor = if (activeTool == AnnotationTool.Pen) penColor else highlighterColor
-                val previewWidth = if (activeTool == AnnotationTool.Pen) 6f else 22f
+                val previewWidth = if (activeTool == AnnotationTool.Pen) {
+                    PEN_STROKE_WIDTH_PX
+                } else {
+                    HIGHLIGHTER_STROKE_WIDTH_PX
+                }
                 drawPath(
                     path = previewPath,
                     color = Color(previewColor),
@@ -1207,6 +1152,32 @@ private fun BoxScope.AnnotationGestureLayer(
         }
     }
 }
+
+/** Builds a midpoint quadratic spline while retaining the captured points as durable geometry. */
+private inline fun Path.addSmoothStroke(
+    points: List<Offset>,
+    transform: (Offset) -> Offset
+) {
+    if (points.isEmpty()) return
+    val first = transform(points.first())
+    moveTo(first.x, first.y)
+    if (points.size == 1) return
+    for (index in 1 until points.lastIndex) {
+        val control = transform(points[index])
+        val next = transform(points[index + 1])
+        quadraticBezierTo(
+            control.x,
+            control.y,
+            (control.x + next.x) / 2f,
+            (control.y + next.y) / 2f
+        )
+    }
+    val last = transform(points.last())
+    lineTo(last.x, last.y)
+}
+
+private const val PEN_STROKE_WIDTH_PX = 6f
+private const val HIGHLIGHTER_STROKE_WIDTH_PX = 22f
 
 @Composable
 private fun BoxScope.SelectedHighlightOverlay(
