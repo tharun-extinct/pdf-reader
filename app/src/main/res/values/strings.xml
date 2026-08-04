@@ -36,8 +36,6 @@
     <string name="local_history_note">Recent history is stored only on this device. Your PDFs remain in their original location.</string>
 
     <!-- Reader -->
-    <string name="annotation_mode_editable">Edit</string>
-    <string name="annotation_mode_flattened">Flat</string>
     <string name="save_annotations">Save annotations to PDF</string>
     <string name="remove_page_bookmark">Remove bookmark from page %1$d</string>
     <string name="add_page_bookmark">Bookmark page %1$d</string>

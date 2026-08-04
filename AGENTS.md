@@ -19,3 +19,8 @@ cross-cutting, persistence-wide, coordinate-contract, or ambiguous changes.
 Current code and verified tests override stale status prose. Never describe
 planned behavior as implemented. Do not run Gradle locally; GitHub Actions is
 the build and test authority for this repository.
+
+
+# Don'ts
+
+- Don't read prompts.md

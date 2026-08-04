@@ -15,9 +15,7 @@ interaction or losing unsaved note contents during a failed save.
   editable field as an optimistic Compose overlay until Save succeeds.
 - PDFBox writes `/Text` note annotations with contents, icon rectangle, color,
   closed state, and a normal appearance.
-- Newly saved notes participate in editable and flattened save modes. Flattened
-  notes render their complete encodable text into a visible note box; notes that
-  cannot be represented without loss remain editable.
+- Newly saved notes persist as editable `/Text` annotations.
 - The [Android Build run for `30240c2`](https://github.com/tharun-extinct/pdf-reader/actions/runs/30745995096)
   compiled this implementation, but the writer tests were not executed by that
   workflow revision.
@@ -54,8 +52,6 @@ interaction or losing unsaved note contents during a failed save.
 ### Failure handling and invalidation
 
 - A failed write, sync, or reopen must retain note text and placement for retry.
-- If lossless flattened output cannot represent the payload, retain the `/Text`
-  annotation rather than dropping its contents.
 
 ## Related blueprints
 
@@ -66,7 +62,7 @@ interaction or losing unsaved note contents during a failed save.
 ### Impact checks
 
 - [Annotation persistence](annotation-persistence.md) when `/Text`, appearance,
-  flattening, or save behavior changes.
+  or save behavior changes.
 
 ## Relevant implementation and tests
 
@@ -79,10 +75,9 @@ interaction or losing unsaved note contents during a failed save.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/PdfReaderScreen.kt` - Add
   text gesture and 180 dp optimistic text field.
 - `app/src/main/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriter.kt` -
-  editable `/Text` output and loss-aware flattened note box.
-- `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriterTest.kt` -
-  visible flattened text and unencodable-payload retention. It does not cover
-  editable output, multiline layout, long text, placement, or external viewers.
+  editable `/Text` output and normal appearance.
+- No note-specific writer fixture currently covers editable output, multiline
+  layout, long text, placement, or external viewers.
 
 ## Acceptance criteria
 
@@ -90,8 +85,6 @@ interaction or losing unsaved note contents during a failed save.
   zoom transforms.
 - [ ] Editing updates optimistic state without blocking pointer interaction.
 - [ ] Editable save/reopen preserves note contents and a usable note icon.
-- [ ] Flattened output visibly preserves the complete supported note content; an
-  unencodable or oversized note remains editable instead of being discarded.
 - [ ] Failed persistence retains the complete pending note.
 - [ ] Empty, multiline, Unicode, long, and read-only-provider cases have explicit
   behavior and tests before the feature is marked Verified.

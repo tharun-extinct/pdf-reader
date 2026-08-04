@@ -3,7 +3,6 @@ package com.pdfreader.app.domain.repository
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
-import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import java.io.File
 
 /**
@@ -29,7 +28,7 @@ interface PdfAnnotationSaver {
         highlightsByPage: Map<Int, List<TextHighlight>>,
         textAnnotationsByPage: Map<Int, List<TextAnnotation>>,
         deletedEmbeddedHighlightIdsByPage: Map<Int, Set<String>>,
-        saveMode: AnnotationSaveMode,
+        deletedEmbeddedInkIdsByPage: Map<Int, Set<String>>,
         outputFile: File
     ): File
 }

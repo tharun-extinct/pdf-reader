@@ -20,6 +20,16 @@ object PdfCoordinateMapper {
         return normalizedWidth.coerceAtLeast(0f) * displayedWidth
     }
 
+    /** Maps a PDF ink width back to the displayed-page-width fraction used by Compose. */
+    fun toNormalizedStrokeWidth(page: PDPage, pdfWidth: Float): Float {
+        val box = page.cropBox
+        val displayedWidth = when (page.normalizedRotation()) {
+            90, 270 -> box.height
+            else -> box.width
+        }
+        return if (displayedWidth > 0f) (pdfWidth / displayedWidth).coerceAtLeast(0f) else 0f
+    }
+
     fun toPdfPoint(page: PDPage, point: Offset): Offset {
         val box = page.cropBox
         val x = point.x.coerceIn(0f, 1f)

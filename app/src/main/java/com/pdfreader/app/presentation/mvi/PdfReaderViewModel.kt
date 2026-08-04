@@ -78,6 +78,7 @@ class PdfReaderViewModel(
                 updatePreferences { it.copy(speechRate = rate) }
             }
             is PdfReaderIntent.RequestPageHighlights -> extractEmbeddedHighlights(intent.pageIndex, intent.onLoaded)
+            is PdfReaderIntent.RequestPageInk -> extractEmbeddedInk(intent.pageIndex)
             is PdfReaderIntent.SelectTool -> selectTool(intent.tool)
             is PdfReaderIntent.SelectPenColor -> selectPenColor(intent.index)
             is PdfReaderIntent.SelectHighlighterColor -> selectHighlighterColor(intent.index)
@@ -88,10 +89,11 @@ class PdfReaderViewModel(
             is PdfReaderIntent.RemoveStrokeAt -> removeStrokeAt(intent.pageIndex, intent.position)
             is PdfReaderIntent.AddTextAnnotation -> addTextAnnotation(intent.pageIndex, intent.position)
             is PdfReaderIntent.UpdateTextAnnotation -> updateTextAnnotation(intent.annotationId, intent.text)
-            is PdfReaderIntent.SetAnnotationSaveMode -> _state.update { it.copy(annotationSaveMode = intent.mode) }
-            is PdfReaderIntent.SelectHighlightAt -> selectHighlightAt(intent.pageIndex, intent.position)
-            is PdfReaderIntent.ClearHighlightSelection -> _state.update { it.copy(selectedHighlight = null) }
-            is PdfReaderIntent.DeleteSelectedHighlight -> deleteSelectedHighlight()
+            is PdfReaderIntent.SelectAnnotationAt -> selectAnnotationAt(intent.pageIndex, intent.position)
+            is PdfReaderIntent.ClearAnnotationSelection -> _state.update {
+                it.copy(selectedHighlight = null, selectedInk = null)
+            }
+            is PdfReaderIntent.DeleteSelectedAnnotation -> deleteSelectedAnnotation()
             is PdfReaderIntent.PlayTts -> playTts(intent.pageIndex, intent.textBoxes)
             is PdfReaderIntent.PauseTts -> ttsManager.pause()
             is PdfReaderIntent.ResumeTts -> ttsManager.resume()
@@ -230,13 +232,48 @@ class PdfReaderViewModel(
         _state.update { state ->
             val pageHighlights = state.highlightsByPage[highlight.pageIndex].orEmpty()
             state.copy(
-                highlightsByPage = state.highlightsByPage + (highlight.pageIndex to (pageHighlights + highlight))
+                highlightsByPage = state.highlightsByPage + (highlight.pageIndex to (pageHighlights + highlight)),
+                selectedHighlight = SelectedHighlight(
+                    id = highlight.id.toString(),
+                    pageIndex = highlight.pageIndex,
+                    source = HighlightSource.Session,
+                    color = highlight.color,
+                    rects = highlight.rects
+                ),
+                selectedInk = null
             )
         }
     }
 
-    private fun selectHighlightAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
+    private fun selectAnnotationAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
         _state.update { state ->
+            val sessionInk = state.strokesByPage[pageIndex].orEmpty().map { stroke ->
+                SelectedInk(
+                    id = stroke.id.toString(),
+                    pageIndex = pageIndex,
+                    source = InkSource.Session,
+                    color = stroke.color,
+                    normalizedStrokeWidth = stroke.normalizedStrokeWidth,
+                    paths = listOf(stroke.points)
+                )
+            }
+            val deletedInkIds = state.deletedEmbeddedInkIdsByPage[pageIndex].orEmpty()
+            val embeddedInk = state.embeddedInkByPage[pageIndex].orEmpty()
+                .filterNot { it.id in deletedInkIds }
+                .map { ink ->
+                    SelectedInk(
+                        id = ink.id,
+                        pageIndex = pageIndex,
+                        source = InkSource.Embedded,
+                        color = ink.color,
+                        normalizedStrokeWidth = ink.normalizedStrokeWidth,
+                        paths = ink.paths
+                    )
+                }
+            val selectedInk = InkHitTester.select(position, sessionInk + embeddedInk)
+            if (selectedInk != null) {
+                return@update state.copy(selectedInk = selectedInk, selectedHighlight = null)
+            }
             val sessionCandidates = state.highlightsByPage[pageIndex].orEmpty().map {
                 SelectedHighlight(
                     id = it.id.toString(),
@@ -259,12 +296,32 @@ class PdfReaderViewModel(
                     )
                 }
             val selected = HighlightHitTester.select(position, sessionCandidates + embeddedCandidates)
-            state.copy(selectedHighlight = selected)
+            state.copy(selectedHighlight = selected, selectedInk = null)
         }
     }
 
-    private fun deleteSelectedHighlight() {
+    private fun deleteSelectedAnnotation() {
         _state.update { state ->
+            val selectedInk = state.selectedInk
+            if (selectedInk != null) {
+                return@update when (selectedInk.source) {
+                    InkSource.Session -> state.copy(
+                        strokesByPage = state.strokesByPage + (
+                            selectedInk.pageIndex to state.strokesByPage[selectedInk.pageIndex].orEmpty()
+                                .filterNot { it.id.toString() == selectedInk.id }
+                            ),
+                        selectedInk = null
+                    )
+                    InkSource.Embedded -> {
+                        val existing = state.deletedEmbeddedInkIdsByPage[selectedInk.pageIndex].orEmpty()
+                        state.copy(
+                            deletedEmbeddedInkIdsByPage = state.deletedEmbeddedInkIdsByPage +
+                                (selectedInk.pageIndex to (existing + selectedInk.id)),
+                            selectedInk = null
+                        )
+                    }
+                }
+            }
             val selected = state.selectedHighlight ?: return@update state
             when (selected.source) {
                 HighlightSource.Session -> {
@@ -366,7 +423,8 @@ class PdfReaderViewModel(
         val hasAnnotations = currentState.strokesByPage.values.any { it.isNotEmpty() } ||
             currentState.highlightsByPage.values.any { it.isNotEmpty() } ||
             currentState.textAnnotationsByPage.values.any { it.isNotEmpty() } ||
-            currentState.deletedEmbeddedHighlightIdsByPage.values.any { it.isNotEmpty() }
+            currentState.deletedEmbeddedHighlightIdsByPage.values.any { it.isNotEmpty() } ||
+            currentState.deletedEmbeddedInkIdsByPage.values.any { it.isNotEmpty() }
         if (!hasAnnotations) return
 
         _state.update { it.copy(isSavingAnnotations = true, errorMessage = null) }
@@ -385,7 +443,7 @@ class PdfReaderViewModel(
                     highlightsByPage = currentState.highlightsByPage,
                     textAnnotationsByPage = currentState.textAnnotationsByPage,
                     deletedEmbeddedHighlightIdsByPage = currentState.deletedEmbeddedHighlightIdsByPage,
-                    saveMode = currentState.annotationSaveMode,
+                    deletedEmbeddedInkIdsByPage = currentState.deletedEmbeddedInkIdsByPage,
                     outputFile = outputFile
                 )
 
@@ -425,7 +483,10 @@ class PdfReaderViewModel(
                         textAnnotationsByPage = emptyMap(),
                         embeddedHighlightsByPage = emptyMap(),
                         deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                        embeddedInkByPage = emptyMap(),
+                        deletedEmbeddedInkIdsByPage = emptyMap(),
                         selectedHighlight = null,
+                        selectedInk = null,
                         textBoxesByPage = emptyMap(), // invalidated by document re-open
                         renderRevision = it.renderRevision + 1
                     )
@@ -623,6 +684,16 @@ class PdfReaderViewModel(
         }
     }
 
+    private fun extractEmbeddedInk(pageIndex: Int) {
+        if (_state.value.embeddedInkByPage.containsKey(pageIndex)) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val ink = runCatching { pdfEngine.getEmbeddedInk(pageIndex) }.getOrElse { emptyList() }
+            _state.update { state ->
+                state.copy(embeddedInkByPage = state.embeddedInkByPage + (pageIndex to ink))
+            }
+        }
+    }
+
     private fun closePdf() {
         val currentState = _state.value
         val uri = currentState.openedUri?.toString()
@@ -654,7 +725,10 @@ class PdfReaderViewModel(
                 highlightsByPage = emptyMap(),
                 embeddedHighlightsByPage = emptyMap(),
                 deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                embeddedInkByPage = emptyMap(),
+                deletedEmbeddedInkIdsByPage = emptyMap(),
                 selectedHighlight = null,
+                selectedInk = null,
                 textBoxesByPage = emptyMap(),
                 textAnnotationsByPage = emptyMap(),
                 selectedTextPositionByPage = emptyMap(),

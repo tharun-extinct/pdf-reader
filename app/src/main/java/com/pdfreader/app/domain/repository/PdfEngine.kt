@@ -5,6 +5,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Size
 import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.pdfreader.app.presentation.mvi.EmbeddedTextHighlight
+import com.pdfreader.app.presentation.mvi.EmbeddedInkAnnotation
 
 /**
  * Domain-level interface for the PDF Rendering Engine.
@@ -41,6 +42,9 @@ interface PdfEngine {
 
     /** Returns embedded text highlights in normalized display coordinates. */
     fun getEmbeddedHighlights(pageIndex: Int): List<EmbeddedTextHighlight>
+
+    /** Returns editable embedded /Ink annotations in normalized display coordinates. */
+    fun getEmbeddedInk(pageIndex: Int): List<EmbeddedInkAnnotation>
     
     /**
      * Returns the raw PDF bytes that were passed to [openDocument].

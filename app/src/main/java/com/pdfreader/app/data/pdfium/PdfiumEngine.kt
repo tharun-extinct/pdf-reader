@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Rect
 import com.pdfreader.app.domain.repository.PdfEngine
 import com.pdfreader.app.data.pdfbox.PdfCoordinateMapper
 import com.pdfreader.app.presentation.mvi.EmbeddedTextHighlight
+import com.pdfreader.app.presentation.mvi.EmbeddedInkAnnotation
 import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.shockwave.pdfium.PdfDocument
 import com.shockwave.pdfium.PdfiumCore
@@ -16,6 +17,9 @@ import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup
+import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationMarkup
+import com.tom_roush.pdfbox.cos.COSDictionary
+import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.text.TextPosition
 import java.io.ByteArrayInputStream
@@ -45,6 +49,7 @@ class PdfiumEngine(private val context: Context) : PdfEngine {
     private var rawPdfBytes: ByteArray? = null
     private val textBoxCache = mutableMapOf<Int, List<PdfTextBox>>()
     private val embeddedHighlightCache = mutableMapOf<Int, List<EmbeddedTextHighlight>>()
+    private val embeddedInkCache = mutableMapOf<Int, List<EmbeddedInkAnnotation>>()
 
     override fun openDocument(pfd: ParcelFileDescriptor, pdfBytes: ByteArray) {
         // Closes previous document if exists
@@ -129,6 +134,35 @@ class PdfiumEngine(private val context: Context) : PdfEngine {
         return highlights
     }
 
+    override fun getEmbeddedInk(pageIndex: Int): List<EmbeddedInkAnnotation> {
+        embeddedInkCache[pageIndex]?.let { return it }
+        val page = textDocument?.getPage(pageIndex) ?: return emptyList()
+        val ink = page.annotations.mapIndexedNotNull { annotationIndex, annotation ->
+            val markup = annotation as? PDAnnotationMarkup
+            if (markup?.subtype != PDAnnotationMarkup.SUB_TYPE_INK) return@mapIndexedNotNull null
+            val paths = markup.getInkList()
+                .map { path ->
+                    path.asList().chunked(2).mapNotNull { pair ->
+                        if (pair.size != 2) null
+                        else PdfCoordinateMapper.toNormalizedDisplayPoint(page, androidx.compose.ui.geometry.Offset(pair[0], pair[1]))
+                    }
+                }
+                .filter { it.isNotEmpty() }
+            if (paths.isEmpty()) return@mapIndexedNotNull null
+            val borderStyle = markup.cosObject.getDictionaryObject(COSName.BS) as? COSDictionary
+            val pdfWidth = borderStyle?.getFloat(COSName.W, DEFAULT_INK_WIDTH) ?: DEFAULT_INK_WIDTH
+            EmbeddedInkAnnotation(
+                id = "embedded-ink:$pageIndex:$annotationIndex",
+                pageIndex = pageIndex,
+                color = markup.toArgbColor(),
+                normalizedStrokeWidth = PdfCoordinateMapper.toNormalizedStrokeWidth(page, pdfWidth),
+                paths = paths
+            )
+        }
+        embeddedInkCache[pageIndex] = ink
+        return ink
+    }
+
     override fun closeDocument() {
         pdfDocument?.let {
             pdfiumCore.closeDocument(it)
@@ -139,12 +173,13 @@ class PdfiumEngine(private val context: Context) : PdfEngine {
         rawPdfBytes = null
         textBoxCache.clear()
         embeddedHighlightCache.clear()
+        embeddedInkCache.clear()
     }
 }
 
 private const val PDFBOX_MEMORY_LIMIT_BYTES = 50L * 1024L * 1024L
 
-private fun PDAnnotationTextMarkup.toArgbColor(): Long {
+private fun PDAnnotationMarkup.toArgbColor(): Long {
     val components = color?.components ?: floatArrayOf(1f, 1f, 0f)
     val red = ((components.getOrElse(0) { 1f } * 255).toInt()).coerceIn(0, 255)
     val green = ((components.getOrElse(1) { 1f } * 255).toInt()).coerceIn(0, 255)
@@ -152,6 +187,8 @@ private fun PDAnnotationTextMarkup.toArgbColor(): Long {
     val alpha = (constantOpacity * 255).toInt().coerceIn(0, 255)
     return (alpha.toLong() shl 24) or (red.toLong() shl 16) or (green.toLong() shl 8) or blue.toLong()
 }
+
+private const val DEFAULT_INK_WIDTH = 2f
 
 private class PositionedWordStripper(
     private val pageIndex: Int,
