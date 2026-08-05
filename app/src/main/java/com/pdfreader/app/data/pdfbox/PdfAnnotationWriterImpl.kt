@@ -30,6 +30,7 @@ class PdfAnnotationWriterImpl : PdfAnnotationSaver {
         textAnnotationsByPage: Map<Int, List<TextAnnotation>>,
         deletedEmbeddedHighlightIdsByPage: Map<Int, Set<String>>,
         deletedEmbeddedInkIdsByPage: Map<Int, Set<String>>,
+        deletedEmbeddedTextAnnotationIdsByPage: Map<Int, Set<String>>,
         outputFile: File
     ): File = withContext(Dispatchers.IO) {
         val document = ByteArrayInputStream(pdfBytes).use { input ->
@@ -42,7 +43,8 @@ class PdfAnnotationWriterImpl : PdfAnnotationSaver {
                 highlightsByPage = highlightsByPage,
                 textAnnotationsByPage = textAnnotationsByPage,
                 deletedEmbeddedHighlightIdsByPage = deletedEmbeddedHighlightIdsByPage,
-                deletedEmbeddedInkIdsByPage = deletedEmbeddedInkIdsByPage
+                deletedEmbeddedInkIdsByPage = deletedEmbeddedInkIdsByPage,
+                deletedEmbeddedTextAnnotationIdsByPage = deletedEmbeddedTextAnnotationIdsByPage
             )
             document.save(outputFile)
         } finally {

@@ -146,3 +146,7 @@ When behavior, navigation, visual tokens, dependencies, build branches, or archi
 3. update this file if agent routing or guidance changed;
 4. update `README.md` if users or contributors are affected;
 5. keep statements limited to behavior present in code or verified CI.
+
+
+
+## Don't read `prompts.md`

@@ -4,11 +4,14 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
 import android.util.Size
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import com.pdfreader.app.domain.repository.PdfEngine
 import com.pdfreader.app.data.pdfbox.PdfCoordinateMapper
+import com.pdfreader.app.data.pdfbox.NOX_READER_TEXT_ANNOTATION_ID
 import com.pdfreader.app.presentation.mvi.EmbeddedTextHighlight
 import com.pdfreader.app.presentation.mvi.EmbeddedInkAnnotation
+import com.pdfreader.app.presentation.mvi.EmbeddedTextAnnotation
 import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.shockwave.pdfium.PdfDocument
 import com.shockwave.pdfium.PdfiumCore
@@ -18,6 +21,7 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationMarkup
+import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationText
 import com.tom_roush.pdfbox.cos.COSDictionary
 import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.text.PDFTextStripper
@@ -50,6 +54,7 @@ class PdfiumEngine(private val context: Context) : PdfEngine {
     private val textBoxCache = mutableMapOf<Int, List<PdfTextBox>>()
     private val embeddedHighlightCache = mutableMapOf<Int, List<EmbeddedTextHighlight>>()
     private val embeddedInkCache = mutableMapOf<Int, List<EmbeddedInkAnnotation>>()
+    private val embeddedTextAnnotationCache = mutableMapOf<Int, List<EmbeddedTextAnnotation>>()
 
     override fun openDocument(pfd: ParcelFileDescriptor, pdfBytes: ByteArray) {
         // Closes previous document if exists
@@ -163,6 +168,14 @@ class PdfiumEngine(private val context: Context) : PdfEngine {
         return ink
     }
 
+    override fun getEmbeddedTextAnnotations(pageIndex: Int): List<EmbeddedTextAnnotation> {
+        embeddedTextAnnotationCache[pageIndex]?.let { return it }
+        val page = textDocument?.getPage(pageIndex) ?: return emptyList()
+        val annotations = readEmbeddedTextAnnotations(page, pageIndex)
+        embeddedTextAnnotationCache[pageIndex] = annotations
+        return annotations
+    }
+
     override fun closeDocument() {
         pdfDocument?.let {
             pdfiumCore.closeDocument(it)
@@ -174,8 +187,45 @@ class PdfiumEngine(private val context: Context) : PdfEngine {
         textBoxCache.clear()
         embeddedHighlightCache.clear()
         embeddedInkCache.clear()
+        embeddedTextAnnotationCache.clear()
     }
 }
+
+internal fun readEmbeddedTextAnnotations(
+    page: PDPage,
+    pageIndex: Int
+): List<EmbeddedTextAnnotation> = page.annotations.mapIndexedNotNull { annotationIndex, annotation ->
+    val textAnnotation = annotation as? PDAnnotationText ?: return@mapIndexedNotNull null
+    val rectangle = textAnnotation.rectangle ?: return@mapIndexedNotNull null
+    val iconBounds = PdfCoordinateMapper.toNormalizedDisplayRect(
+        page,
+        floatArrayOf(
+            rectangle.lowerLeftX, rectangle.lowerLeftY,
+            rectangle.upperRightX, rectangle.lowerLeftY,
+            rectangle.lowerLeftX, rectangle.upperRightY,
+            rectangle.upperRightX, rectangle.upperRightY
+        )
+    ) ?: return@mapIndexedNotNull null
+    val anchor = PdfCoordinateMapper.toNormalizedDisplayPoint(
+        page,
+        Offset(rectangle.lowerLeftX, rectangle.upperRightY)
+    )
+    EmbeddedTextAnnotation(
+        id = embeddedTextAnnotationUiId(pageIndex, annotationIndex),
+        embeddedId = "embedded-text:$pageIndex:$annotationIndex",
+        pageIndex = pageIndex,
+        position = anchor,
+        iconBounds = iconBounds,
+        color = textAnnotation.toArgbColor(),
+        text = textAnnotation.contents.orEmpty(),
+        sourceAnnotationId = textAnnotation.cosObject
+            .getString(NOX_READER_TEXT_ANNOTATION_ID)
+            ?.toLongOrNull()
+    )
+}
+
+private fun embeddedTextAnnotationUiId(pageIndex: Int, annotationIndex: Int): Long =
+    -1L - ((pageIndex.toLong() shl 32) or annotationIndex.toLong())
 
 private const val PDFBOX_MEMORY_LIMIT_BYTES = 50L * 1024L * 1024L
 

@@ -35,6 +35,8 @@ data class PdfReaderState(
     val selectedInk: SelectedInk? = null,
     val textBoxesByPage: Map<Int, List<PdfTextBox>> = emptyMap(),
     val textAnnotationsByPage: Map<Int, List<TextAnnotation>> = emptyMap(),
+    val embeddedTextAnnotationsByPage: Map<Int, List<EmbeddedTextAnnotation>> = emptyMap(),
+    val deletedEmbeddedTextAnnotationIdsByPage: Map<Int, Set<String>> = emptyMap(),
     val selectedTextAnnotationId: Long? = null,
     val ttsState: TtsState = TtsState.Idle,
     /**

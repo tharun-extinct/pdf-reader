@@ -29,6 +29,7 @@ interface PdfAnnotationSaver {
         textAnnotationsByPage: Map<Int, List<TextAnnotation>>,
         deletedEmbeddedHighlightIdsByPage: Map<Int, Set<String>>,
         deletedEmbeddedInkIdsByPage: Map<Int, Set<String>>,
+        deletedEmbeddedTextAnnotationIdsByPage: Map<Int, Set<String>>,
         outputFile: File
     ): File
 }

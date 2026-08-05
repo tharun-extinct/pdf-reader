@@ -106,6 +106,7 @@ import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextHighlight
 import com.pdfreader.app.presentation.mvi.TextHighlightSelector
 import com.pdfreader.app.presentation.mvi.TextAnnotation
+import com.pdfreader.app.presentation.mvi.TextAnnotationGeometry
 import com.pdfreader.app.presentation.mvi.TextAnnotationHandle
 import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
@@ -207,7 +208,8 @@ fun PdfReaderScreen(
                             state.highlightsByPage.values.any { it.isNotEmpty() } ||
                             state.textAnnotationsByPage.values.any { it.isNotEmpty() } ||
                             state.deletedEmbeddedHighlightIdsByPage.values.any { it.isNotEmpty() } ||
-                            state.deletedEmbeddedInkIdsByPage.values.any { it.isNotEmpty() }
+                            state.deletedEmbeddedInkIdsByPage.values.any { it.isNotEmpty() } ||
+                            state.deletedEmbeddedTextAnnotationIdsByPage.values.any { it.isNotEmpty() }
 
                         IconButton(
                             onClick = { viewModel.processIntent(PdfReaderIntent.SaveAnnotations) },
@@ -791,6 +793,24 @@ fun PdfPage(
     val pageHighlights = state.highlightsByPage[pageIndex].orEmpty()
     val pageTextBoxes = state.textBoxesByPage[pageIndex].orEmpty()
     val pageTextAnnotations = state.textAnnotationsByPage[pageIndex].orEmpty()
+    val selectedEmbeddedTextAnnotation = state.embeddedTextAnnotationsByPage[pageIndex]
+        .orEmpty()
+        .firstOrNull { it.id == state.selectedTextAnnotationId }
+        ?.let { embedded ->
+            TextAnnotation(
+                id = embedded.id,
+                pageIndex = embedded.pageIndex,
+                position = embedded.position,
+                bounds = TextAnnotationGeometry.createBounds(embedded.position),
+                color = embedded.color,
+                text = embedded.text
+            )
+        }
+    val visibleTextAnnotations = if (selectedEmbeddedTextAnnotation == null) {
+        pageTextAnnotations
+    } else {
+        pageTextAnnotations + selectedEmbeddedTextAnnotation
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -819,6 +839,9 @@ fun PdfPage(
                 }
                 if (!state.embeddedInkByPage.containsKey(pageIndex)) {
                     onIntent(PdfReaderIntent.RequestPageInk(pageIndex))
+                }
+                if (!state.embeddedTextAnnotationsByPage.containsKey(pageIndex)) {
+                    onIntent(PdfReaderIntent.RequestPageTextAnnotations(pageIndex))
                 }
             }
 
@@ -939,7 +962,7 @@ fun PdfPage(
                     )
                 }
 
-                pageTextAnnotations.forEach { annotation ->
+                visibleTextAnnotations.forEach { annotation ->
                     val displayBounds = annotation.bounds.toDisplayRect(contentBounds)
                     val isSelected = state.selectedTextAnnotationId == annotation.id
                     val noteShape = RoundedCornerShape(8.dp)
@@ -1003,7 +1026,7 @@ fun PdfPage(
                     }
                 }
 
-                val selectedTextAnnotation = pageTextAnnotations.firstOrNull {
+                val selectedTextAnnotation = visibleTextAnnotations.firstOrNull {
                     it.id == state.selectedTextAnnotationId
                 }
                 if (selectedTextAnnotation != null) {

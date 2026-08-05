@@ -14,6 +14,12 @@ interaction or losing unsaved note contents during a failed save.
 - Add Text places an editable note field and updates it through MVI intents.
 - Pending notes can be reselected, deleted, and resized within the page through
   a blue selection outline with four accessible corner handles.
+- Embedded `/Text` notes are loaded per visible page and can be reselected from
+  their rendered note icon after reopening the document.
+- Editing or resizing an embedded note creates one pending replacement and
+  queues the original annotation for removal, preventing duplicate notes.
+- A selected pending note is mapped back to its embedded identity and remains
+  selected after a successful save and reopen.
 - The reader exposes Add text as a semantic 48 dp toolbar action and keeps the
   editable field as an optimistic Compose overlay until Save succeeds.
 - PDFBox writes `/Text` note annotations with contents, icon rectangle, color,
@@ -22,8 +28,8 @@ interaction or losing unsaved note contents during a failed save.
 - The [Android Build run for `30240c2`](https://github.com/tharun-extinct/pdf-reader/actions/runs/30745995096)
   compiled this implementation, but the writer tests were not executed by that
   workflow revision.
-- Existing embedded note loading, selection, editing, and deletion are not
-  implemented, and note-specific persistence fixtures are absent.
+- JVM test sources cover reopened note content/anchor/identity, reselection
+  matching, and embedded-note deletion; CI verification remains pending.
 
 ## Architecture dependencies
 
@@ -45,8 +51,8 @@ interaction or losing unsaved note contents during a failed save.
 
 - Keep text editing in optimistic MVI state; do not write PDFBox objects from a
   Compose input callback.
-- The current editor is a transient overlay; embedded `/Text` notes are not yet
-  loaded back into this interaction model.
+- The editor remains a transient overlay; an embedded `/Text` icon is promoted
+  to a pending replacement only after the user edits or resizes it.
 
 ### Commit pipeline
 
@@ -81,9 +87,16 @@ interaction or losing unsaved note contents during a failed save.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/PdfReaderScreen.kt` - Add
   text gesture, reselectable editor, selection outline, and resize handles.
 - `app/src/main/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriter.kt` -
-  editable `/Text` output and normal appearance.
-- No note-specific writer fixture currently covers editable output, multiline
-  layout, long text, placement, or external viewers.
+  editable `/Text` output, stable NoxReader note identity, normal appearance,
+  and replacement/deletion of embedded notes.
+- `app/src/main/java/com/pdfreader/app/data/pdfium/PdfiumEngine.kt` - embedded
+  `/Text` discovery and normalized icon/anchor mapping.
+- `app/src/test/java/com/pdfreader/app/data/pdfium/PdfEmbeddedTextAnnotationReaderTest.kt`
+  - reopened content, anchor, color, and source-identity round trip.
+- `app/src/test/java/com/pdfreader/app/presentation/mvi/TextAnnotationReselectionTest.kt`
+  - exact identity and external-note fallback matching after reopen.
+- `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriterTest.kt` -
+  embedded-note deletion during replacement saves.
 - `app/src/test/java/com/pdfreader/app/presentation/mvi/TextAnnotationGeometryTest.kt`
   - page clamping, minimum resize bounds, and overlapping-note selection.
 
@@ -98,15 +111,16 @@ interaction or losing unsaved note contents during a failed save.
   selected pending text box can be deleted explicitly.
 - [x] Editable save/reopen preserves note contents and a usable note icon.
 - [x] Failed persistence retains the complete pending note.
-- [ ] A saved embedded note can be reselected, edited, or deleted after reopen.
+- [x] A saved embedded note can be reselected, edited, or deleted after reopen.
 - [ ] Empty, multiline, Unicode, long, and read-only-provider cases have explicit
   behavior and tests before the feature is marked Verified.
 
 ## Remaining gaps
 
-- Embedded note discovery, reselection, editing, and deletion after reopen.
 - Editor width and height are optimistic UI state; standard `/Text` output keeps
   the normalized anchor and renders as a note icon after save.
+- Imported notes without a NoxReader identity use exact contents and nearest
+  anchor as the bounded reselection fallback.
 - Defined empty-note and long-note UX.
 - Editable-note, multiline, long-note, coordinate, and external-viewer tests.
 - Blank pending notes currently count as save work, are skipped by the writer,

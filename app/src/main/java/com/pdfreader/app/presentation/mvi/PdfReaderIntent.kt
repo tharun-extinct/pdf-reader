@@ -56,6 +56,8 @@ sealed class PdfReaderIntent {
 
     data class RequestPageInk(val pageIndex: Int) : PdfReaderIntent()
 
+    data class RequestPageTextAnnotations(val pageIndex: Int) : PdfReaderIntent()
+
     data class SelectTool(val tool: AnnotationTool) : PdfReaderIntent()
 
     data class SelectPenColor(val index: Int) : PdfReaderIntent()

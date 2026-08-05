@@ -19,6 +19,9 @@ annotations without losing pending work on write, provider-sync, or reopen failu
 - Editable `/Ink` gets an explicit rounded, width-exact normal appearance.
 - Embedded `/Ink` geometry, width, and color are loaded for in-reader reselection;
   selected embedded ink can be queued for deletion on the next save.
+- Embedded `/Text` notes are loaded for reselection; editing creates a pending
+  replacement, queues the original for deletion, and restores selection after
+  the successful reopen without duplicating the note.
 - Save writes a temporary PDF, syncs through SAF, reopens the document, and
   clears optimistic state only after success.
 - Reader controls omit save-mode UI, disable Save when all pending annotation
@@ -97,11 +100,16 @@ annotations without losing pending work on write, provider-sync, or reopen failu
   normalized-display to PDF-space conversion boundary.
 - `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriterTest.kt` -
   resource-less-page highlight saving, editable ink appearance width/cap/join,
-  and embedded-ink deletion. CI has not executed this revision.
+  embedded-ink deletion, and embedded-note deletion. CI has not executed this
+  revision.
+- `app/src/test/java/com/pdfreader/app/data/pdfium/PdfEmbeddedTextAnnotationReaderTest.kt`
+  - `/Text` content, anchor, color, and stable source identity after reopen.
 
 ## Acceptance criteria
 
-- [ ] Editable output reopens with supported annotations still selectable.
+- [x] Editable output reopens with supported annotations still selectable in
+  the implemented reader interaction model; external-viewer validation remains
+  pending.
 - [x] The reader exposes no flattened-output mode or mode selector.
 - [ ] Existing unrelated PDF objects remain intact.
 - [ ] Failed write, sync, or reopen retains pending overlays and deletions for retry.

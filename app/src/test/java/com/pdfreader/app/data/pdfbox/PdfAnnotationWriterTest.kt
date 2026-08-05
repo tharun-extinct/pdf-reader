@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.test.core.app.ApplicationProvider
 import com.pdfreader.app.presentation.mvi.AnnotationTool
 import com.pdfreader.app.presentation.mvi.FreehandStroke
+import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.cos.COSDictionary
@@ -41,7 +42,8 @@ class PdfAnnotationWriterTest {
                 ),
                 textAnnotationsByPage = emptyMap(),
                 deletedEmbeddedHighlightIdsByPage = emptyMap(),
-                deletedEmbeddedInkIdsByPage = emptyMap()
+                deletedEmbeddedInkIdsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
             )
 
             val savedPdf = ByteArrayOutputStream().use { output ->
@@ -75,7 +77,8 @@ class PdfAnnotationWriterTest {
                 highlightsByPage = emptyMap(),
                 textAnnotationsByPage = emptyMap(),
                 deletedEmbeddedHighlightIdsByPage = emptyMap(),
-                deletedEmbeddedInkIdsByPage = emptyMap()
+                deletedEmbeddedInkIdsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
             )
 
             val annotation = document.getPage(0).annotations.single()
@@ -106,7 +109,8 @@ class PdfAnnotationWriterTest {
                 highlightsByPage = emptyMap(),
                 textAnnotationsByPage = emptyMap(),
                 deletedEmbeddedHighlightIdsByPage = emptyMap(),
-                deletedEmbeddedInkIdsByPage = emptyMap()
+                deletedEmbeddedInkIdsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
             )
             PdfAnnotationWriter.writeAll(
                 document,
@@ -114,8 +118,49 @@ class PdfAnnotationWriterTest {
                 highlightsByPage = emptyMap(),
                 textAnnotationsByPage = emptyMap(),
                 deletedEmbeddedHighlightIdsByPage = emptyMap(),
-                deletedEmbeddedInkIdsByPage = mapOf(0 to setOf("embedded-ink:0:0"))
+                deletedEmbeddedInkIdsByPage = mapOf(0 to setOf("embedded-ink:0:0")),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
             )
+            assertTrue(document.getPage(0).annotations.isEmpty())
+        }
+    }
+
+    @Test
+    fun deletesSelectedEmbeddedTextNoteByStablePageAnnotationIndex() {
+        PDDocument().use { document ->
+            document.addPage(PDPage(PDRectangle.LETTER))
+            PdfAnnotationWriter.writeAll(
+                document = document,
+                strokesByPage = emptyMap(),
+                highlightsByPage = emptyMap(),
+                textAnnotationsByPage = mapOf(
+                    0 to listOf(
+                        TextAnnotation(
+                            id = 42L,
+                            pageIndex = 0,
+                            position = Offset(0.2f, 0.3f),
+                            bounds = Rect(0.2f, 0.3f, 0.56f, 0.44f),
+                            color = 0xFF336699L,
+                            text = "Delete me"
+                        )
+                    )
+                ),
+                deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                deletedEmbeddedInkIdsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
+            )
+            PdfAnnotationWriter.writeAll(
+                document = document,
+                strokesByPage = emptyMap(),
+                highlightsByPage = emptyMap(),
+                textAnnotationsByPage = emptyMap(),
+                deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                deletedEmbeddedInkIdsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = mapOf(
+                    0 to setOf("embedded-text:0:0")
+                )
+            )
+
             assertTrue(document.getPage(0).annotations.isEmpty())
         }
     }

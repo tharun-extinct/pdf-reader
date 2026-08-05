@@ -189,6 +189,7 @@ object PdfAnnotationWriter {
             annot.color = ta.color.toRgbPdColor()
             annot.setName(PDAnnotationText.NAME_NOTE)
             annot.setOpen(false)
+            annot.cosObject.setString(NOX_READER_TEXT_ANNOTATION_ID, ta.id.toString())
             annot.constructAppearances(document)
 
             annotations.add(annot)
@@ -205,11 +206,13 @@ object PdfAnnotationWriter {
         highlightsByPage: Map<Int, List<TextHighlight>>,
         textAnnotationsByPage: Map<Int, List<TextAnnotation>>,
         deletedEmbeddedHighlightIdsByPage: Map<Int, Set<String>>,
-        deletedEmbeddedInkIdsByPage: Map<Int, Set<String>>
+        deletedEmbeddedInkIdsByPage: Map<Int, Set<String>>,
+        deletedEmbeddedTextAnnotationIdsByPage: Map<Int, Set<String>>
     ) {
         val allPageIndices = (
             strokesByPage.keys + highlightsByPage.keys + textAnnotationsByPage.keys +
-                deletedEmbeddedHighlightIdsByPage.keys + deletedEmbeddedInkIdsByPage.keys
+                deletedEmbeddedHighlightIdsByPage.keys + deletedEmbeddedInkIdsByPage.keys +
+                deletedEmbeddedTextAnnotationIdsByPage.keys
             ).toSet()
         for (pageIndex in allPageIndices) {
             if (pageIndex < 0 || pageIndex >= document.numberOfPages) continue
@@ -217,7 +220,8 @@ object PdfAnnotationWriter {
                 page = document.getPage(pageIndex),
                 pageIndex = pageIndex,
                 highlightIds = deletedEmbeddedHighlightIdsByPage[pageIndex].orEmpty(),
-                inkIds = deletedEmbeddedInkIdsByPage[pageIndex].orEmpty()
+                inkIds = deletedEmbeddedInkIdsByPage[pageIndex].orEmpty(),
+                textIds = deletedEmbeddedTextAnnotationIdsByPage[pageIndex].orEmpty()
             )
             writeHighlights(document, pageIndex, highlightsByPage[pageIndex].orEmpty())
             writeInkStrokes(document, pageIndex, strokesByPage[pageIndex].orEmpty())
@@ -245,7 +249,8 @@ object PdfAnnotationWriter {
         page: PDPage,
         pageIndex: Int,
         highlightIds: Set<String>,
-        inkIds: Set<String>
+        inkIds: Set<String>,
+        textIds: Set<String>
     ) {
         val highlightIndexes = highlightIds.mapNotNull { id ->
             id.removePrefix("embedded:$pageIndex:").toIntOrNull()
@@ -253,11 +258,15 @@ object PdfAnnotationWriter {
         val inkIndexes = inkIds.mapNotNull { id ->
             id.removePrefix("embedded-ink:$pageIndex:").toIntOrNull()
         }.toSet()
-        if (highlightIndexes.isEmpty() && inkIndexes.isEmpty()) return
+        val textIndexes = textIds.mapNotNull { id ->
+            id.removePrefix("embedded-text:$pageIndex:").toIntOrNull()
+        }.toSet()
+        if (highlightIndexes.isEmpty() && inkIndexes.isEmpty() && textIndexes.isEmpty()) return
         page.annotations = page.annotations.filterIndexed { index, annotation ->
             !(
                 index in highlightIndexes && annotation.subtype == PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT ||
-                    index in inkIndexes && annotation.subtype == PDAnnotationMarkup.SUB_TYPE_INK
+                    index in inkIndexes && annotation.subtype == PDAnnotationMarkup.SUB_TYPE_INK ||
+                    index in textIndexes && annotation is PDAnnotationText
                 )
         }.toMutableList()
     }
@@ -353,3 +362,6 @@ object PdfAnnotationWriter {
     private const val MIN_INK_STROKE_WIDTH = 0.5f
 
 }
+
+internal val NOX_READER_TEXT_ANNOTATION_ID: COSName =
+    COSName.getPDFName("NoxReaderTextAnnotationId")

@@ -160,7 +160,7 @@ zoom panning remain planned and must not be described as shipped.
 
 1. The Android document picker returns a persistable SAF URI.
 2. The ViewModel reads the file on `Dispatchers.IO`, retaining raw bytes for PDFBox and a file descriptor for PDFium.
-3. PDFium renders static page bitmaps. PDFBox supplies positioned word/character geometry and embedded highlight metadata.
+3. PDFium renders static page bitmaps. PDFBox supplies positioned word/character geometry and embedded highlight, ink, and text-note metadata.
 4. Compose records pending annotation changes in immutable MVI state.
 5. Save snapshots pending state and writes a temporary PDF off the main thread.
 6. The sync layer copies the result to the original SAF URI.
@@ -193,8 +193,9 @@ or unavailable. A failed write, sync, or reopen keeps pending overlays,
 deletions, and note contents available for retry and exposes an actionable
 error.
 
-A successful reopen clears page-scoped text and embedded-highlight caches and
-increments `renderRevision` before persisted optimistic items are removed.
+A successful reopen clears page-scoped text and embedded-annotation caches,
+reloads any text note needed to preserve the active selection, and increments
+`renderRevision` before persisted optimistic items are removed.
 Future tile caches must include document version, page, viewport, zoom, and tile
 identity and must invalidate affected entries only after commit succeeds.
 
@@ -240,7 +241,7 @@ PDF contents stay at their selected SAF location. The file provider determines w
   serializes concurrent metadata updates.
 - PDFBox uses `MemoryUsageSetting.setupMixed(50 MiB)`.
 - Render callbacks keep bitmap objects out of `PdfReaderState`.
-- Page text and embedded highlights are cached per open document.
+- Page text and embedded annotations are cached per open document.
 - PDF documents, descriptors, TTS resources, and temporary save files must be released on replacement, close, completion, and failure paths.
 - Saving never clears optimistic state before sync and reopen succeed.
 

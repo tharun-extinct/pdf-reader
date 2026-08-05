@@ -40,6 +40,21 @@ data class TextAnnotation(
     val text: String
 )
 
+/** An editable /Text note read from the opened PDF. */
+data class EmbeddedTextAnnotation(
+    /** Negative, page-scoped UI identity that cannot collide with pending note IDs. */
+    val id: Long,
+    /** Stable PDF identity used to remove or replace this annotation on save. */
+    val embeddedId: String,
+    val pageIndex: Int,
+    val position: Offset,
+    val iconBounds: Rect,
+    val color: Long,
+    val text: String,
+    /** Original pending-note ID persisted by NoxReader, when available. */
+    val sourceAnnotationId: Long? = null
+)
+
 enum class TextAnnotationHandle {
     TopLeft,
     TopRight,
