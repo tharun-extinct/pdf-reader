@@ -89,9 +89,19 @@ class PdfReaderViewModel(
             is PdfReaderIntent.RemoveStrokeAt -> removeStrokeAt(intent.pageIndex, intent.position)
             is PdfReaderIntent.AddTextAnnotation -> addTextAnnotation(intent.pageIndex, intent.position)
             is PdfReaderIntent.UpdateTextAnnotation -> updateTextAnnotation(intent.annotationId, intent.text)
+            is PdfReaderIntent.SelectTextAnnotation -> selectTextAnnotation(intent.annotationId)
+            is PdfReaderIntent.ResizeTextAnnotation -> resizeTextAnnotation(
+                intent.annotationId,
+                intent.handle,
+                intent.normalizedDelta
+            )
             is PdfReaderIntent.SelectAnnotationAt -> selectAnnotationAt(intent.pageIndex, intent.position)
             is PdfReaderIntent.ClearAnnotationSelection -> _state.update {
-                it.copy(selectedHighlight = null, selectedInk = null)
+                it.copy(
+                    selectedHighlight = null,
+                    selectedInk = null,
+                    selectedTextAnnotationId = null
+                )
             }
             is PdfReaderIntent.DeleteSelectedAnnotation -> deleteSelectedAnnotation()
             is PdfReaderIntent.PlayTts -> playTts(intent.pageIndex, intent.textBoxes)
@@ -240,13 +250,25 @@ class PdfReaderViewModel(
                     color = highlight.color,
                     rects = highlight.rects
                 ),
-                selectedInk = null
+                selectedInk = null,
+                selectedTextAnnotationId = null
             )
         }
     }
 
     private fun selectAnnotationAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
         _state.update { state ->
+            val selectedText = TextAnnotationGeometry.select(
+                position,
+                state.textAnnotationsByPage[pageIndex].orEmpty()
+            )
+            if (selectedText != null) {
+                return@update state.copy(
+                    selectedTextAnnotationId = selectedText.id,
+                    selectedInk = null,
+                    selectedHighlight = null
+                )
+            }
             val sessionInk = state.strokesByPage[pageIndex].orEmpty().map { stroke ->
                 SelectedInk(
                     id = stroke.id.toString(),
@@ -272,7 +294,11 @@ class PdfReaderViewModel(
                 }
             val selectedInk = InkHitTester.select(position, sessionInk + embeddedInk)
             if (selectedInk != null) {
-                return@update state.copy(selectedInk = selectedInk, selectedHighlight = null)
+                return@update state.copy(
+                    selectedInk = selectedInk,
+                    selectedHighlight = null,
+                    selectedTextAnnotationId = null
+                )
             }
             val sessionCandidates = state.highlightsByPage[pageIndex].orEmpty().map {
                 SelectedHighlight(
@@ -296,12 +322,25 @@ class PdfReaderViewModel(
                     )
                 }
             val selected = HighlightHitTester.select(position, sessionCandidates + embeddedCandidates)
-            state.copy(selectedHighlight = selected, selectedInk = null)
+            state.copy(
+                selectedHighlight = selected,
+                selectedInk = null,
+                selectedTextAnnotationId = null
+            )
         }
     }
 
     private fun deleteSelectedAnnotation() {
         _state.update { state ->
+            val selectedTextId = state.selectedTextAnnotationId
+            if (selectedTextId != null) {
+                return@update state.copy(
+                    textAnnotationsByPage = state.textAnnotationsByPage.mapValues { (_, annotations) ->
+                        annotations.filterNot { it.id == selectedTextId }
+                    },
+                    selectedTextAnnotationId = null
+                )
+            }
             val selectedInk = state.selectedInk
             if (selectedInk != null) {
                 return@update when (selectedInk.source) {
@@ -369,10 +408,17 @@ class PdfReaderViewModel(
                 id = System.currentTimeMillis(),
                 pageIndex = pageIndex,
                 position = position,
+                bounds = TextAnnotationGeometry.createBounds(position),
                 color = state.penPalette.colors[state.selectedPenColorIndex],
                 text = ""
             )
-            state.copy(textAnnotationsByPage = state.textAnnotationsByPage + (pageIndex to (pageAnnotations + annotation)))
+            state.copy(
+                textAnnotationsByPage = state.textAnnotationsByPage +
+                    (pageIndex to (pageAnnotations + annotation)),
+                selectedTextAnnotationId = annotation.id,
+                selectedHighlight = null,
+                selectedInk = null
+            )
         }
     }
 
@@ -384,6 +430,47 @@ class PdfReaderViewModel(
                 }
             }
             state.copy(textAnnotationsByPage = updatedPages)
+        }
+    }
+
+    private fun selectTextAnnotation(annotationId: Long) {
+        _state.update { state ->
+            val exists = state.textAnnotationsByPage.values.any { annotations ->
+                annotations.any { it.id == annotationId }
+            }
+            if (!exists) state else state.copy(
+                selectedTextAnnotationId = annotationId,
+                selectedHighlight = null,
+                selectedInk = null
+            )
+        }
+    }
+
+    private fun resizeTextAnnotation(
+        annotationId: Long,
+        handle: TextAnnotationHandle,
+        normalizedDelta: androidx.compose.ui.geometry.Offset
+    ) {
+        _state.update { state ->
+            val updatedPages = state.textAnnotationsByPage.mapValues { (_, annotations) ->
+                annotations.map { annotation ->
+                    if (annotation.id == annotationId) {
+                        annotation.copy(
+                            bounds = TextAnnotationGeometry.resize(
+                                annotation.bounds,
+                                handle,
+                                normalizedDelta
+                            )
+                        )
+                    } else {
+                        annotation
+                    }
+                }
+            }
+            state.copy(
+                textAnnotationsByPage = updatedPages,
+                selectedTextAnnotationId = annotationId
+            )
         }
     }
 
@@ -487,6 +574,7 @@ class PdfReaderViewModel(
                         deletedEmbeddedInkIdsByPage = emptyMap(),
                         selectedHighlight = null,
                         selectedInk = null,
+                        selectedTextAnnotationId = null,
                         textBoxesByPage = emptyMap(), // invalidated by document re-open
                         renderRevision = it.renderRevision + 1
                     )
@@ -578,6 +666,8 @@ class PdfReaderViewModel(
                             embeddedHighlightsByPage = emptyMap(),
                             deletedEmbeddedHighlightIdsByPage = emptyMap(),
                             selectedHighlight = null,
+                            selectedInk = null,
+                            selectedTextAnnotationId = null,
                             textBoxesByPage = emptyMap(),
                             textAnnotationsByPage = emptyMap(),
                             ttsState = TtsState.Idle
@@ -729,9 +819,9 @@ class PdfReaderViewModel(
                 deletedEmbeddedInkIdsByPage = emptyMap(),
                 selectedHighlight = null,
                 selectedInk = null,
+                selectedTextAnnotationId = null,
                 textBoxesByPage = emptyMap(),
                 textAnnotationsByPage = emptyMap(),
-                selectedTextPositionByPage = emptyMap(),
                 ttsState = TtsState.Idle
             )
         }

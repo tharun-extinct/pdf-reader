@@ -61,6 +61,7 @@
     <string name="tool_add_text">Add text</string>
     <string name="page_content_description">Page %1$d</string>
     <string name="note_label">Note</string>
+    <string name="resize_text_note">Resize text note</string>
     <string name="close">Close</string>
     <string name="annotation_colors_title">Annotation colors</string>
     <string name="annotation_colors_format_hint">Use #RRGGBB or #AARRGGBB.</string>

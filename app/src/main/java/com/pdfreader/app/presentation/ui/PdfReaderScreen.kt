@@ -105,6 +105,8 @@ import com.pdfreader.app.presentation.mvi.AnnotationTool
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextHighlight
 import com.pdfreader.app.presentation.mvi.TextHighlightSelector
+import com.pdfreader.app.presentation.mvi.TextAnnotation
+import com.pdfreader.app.presentation.mvi.TextAnnotationHandle
 import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderState
@@ -938,32 +940,89 @@ fun PdfPage(
                 }
 
                 pageTextAnnotations.forEach { annotation ->
-                val position = annotation.position.toDisplayOffset(contentBounds)
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    tonalElevation = 3.dp,
-                    shadowElevation = 4.dp,
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                x = position.x.roundToInt(),
-                                y = position.y.roundToInt()
+                    val displayBounds = annotation.bounds.toDisplayRect(contentBounds)
+                    val isSelected = state.selectedTextAnnotationId == annotation.id
+                    val noteShape = RoundedCornerShape(8.dp)
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        tonalElevation = if (isSelected) 4.dp else 2.dp,
+                        shadowElevation = if (isSelected) 6.dp else 3.dp,
+                        shape = noteShape,
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    x = displayBounds.left.roundToInt(),
+                                    y = displayBounds.top.roundToInt()
+                                )
+                            }
+                            .width(with(LocalDensity.current) { displayBounds.width.toDp() })
+                            .height(with(LocalDensity.current) { displayBounds.height.toDp() })
+                            .then(
+                                if (isSelected) {
+                                    Modifier
+                                } else {
+                                    Modifier
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.outlineVariant,
+                                            noteShape
+                                        )
+                                        .clickable {
+                                            onIntent(
+                                                PdfReaderIntent.SelectTextAnnotation(annotation.id)
+                                            )
+                                        }
+                                }
+                            )
+                    ) {
+                        if (isSelected) {
+                            OutlinedTextField(
+                                value = annotation.text,
+                                onValueChange = {
+                                    onIntent(PdfReaderIntent.UpdateTextAnnotation(annotation.id, it))
+                                },
+                                modifier = Modifier.fillMaxSize(),
+                                minLines = 2,
+                                label = { Text(stringResource(R.string.note_label)) }
+                            )
+                        } else {
+                            Text(
+                                text = annotation.text.ifBlank {
+                                    stringResource(R.string.note_label)
+                                },
+                                color = if (annotation.text.isBlank()) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                maxLines = 4,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(12.dp)
                             )
                         }
-                        .width(180.dp)
-                ) {
-                    OutlinedTextField(
-                        value = annotation.text,
-                        onValueChange = {
-                            onIntent(PdfReaderIntent.UpdateTextAnnotation(annotation.id, it))
+                    }
+                }
+
+                val selectedTextAnnotation = pageTextAnnotations.firstOrNull {
+                    it.id == state.selectedTextAnnotationId
+                }
+                if (selectedTextAnnotation != null) {
+                    SelectedTextAnnotationOverlay(
+                        annotation = selectedTextAnnotation,
+                        contentBounds = contentBounds,
+                        containerSize = size,
+                        onResize = { handle, normalizedDelta ->
+                            onIntent(
+                                PdfReaderIntent.ResizeTextAnnotation(
+                                    annotationId = selectedTextAnnotation.id,
+                                    handle = handle,
+                                    normalizedDelta = normalizedDelta
+                                )
+                            )
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        label = { Text(stringResource(R.string.note_label)) }
+                        onDelete = { onIntent(PdfReaderIntent.DeleteSelectedAnnotation) }
                     )
                 }
-            }
             }
         } else {
             CircularProgressIndicator()
@@ -1221,6 +1280,83 @@ private inline fun Path.addSmoothStroke(
 }
 
 private const val PEN_STROKE_WIDTH_PX = 6f
+
+@Composable
+private fun BoxScope.SelectedTextAnnotationOverlay(
+    annotation: TextAnnotation,
+    contentBounds: Rect,
+    containerSize: IntSize,
+    onResize: (TextAnnotationHandle, Offset) -> Unit,
+    onDelete: () -> Unit
+) {
+    if (contentBounds.width <= 0f || contentBounds.height <= 0f) return
+    val bounds = annotation.bounds.toDisplayRect(contentBounds)
+    val selectionColor = Color(0xFF2196F3)
+    val density = LocalDensity.current
+    val handleTouchSize = 48.dp
+    val handleTouchSizePx = with(density) { handleTouchSize.toPx() }
+    val handleRadiusPx = with(density) { 7.dp.toPx() }
+    val handleFillColor = MaterialTheme.colorScheme.surfaceContainerLowest
+    val resizeDescription = stringResource(R.string.resize_text_note)
+
+    Canvas(modifier = Modifier.matchParentSize()) {
+        drawRect(
+            color = selectionColor,
+            topLeft = bounds.topLeft,
+            size = androidx.compose.ui.geometry.Size(bounds.width, bounds.height),
+            style = Stroke(width = 2.dp.toPx())
+        )
+        listOf(bounds.topLeft, bounds.topRight, bounds.bottomLeft, bounds.bottomRight).forEach { center ->
+            drawCircle(
+                color = handleFillColor,
+                radius = handleRadiusPx,
+                center = center
+            )
+            drawCircle(
+                color = selectionColor,
+                radius = handleRadiusPx,
+                center = center,
+                style = Stroke(width = 2.dp.toPx())
+            )
+        }
+    }
+
+    val handles = listOf(
+        TextAnnotationHandle.TopLeft to bounds.topLeft,
+        TextAnnotationHandle.TopRight to bounds.topRight,
+        TextAnnotationHandle.BottomLeft to bounds.bottomLeft,
+        TextAnnotationHandle.BottomRight to bounds.bottomRight
+    )
+    handles.forEach { (handle, center) ->
+        Box(
+            modifier = Modifier
+                .offset {
+                    IntOffset(
+                        (center.x - handleTouchSizePx / 2f).roundToInt(),
+                        (center.y - handleTouchSizePx / 2f).roundToInt()
+                    )
+                }
+                .size(handleTouchSize)
+                .semantics {
+                    contentDescription = resizeDescription
+                }
+                .pointerInput(annotation.id, handle, contentBounds) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        onResize(
+                            handle,
+                            Offset(
+                                x = dragAmount.x / contentBounds.width,
+                                y = dragAmount.y / contentBounds.height
+                            )
+                        )
+                    }
+                }
+        )
+    }
+
+    SelectionDeleteMenu(bounds, containerSize, onDelete)
+}
 
 @Composable
 private fun BoxScope.SelectedInkOverlay(

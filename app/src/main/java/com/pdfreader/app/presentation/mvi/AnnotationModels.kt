@@ -35,9 +35,17 @@ data class TextAnnotation(
     val id: Long,
     val pageIndex: Int,
     val position: Offset,
+    val bounds: Rect,
     val color: Long,
     val text: String
 )
+
+enum class TextAnnotationHandle {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight
+}
 
 data class PdfTextBox(
     val pageIndex: Int,

@@ -76,6 +76,14 @@ sealed class PdfReaderIntent {
 
     data class UpdateTextAnnotation(val annotationId: Long, val text: String) : PdfReaderIntent()
 
+    data class SelectTextAnnotation(val annotationId: Long) : PdfReaderIntent()
+
+    data class ResizeTextAnnotation(
+        val annotationId: Long,
+        val handle: TextAnnotationHandle,
+        val normalizedDelta: Offset
+    ) : PdfReaderIntent()
+
     data class SelectAnnotationAt(val pageIndex: Int, val position: Offset) : PdfReaderIntent()
     object ClearAnnotationSelection : PdfReaderIntent()
     object DeleteSelectedAnnotation : PdfReaderIntent()

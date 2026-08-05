@@ -7,10 +7,13 @@ interaction or losing unsaved note contents during a failed save.
 
 ## Current verified status
 
-**Status: Partial - code and test sources inspected 2026-08-03.**
+**Status: Partial - code and test sources inspected 2026-08-05.**
 
-- `TextAnnotation` stores page, normalized position, color, and text.
+- `TextAnnotation` stores page, a normalized durable anchor, clamped editor
+  bounds, color, and text.
 - Add Text places an editable note field and updates it through MVI intents.
+- Pending notes can be reselected, deleted, and resized within the page through
+  a blue selection outline with four accessible corner handles.
 - The reader exposes Add text as a semantic 48 dp toolbar action and keeps the
   editable field as an optimistic Compose overlay until Save succeeds.
 - PDFBox writes `/Text` note annotations with contents, icon rectangle, color,
@@ -67,31 +70,43 @@ interaction or losing unsaved note contents during a failed save.
 ## Relevant implementation and tests
 
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/AnnotationModels.kt` -
-  page, normalized anchor, color, and text payload.
+  page, normalized anchor and editor bounds, color, and text payload.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderIntent.kt` -
-  note placement and text-update intents.
+  note placement, text-update, selection, and resize intents.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderViewModel.kt` -
-  optimistic page-scoped note state and save snapshot.
+  optimistic page-scoped note state, selection, resizing, deletion, and save
+  snapshot.
+- `app/src/main/java/com/pdfreader/app/presentation/mvi/TextAnnotationGeometry.kt`
+  - normalized creation, resize constraints, and topmost-note hit testing.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/PdfReaderScreen.kt` - Add
-  text gesture and 180 dp optimistic text field.
+  text gesture, reselectable editor, selection outline, and resize handles.
 - `app/src/main/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriter.kt` -
   editable `/Text` output and normal appearance.
 - No note-specific writer fixture currently covers editable output, multiline
   layout, long text, placement, or external viewers.
+- `app/src/test/java/com/pdfreader/app/presentation/mvi/TextAnnotationGeometryTest.kt`
+  - page clamping, minimum resize bounds, and overlapping-note selection.
 
 ## Acceptance criteria
 
 - [x] A note remains anchored to the same page position through fit, rotation, and
   zoom transforms.
 - [x] Editing updates optimistic state without blocking pointer interaction.
+- [x] A pending text box can be reselected and displays a visible selection
+  outline with four resize handles.
+- [x] Resizing stays inside the page, preserves a usable minimum size, and the
+  selected pending text box can be deleted explicitly.
 - [x] Editable save/reopen preserves note contents and a usable note icon.
 - [x] Failed persistence retains the complete pending note.
+- [ ] A saved embedded note can be reselected, edited, or deleted after reopen.
 - [ ] Empty, multiline, Unicode, long, and read-only-provider cases have explicit
   behavior and tests before the feature is marked Verified.
 
 ## Remaining gaps
 
-- Embedded note discovery, selection, editing, and deletion.
+- Embedded note discovery, reselection, editing, and deletion after reopen.
+- Editor width and height are optimistic UI state; standard `/Text` output keeps
+  the normalized anchor and renders as a note icon after save.
 - Defined empty-note and long-note UX.
 - Editable-note, multiline, long-note, coordinate, and external-viewer tests.
 - Blank pending notes currently count as save work, are skipped by the writer,

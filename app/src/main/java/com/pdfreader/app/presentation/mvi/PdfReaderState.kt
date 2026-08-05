@@ -1,7 +1,6 @@
 package com.pdfreader.app.presentation.mvi
 
 import android.net.Uri
-import androidx.compose.ui.geometry.Offset
 import com.pdfreader.app.domain.model.ReaderPreferences
 import com.pdfreader.app.domain.model.RecentDocument
 import com.pdfreader.app.domain.tts.TtsState
@@ -36,7 +35,7 @@ data class PdfReaderState(
     val selectedInk: SelectedInk? = null,
     val textBoxesByPage: Map<Int, List<PdfTextBox>> = emptyMap(),
     val textAnnotationsByPage: Map<Int, List<TextAnnotation>> = emptyMap(),
-    val selectedTextPositionByPage: Map<Int, Offset> = emptyMap(),
+    val selectedTextAnnotationId: Long? = null,
     val ttsState: TtsState = TtsState.Idle,
     /**
      * Incremented each time annotations are baked into the PDF and the document is
