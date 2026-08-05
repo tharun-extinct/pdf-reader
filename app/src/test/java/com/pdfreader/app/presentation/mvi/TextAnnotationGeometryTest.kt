@@ -9,7 +9,7 @@ import org.junit.Test
 class TextAnnotationGeometryTest {
     @Test
     fun createBoundsKeepsTextBoxInsidePage() {
-        assertEquals(
+        assertRectEquals(
             Rect(0.84f, 0.92f, 1f, 1f),
             TextAnnotationGeometry.createBounds(Offset(0.98f, 0.99f))
         )
@@ -19,7 +19,7 @@ class TextAnnotationGeometryTest {
     fun resizeClampsToPageAndMinimumSize() {
         val bounds = Rect(0.2f, 0.2f, 0.6f, 0.5f)
 
-        assertEquals(
+        assertRectEquals(
             Rect(0.44f, 0.42f, 0.6f, 0.5f),
             TextAnnotationGeometry.resize(
                 bounds,
@@ -27,7 +27,7 @@ class TextAnnotationGeometryTest {
                 Offset(0.8f, 0.8f)
             )
         )
-        assertEquals(
+        assertRectEquals(
             Rect(0.2f, 0.2f, 1f, 1f),
             TextAnnotationGeometry.resize(
                 bounds,
@@ -86,4 +86,15 @@ class TextAnnotationGeometryTest {
         color = 0xFF000000,
         text = "Note"
     )
+
+    private fun assertRectEquals(expected: Rect, actual: Rect) {
+        assertEquals(expected.left, actual.left, CoordinateTolerance)
+        assertEquals(expected.top, actual.top, CoordinateTolerance)
+        assertEquals(expected.right, actual.right, CoordinateTolerance)
+        assertEquals(expected.bottom, actual.bottom, CoordinateTolerance)
+    }
+
+    private companion object {
+        const val CoordinateTolerance = 0.000001f
+    }
 }
