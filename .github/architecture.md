@@ -27,7 +27,7 @@ Navigation is implemented by a Compose `NavHost` in `MainActivity`:
 | Route | Purpose | Primary actions |
 |---|---|---|
 | `bookshelf` | Home and document history | Continue reading, open a recent PDF, choose a PDF, open Settings |
-| `reader` | Read and annotate the active document | Change page, zoom, bookmark, read aloud, annotate, choose save mode, save |
+| `reader` | Read and annotate the active document | Change page, zoom, bookmark, read aloud, annotate, save |
 | `settings` | App-level preferences and local-data controls | Theme, keep screen awake, speech rate, clear recent history |
 
 Opening a document is state-driven. The bookshelf observes `isPdfLoaded` and navigates to the reader only after the file has opened successfully.
@@ -113,7 +113,7 @@ flowchart LR
     VM --> TTS["Android TextToSpeech"]
     Engine --> PDFium["PDFium page bitmap"]
     Engine --> PDFBoxRead["PDFBox text and highlight parsing"]
-    Saver --> PDFBoxWrite["Editable or flattened output"]
+    Saver --> PDFBoxWrite["Editable PDF annotations"]
     PDFBoxWrite --> Sync
     Sync --> Engine
 ```
@@ -160,7 +160,7 @@ zoom panning remain planned and must not be described as shipped.
 
 1. The Android document picker returns a persistable SAF URI.
 2. The ViewModel reads the file on `Dispatchers.IO`, retaining raw bytes for PDFBox and a file descriptor for PDFium.
-3. PDFium renders static page bitmaps. PDFBox supplies positioned word/character geometry and embedded highlight metadata.
+3. PDFium renders static page bitmaps. PDFBox supplies positioned word/character geometry and embedded highlight, ink, and text-note metadata.
 4. Compose records pending annotation changes in immutable MVI state.
 5. Save snapshots pending state and writes a temporary PDF off the main thread.
 6. The sync layer copies the result to the original SAF URI.
@@ -177,15 +177,12 @@ Text extraction retains word bounds and per-character bounds. `TextHighlightSele
 
 Reverse drags normalize to the same result. Preview and persistence use identical normalized rectangles.
 
-### Save modes
+### Editable annotation output
 
-- **Editable:** preserves new `/Annots` for highlights, ink, and text notes. Highlight normal appearances paint selected quads with the configured opacity.
-- **Flattened:** paints newly created supported annotations into page `/Contents`, then removes only those newly created annotation entries. Existing annotations remain intact. Flattening is irreversible.
-
-An annotation may be removed only after its complete supported payload has been
-represented in page content. If lossless flattening is unavailable for a
-particular payload, keep that annotation editable rather than silently dropping
-user data.
+All saves preserve annotations as standard editable PDF `/Annots`: text ranges
+use `/Highlight` with `/QuadPoints`, freehand strokes use `/Ink`, and notes use
+`/Text`. The reader exposes no save-mode selector and never paints newly created
+annotations irreversibly into page `/Contents`.
 
 The annotation union rectangle is metadata only and must never be rendered as a solid highlight because it can obscure text between selected lines.
 
@@ -196,8 +193,9 @@ or unavailable. A failed write, sync, or reopen keeps pending overlays,
 deletions, and note contents available for retry and exposes an actionable
 error.
 
-A successful reopen clears page-scoped text and embedded-highlight caches and
-increments `renderRevision` before persisted optimistic items are removed.
+A successful reopen clears page-scoped text and embedded-annotation caches,
+reloads any text note needed to preserve the active selection, and increments
+`renderRevision` before persisted optimistic items are removed.
 Future tile caches must include document version, page, viewport, zoom, and tile
 identity and must invalidate affected entries only after commit succeeds.
 
@@ -243,15 +241,15 @@ PDF contents stay at their selected SAF location. The file provider determines w
   serializes concurrent metadata updates.
 - PDFBox uses `MemoryUsageSetting.setupMixed(50 MiB)`.
 - Render callbacks keep bitmap objects out of `PdfReaderState`.
-- Page text and embedded highlights are cached per open document.
+- Page text and embedded annotations are cached per open document.
 - PDF documents, descriptors, TTS resources, and temporary save files must be released on replacement, close, completion, and failure paths.
 - Saving never clears optimistic state before sync and reopen succeed.
 
 ## Validation and delivery
 
-- JVM test sources cover coordinate mapping, overlapping-highlight hit testing,
-  contiguous/reverse text selection, flattened note text retention, and
-  flattened ink width under `app/src/test`. Proto repository and migration tests
+- JVM test sources cover coordinate mapping, overlapping-highlight and ink hit
+  testing, contiguous/reverse text selection, and editable PDF annotation output
+  under `app/src/test`. Proto repository and migration tests
   cover bounded history, bookmarks, preferences, defaults, legacy JSON mapping,
   and migration idempotence.
 - GitHub Actions is the build and test authority; repository guidance intentionally forbids local Gradle execution.
@@ -288,9 +286,9 @@ authoritative here; each blueprint states how they constrain that feature.
 | Blueprint | Current scope |
 |---|---|
 | [`pdf-rendering.md`](../feature-blueprints/pdf-rendering.md) | Page rendering, transforms, zoom, caching, and lifecycle |
-| [`annotation-persistence.md`](../feature-blueprints/annotation-persistence.md) | Editable/flattened save, SAF sync, reopen, and failure recovery |
+| [`annotation-persistence.md`](../feature-blueprints/annotation-persistence.md) | Editable annotation save, SAF sync, reopen, and failure recovery |
 | [`text-highlighting.md`](../feature-blueprints/text-highlighting.md) | Text selection, embedded-highlight interaction, deletion, and geometry |
-| [`freehand-annotation.md`](../feature-blueprints/freehand-annotation.md) | Pen/freehand strokes, erasing, ink output, and flattening |
+| [`freehand-annotation.md`](../feature-blueprints/freehand-annotation.md) | Pen/freehand strokes, erasing, ink output, and reselection |
 | [`text-notes.md`](../feature-blueprints/text-notes.md) | Note placement, editing, display, and persistence |
 | [`document-library.md`](../feature-blueprints/document-library.md) | PDF selection, persisted access, recents, progress, and bookmarks |
 | [`read-aloud.md`](../feature-blueprints/read-aloud.md) | TTS lifecycle, chunking, synchronized highlighting, and playback controls |

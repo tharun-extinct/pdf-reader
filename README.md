@@ -6,7 +6,7 @@ NoxReader is a local-first Android PDF reader built with Kotlin and Jetpack Comp
 
 - **Focused library:** recent documents, animated reading progress, resume position, and page bookmarks.
 - **Fast page rendering:** PDFium-backed full-page bitmap rendering with horizontal paging and 1x-5x pinch zoom.
-- **PDF annotations:** pen, text-aware highlighter, eraser, editable text notes, custom color palettes, and selection/deletion of existing highlights.
+- **PDF annotations:** pen, text-aware highlighter, eraser, editable text notes, custom color palettes, and selection/deletion of existing highlights, ink, and text notes. Saved text notes can be reselected after reopening.
 - **Two save modes:** keep new annotations editable or flatten supported new marks into page content.
 - **Read aloud:** Android TextToSpeech with play, pause, resume, stop, adjustable speed, and synchronized word-area highlighting.
 - **Comfort controls:** System, Light, and Dark themes plus an optional keep-screen-awake setting.

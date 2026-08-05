@@ -86,7 +86,7 @@ requests must not cause unbounded memory use.
 
 ## Acceptance criteria
 
-- [ ] Pointer interaction does not rerender the base PDF bitmap.
+- [x] Pointer interaction does not rerender the base PDF bitmap.
 - [ ] Page and annotation geometry stay aligned for portrait, landscape, cropped,
   and right-angle rotated pages.
 - [ ] Superseded rendering work does not overwrite newer page state.

@@ -12,12 +12,6 @@ enum class AnnotationTool {
     AddText
 }
 
-/** Controls whether newly saved annotations remain editable or are painted into page content. */
-enum class AnnotationSaveMode {
-    Editable,
-    Flattened
-}
-
 enum class HighlightSource {
     Session,
     Embedded
@@ -41,9 +35,34 @@ data class TextAnnotation(
     val id: Long,
     val pageIndex: Int,
     val position: Offset,
+    val bounds: Rect,
     val color: Long,
-    val text: String
+    val text: String,
+    /** Original embedded UI identity while this pending note replaces a saved note. */
+    val sourceEmbeddedAnnotationId: Long? = null
 )
+
+/** An editable /Text note read from the opened PDF. */
+data class EmbeddedTextAnnotation(
+    /** Negative, page-scoped UI identity that cannot collide with pending note IDs. */
+    val id: Long,
+    /** Stable PDF identity used to remove or replace this annotation on save. */
+    val embeddedId: String,
+    val pageIndex: Int,
+    val position: Offset,
+    val iconBounds: Rect,
+    val color: Long,
+    val text: String,
+    /** Original pending-note ID persisted by NoxReader, when available. */
+    val sourceAnnotationId: Long? = null
+)
+
+enum class TextAnnotationHandle {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight
+}
 
 data class PdfTextBox(
     val pageIndex: Int,
@@ -66,6 +85,29 @@ data class EmbeddedTextHighlight(
     val pageIndex: Int,
     val color: Long,
     val rects: List<Rect>
+)
+
+enum class InkSource {
+    Session,
+    Embedded
+}
+
+/** A page-scoped editable /Ink annotation read from the opened PDF. */
+data class EmbeddedInkAnnotation(
+    val id: String,
+    val pageIndex: Int,
+    val color: Long,
+    val normalizedStrokeWidth: Float,
+    val paths: List<List<Offset>>
+)
+
+data class SelectedInk(
+    val id: String,
+    val pageIndex: Int,
+    val source: InkSource,
+    val color: Long,
+    val normalizedStrokeWidth: Float,
+    val paths: List<List<Offset>>
 )
 
 data class SelectedHighlight(

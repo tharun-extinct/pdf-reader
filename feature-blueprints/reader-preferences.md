@@ -134,22 +134,22 @@ clear local-data controls whose effects are immediate, bounded, and private.
 
 ## Acceptance criteria
 
-- [ ] Theme mode survives recreation and applies consistently to app chrome.
-- [ ] Keep screen awake adds and clears the activity flag exactly when requested.
-- [ ] Speech rate remains within `0.6f..1.6f`, survives recreation, and updates
+- [x] Theme mode survives recreation and applies consistently to app chrome.
+- [x] Keep screen awake adds and clears the activity flag exactly when requested.
+- [x] Speech rate remains within `0.6f..1.6f`, survives recreation, and updates
   active and future narration.
-- [ ] Valid pen and highlighter palettes survive recreation and update reader
+- [x] Valid pen and highlighter palettes survive recreation and update reader
   selection chips without a reader-window editor.
-- [ ] Rapid preference changes persist the final accepted value without blocking
+- [x] Rapid preference changes persist the final accepted value without blocking
   the main thread.
-- [ ] Invalid or unknown stored values fall back to documented defaults.
-- [ ] Legacy preferences migrate exactly once, and every future semantic schema
+- [x] Invalid or unknown stored values fall back to documented defaults.
+- [x] Legacy preferences migrate exactly once, and every future semantic schema
   change has an idempotent version-to-version migration test.
-- [ ] Clear history requires confirmation, removes only recent metadata, and
+- [x] Clear history requires confirmation, removes only recent metadata, and
   leaves preferences and PDF files unchanged.
-- [ ] UI and accessibility copy comes from Android resources and remains free of
+- [x] UI and accessibility copy comes from Android resources and remains free of
   malformed character-encoding sequences.
-- [ ] Backup and device transfer exclude the shared store while it contains
+- [x] Backup and device transfer exclude the shared store while it contains
   document history and persisted URI strings.
 - [ ] Storage failures are observable or have an explicit recovery policy.
 

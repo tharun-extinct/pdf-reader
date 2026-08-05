@@ -125,18 +125,18 @@ document contents.
 
 ## Acceptance criteria
 
-- [ ] Successful picker and recent-item opens navigate only after the engine has
+- [x] Successful picker and recent-item opens navigate only after the engine has
   reported a readable document.
-- [ ] Reopening restores the last valid page and the correct bookmark set.
-- [ ] Recent entries remain URI-unique, newest-first, and capped at 20.
-- [ ] Loading, empty, opening, populated, revoked-access, and provider-error
+- [x] Reopening restores the last valid page and the correct bookmark set.
+- [x] Recent entries remain URI-unique, newest-first, and capped at 20.
+- [x] Loading, empty, opening, populated, revoked-access, and provider-error
   states have recoverable UI behavior.
-- [ ] Page progress and bookmarks survive process recreation without UI-thread
+- [x] Page progress and bookmarks survive process recreation without UI-thread
   disk access.
-- [ ] Existing SharedPreferences history and bookmarks migrate exactly once and
+- [x] Existing SharedPreferences history and bookmarks migrate exactly once and
   future schema versions preserve all still-supported fields.
-- [ ] Clearing history removes metadata but leaves every source PDF untouched.
-- [ ] Cloud backup and device transfer do not restore recent-document metadata
+- [x] Clearing history removes metadata but leaves every source PDF untouched.
+- [x] Cloud backup and device transfer do not restore recent-document metadata
   or persisted URI strings without corresponding SAF grants.
 - [ ] Read-only access remains useful for reading and produces an explicit save
   limitation when a write is requested.

@@ -7,22 +7,29 @@ interaction or losing unsaved note contents during a failed save.
 
 ## Current verified status
 
-**Status: Partial - code and test sources inspected 2026-08-03.**
+**Status: Partial - code and test sources inspected 2026-08-05.**
 
-- `TextAnnotation` stores page, normalized position, color, and text.
+- `TextAnnotation` stores page, a normalized durable anchor, clamped editor
+  bounds, color, and text.
 - Add Text places an editable note field and updates it through MVI intents.
+- Pending notes can be reselected, deleted, and resized within the page through
+  a blue selection outline with four accessible corner handles.
+- Embedded `/Text` notes are loaded per visible page and can be reselected from
+  their rendered note icon after reopening the document.
+- Editing or resizing an embedded note creates one pending replacement and
+  queues the original annotation for removal, preventing duplicate notes.
+- A selected pending note is mapped back to its embedded identity and remains
+  selected after a successful save and reopen.
 - The reader exposes Add text as a semantic 48 dp toolbar action and keeps the
   editable field as an optimistic Compose overlay until Save succeeds.
 - PDFBox writes `/Text` note annotations with contents, icon rectangle, color,
   closed state, and a normal appearance.
-- Newly saved notes participate in editable and flattened save modes. Flattened
-  notes render their complete encodable text into a visible note box; notes that
-  cannot be represented without loss remain editable.
+- Newly saved notes persist as editable `/Text` annotations.
 - The [Android Build run for `30240c2`](https://github.com/tharun-extinct/pdf-reader/actions/runs/30745995096)
   compiled this implementation, but the writer tests were not executed by that
   workflow revision.
-- Existing embedded note loading, selection, editing, and deletion are not
-  implemented, and note-specific persistence fixtures are absent.
+- JVM test sources cover reopened note content/anchor/identity, reselection
+  matching, and embedded-note deletion; CI verification remains pending.
 
 ## Architecture dependencies
 
@@ -44,8 +51,8 @@ interaction or losing unsaved note contents during a failed save.
 
 - Keep text editing in optimistic MVI state; do not write PDFBox objects from a
   Compose input callback.
-- The current editor is a transient overlay; embedded `/Text` notes are not yet
-  loaded back into this interaction model.
+- The editor remains a transient overlay; an embedded `/Text` icon is promoted
+  to a pending replacement only after the user edits or resizes it.
 
 ### Commit pipeline
 
@@ -54,8 +61,6 @@ interaction or losing unsaved note contents during a failed save.
 ### Failure handling and invalidation
 
 - A failed write, sync, or reopen must retain note text and placement for retry.
-- If lossless flattened output cannot represent the payload, retain the `/Text`
-  annotation rather than dropping its contents.
 
 ## Related blueprints
 
@@ -66,39 +71,57 @@ interaction or losing unsaved note contents during a failed save.
 ### Impact checks
 
 - [Annotation persistence](annotation-persistence.md) when `/Text`, appearance,
-  flattening, or save behavior changes.
+  or save behavior changes.
 
 ## Relevant implementation and tests
 
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/AnnotationModels.kt` -
-  page, normalized anchor, color, and text payload.
+  page, normalized anchor and editor bounds, color, and text payload.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderIntent.kt` -
-  note placement and text-update intents.
+  note placement, text-update, selection, and resize intents.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderViewModel.kt` -
-  optimistic page-scoped note state and save snapshot.
+  optimistic page-scoped note state, selection, resizing, deletion, and save
+  snapshot.
+- `app/src/main/java/com/pdfreader/app/presentation/mvi/TextAnnotationGeometry.kt`
+  - normalized creation, resize constraints, and topmost-note hit testing.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/PdfReaderScreen.kt` - Add
-  text gesture and 180 dp optimistic text field.
+  text gesture, reselectable editor, selection outline, and resize handles.
 - `app/src/main/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriter.kt` -
-  editable `/Text` output and loss-aware flattened note box.
+  editable `/Text` output, stable NoxReader note identity, normal appearance,
+  and replacement/deletion of embedded notes.
+- `app/src/main/java/com/pdfreader/app/data/pdfium/PdfiumEngine.kt` - embedded
+  `/Text` discovery and normalized icon/anchor mapping.
+- `app/src/test/java/com/pdfreader/app/data/pdfium/PdfEmbeddedTextAnnotationReaderTest.kt`
+  - reopened content, color, source identity, and CropBox/right-angle anchor
+  round trips.
+- `app/src/test/java/com/pdfreader/app/presentation/mvi/TextAnnotationReselectionTest.kt`
+  - exact identity and external-note fallback matching after reopen.
 - `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriterTest.kt` -
-  visible flattened text and unencodable-payload retention. It does not cover
-  editable output, multiline layout, long text, placement, or external viewers.
+  embedded-note deletion during replacement saves.
+- `app/src/test/java/com/pdfreader/app/presentation/mvi/TextAnnotationGeometryTest.kt`
+  - page clamping, minimum resize bounds, and overlapping-note selection.
 
 ## Acceptance criteria
 
-- [ ] A note remains anchored to the same page position through fit, rotation, and
+- [x] A note remains anchored to the same page position through fit, rotation, and
   zoom transforms.
-- [ ] Editing updates optimistic state without blocking pointer interaction.
-- [ ] Editable save/reopen preserves note contents and a usable note icon.
-- [ ] Flattened output visibly preserves the complete supported note content; an
-  unencodable or oversized note remains editable instead of being discarded.
-- [ ] Failed persistence retains the complete pending note.
+- [x] Editing updates optimistic state without blocking pointer interaction.
+- [x] A pending text box can be reselected and displays a visible selection
+  outline with four resize handles.
+- [x] Resizing stays inside the page, preserves a usable minimum size, and the
+  selected pending text box can be deleted explicitly.
+- [x] Editable save/reopen preserves note contents and a usable note icon.
+- [x] Failed persistence retains the complete pending note.
+- [x] A saved embedded note can be reselected, edited, or deleted after reopen.
 - [ ] Empty, multiline, Unicode, long, and read-only-provider cases have explicit
   behavior and tests before the feature is marked Verified.
 
 ## Remaining gaps
 
-- Embedded note discovery, selection, editing, and deletion.
+- Editor width and height are optimistic UI state; standard `/Text` output keeps
+  the normalized anchor and renders as a note icon after save.
+- Imported notes without a NoxReader identity use exact contents and nearest
+  anchor as the bounded reselection fallback.
 - Defined empty-note and long-note UX.
 - Editable-note, multiline, long-note, coordinate, and external-viewer tests.
 - Blank pending notes currently count as save work, are skipped by the writer,

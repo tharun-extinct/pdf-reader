@@ -55,6 +55,7 @@ class PdfReaderViewModel(
     }
 
     fun processIntent(intent: PdfReaderIntent) {
+        if (_state.value.isSavingAnnotations && intent.mutatesAnnotations()) return
         when (intent) {
             is PdfReaderIntent.OpenPdf -> openPdf(intent.uri)
             is PdfReaderIntent.ClosePdf -> closePdf()
@@ -78,6 +79,8 @@ class PdfReaderViewModel(
                 updatePreferences { it.copy(speechRate = rate) }
             }
             is PdfReaderIntent.RequestPageHighlights -> extractEmbeddedHighlights(intent.pageIndex, intent.onLoaded)
+            is PdfReaderIntent.RequestPageInk -> extractEmbeddedInk(intent.pageIndex)
+            is PdfReaderIntent.RequestPageTextAnnotations -> extractEmbeddedTextAnnotations(intent.pageIndex)
             is PdfReaderIntent.SelectTool -> selectTool(intent.tool)
             is PdfReaderIntent.SelectPenColor -> selectPenColor(intent.index)
             is PdfReaderIntent.SelectHighlighterColor -> selectHighlighterColor(intent.index)
@@ -88,10 +91,21 @@ class PdfReaderViewModel(
             is PdfReaderIntent.RemoveStrokeAt -> removeStrokeAt(intent.pageIndex, intent.position)
             is PdfReaderIntent.AddTextAnnotation -> addTextAnnotation(intent.pageIndex, intent.position)
             is PdfReaderIntent.UpdateTextAnnotation -> updateTextAnnotation(intent.annotationId, intent.text)
-            is PdfReaderIntent.SetAnnotationSaveMode -> _state.update { it.copy(annotationSaveMode = intent.mode) }
-            is PdfReaderIntent.SelectHighlightAt -> selectHighlightAt(intent.pageIndex, intent.position)
-            is PdfReaderIntent.ClearHighlightSelection -> _state.update { it.copy(selectedHighlight = null) }
-            is PdfReaderIntent.DeleteSelectedHighlight -> deleteSelectedHighlight()
+            is PdfReaderIntent.SelectTextAnnotation -> selectTextAnnotation(intent.annotationId)
+            is PdfReaderIntent.ResizeTextAnnotation -> resizeTextAnnotation(
+                intent.annotationId,
+                intent.handle,
+                intent.normalizedDelta
+            )
+            is PdfReaderIntent.SelectAnnotationAt -> selectAnnotationAt(intent.pageIndex, intent.position)
+            is PdfReaderIntent.ClearAnnotationSelection -> _state.update {
+                it.copy(
+                    selectedHighlight = null,
+                    selectedInk = null,
+                    selectedTextAnnotationId = null
+                )
+            }
+            is PdfReaderIntent.DeleteSelectedAnnotation -> deleteSelectedAnnotation()
             is PdfReaderIntent.PlayTts -> playTts(intent.pageIndex, intent.textBoxes)
             is PdfReaderIntent.PauseTts -> ttsManager.pause()
             is PdfReaderIntent.ResumeTts -> ttsManager.resume()
@@ -230,13 +244,77 @@ class PdfReaderViewModel(
         _state.update { state ->
             val pageHighlights = state.highlightsByPage[highlight.pageIndex].orEmpty()
             state.copy(
-                highlightsByPage = state.highlightsByPage + (highlight.pageIndex to (pageHighlights + highlight))
+                highlightsByPage = state.highlightsByPage + (highlight.pageIndex to (pageHighlights + highlight)),
+                selectedHighlight = SelectedHighlight(
+                    id = highlight.id.toString(),
+                    pageIndex = highlight.pageIndex,
+                    source = HighlightSource.Session,
+                    color = highlight.color,
+                    rects = highlight.rects
+                ),
+                selectedInk = null,
+                selectedTextAnnotationId = null
             )
         }
     }
 
-    private fun selectHighlightAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
+    private fun selectAnnotationAt(pageIndex: Int, position: androidx.compose.ui.geometry.Offset) {
         _state.update { state ->
+            val selectedText = TextAnnotationGeometry.select(
+                position,
+                state.textAnnotationsByPage[pageIndex].orEmpty()
+            )
+            if (selectedText != null) {
+                return@update state.copy(
+                    selectedTextAnnotationId = selectedText.id,
+                    selectedInk = null,
+                    selectedHighlight = null
+                )
+            }
+            val deletedTextIds = state.deletedEmbeddedTextAnnotationIdsByPage[pageIndex].orEmpty()
+            val selectedEmbeddedText = TextAnnotationGeometry.selectEmbedded(
+                position = position,
+                annotations = state.embeddedTextAnnotationsByPage[pageIndex].orEmpty(),
+                deletedIds = deletedTextIds
+            )
+            if (selectedEmbeddedText != null) {
+                return@update state.copy(
+                    selectedTextAnnotationId = selectedEmbeddedText.id,
+                    selectedInk = null,
+                    selectedHighlight = null
+                )
+            }
+            val sessionInk = state.strokesByPage[pageIndex].orEmpty().map { stroke ->
+                SelectedInk(
+                    id = stroke.id.toString(),
+                    pageIndex = pageIndex,
+                    source = InkSource.Session,
+                    color = stroke.color,
+                    normalizedStrokeWidth = stroke.normalizedStrokeWidth,
+                    paths = listOf(stroke.points)
+                )
+            }
+            val deletedInkIds = state.deletedEmbeddedInkIdsByPage[pageIndex].orEmpty()
+            val embeddedInk = state.embeddedInkByPage[pageIndex].orEmpty()
+                .filterNot { it.id in deletedInkIds }
+                .map { ink ->
+                    SelectedInk(
+                        id = ink.id,
+                        pageIndex = pageIndex,
+                        source = InkSource.Embedded,
+                        color = ink.color,
+                        normalizedStrokeWidth = ink.normalizedStrokeWidth,
+                        paths = ink.paths
+                    )
+                }
+            val selectedInk = InkHitTester.select(position, sessionInk + embeddedInk)
+            if (selectedInk != null) {
+                return@update state.copy(
+                    selectedInk = selectedInk,
+                    selectedHighlight = null,
+                    selectedTextAnnotationId = null
+                )
+            }
             val sessionCandidates = state.highlightsByPage[pageIndex].orEmpty().map {
                 SelectedHighlight(
                     id = it.id.toString(),
@@ -259,12 +337,62 @@ class PdfReaderViewModel(
                     )
                 }
             val selected = HighlightHitTester.select(position, sessionCandidates + embeddedCandidates)
-            state.copy(selectedHighlight = selected)
+            state.copy(
+                selectedHighlight = selected,
+                selectedInk = null,
+                selectedTextAnnotationId = null
+            )
         }
     }
 
-    private fun deleteSelectedHighlight() {
+    private fun deleteSelectedAnnotation() {
         _state.update { state ->
+            val selectedTextId = state.selectedTextAnnotationId
+            if (selectedTextId != null) {
+                val pendingExists = state.textAnnotationsByPage.values.any { annotations ->
+                    annotations.any { it.id == selectedTextId }
+                }
+                if (pendingExists) {
+                    return@update state.copy(
+                        textAnnotationsByPage = state.textAnnotationsByPage.mapValues { (_, annotations) ->
+                            annotations.filterNot { it.id == selectedTextId }
+                        },
+                        selectedTextAnnotationId = null
+                    )
+                }
+                val embedded = state.embeddedTextAnnotationsByPage.values
+                    .flatten()
+                    .firstOrNull { it.id == selectedTextId }
+                if (embedded != null) {
+                    val deletedIds = state.deletedEmbeddedTextAnnotationIdsByPage[embedded.pageIndex].orEmpty()
+                    return@update state.copy(
+                        deletedEmbeddedTextAnnotationIdsByPage =
+                            state.deletedEmbeddedTextAnnotationIdsByPage +
+                                (embedded.pageIndex to (deletedIds + embedded.embeddedId)),
+                        selectedTextAnnotationId = null
+                    )
+                }
+            }
+            val selectedInk = state.selectedInk
+            if (selectedInk != null) {
+                return@update when (selectedInk.source) {
+                    InkSource.Session -> state.copy(
+                        strokesByPage = state.strokesByPage + (
+                            selectedInk.pageIndex to state.strokesByPage[selectedInk.pageIndex].orEmpty()
+                                .filterNot { it.id.toString() == selectedInk.id }
+                            ),
+                        selectedInk = null
+                    )
+                    InkSource.Embedded -> {
+                        val existing = state.deletedEmbeddedInkIdsByPage[selectedInk.pageIndex].orEmpty()
+                        state.copy(
+                            deletedEmbeddedInkIdsByPage = state.deletedEmbeddedInkIdsByPage +
+                                (selectedInk.pageIndex to (existing + selectedInk.id)),
+                            selectedInk = null
+                        )
+                    }
+                }
+            }
             val selected = state.selectedHighlight ?: return@update state
             when (selected.source) {
                 HighlightSource.Session -> {
@@ -312,22 +440,129 @@ class PdfReaderViewModel(
                 id = System.currentTimeMillis(),
                 pageIndex = pageIndex,
                 position = position,
+                bounds = TextAnnotationGeometry.createBounds(position),
                 color = state.penPalette.colors[state.selectedPenColorIndex],
                 text = ""
             )
-            state.copy(textAnnotationsByPage = state.textAnnotationsByPage + (pageIndex to (pageAnnotations + annotation)))
+            state.copy(
+                textAnnotationsByPage = state.textAnnotationsByPage +
+                    (pageIndex to (pageAnnotations + annotation)),
+                selectedTextAnnotationId = annotation.id,
+                selectedHighlight = null,
+                selectedInk = null
+            )
         }
     }
 
     private fun updateTextAnnotation(annotationId: Long, text: String) {
         _state.update { state ->
+            val pendingId = state.resolvePendingTextAnnotationId(annotationId)
+            if (pendingId == null) {
+                return@update promoteEmbeddedTextAnnotation(state, annotationId) { annotation ->
+                    annotation.copy(text = text)
+                } ?: state
+            }
             val updatedPages = state.textAnnotationsByPage.mapValues { (_, annotations) ->
                 annotations.map { annotation ->
-                    if (annotation.id == annotationId) annotation.copy(text = text) else annotation
+                    if (annotation.id == pendingId) annotation.copy(text = text) else annotation
                 }
             }
             state.copy(textAnnotationsByPage = updatedPages)
         }
+    }
+
+    private fun selectTextAnnotation(annotationId: Long) {
+        _state.update { state ->
+            val exists = state.textAnnotationsByPage.values.any { annotations ->
+                annotations.any { it.id == annotationId }
+            } || state.embeddedTextAnnotationsByPage.values.any { annotations ->
+                annotations.any { it.id == annotationId }
+            }
+            if (!exists) state else state.copy(
+                selectedTextAnnotationId = annotationId,
+                selectedHighlight = null,
+                selectedInk = null
+            )
+        }
+    }
+
+    private fun resizeTextAnnotation(
+        annotationId: Long,
+        handle: TextAnnotationHandle,
+        normalizedDelta: androidx.compose.ui.geometry.Offset
+    ) {
+        _state.update { state ->
+            val pendingId = state.resolvePendingTextAnnotationId(annotationId)
+            if (pendingId == null) {
+                return@update promoteEmbeddedTextAnnotation(state, annotationId) { annotation ->
+                    annotation.copy(
+                        bounds = TextAnnotationGeometry.resize(
+                            annotation.bounds,
+                            handle,
+                            normalizedDelta
+                        )
+                    )
+                } ?: state
+            }
+            val updatedPages = state.textAnnotationsByPage.mapValues { (_, annotations) ->
+                annotations.map { annotation ->
+                    if (annotation.id == pendingId) {
+                        annotation.copy(
+                            bounds = TextAnnotationGeometry.resize(
+                                annotation.bounds,
+                                handle,
+                                normalizedDelta
+                            )
+                        )
+                    } else {
+                        annotation
+                    }
+                }
+            }
+            state.copy(
+                textAnnotationsByPage = updatedPages,
+                selectedTextAnnotationId = pendingId
+            )
+        }
+    }
+
+    private fun promoteEmbeddedTextAnnotation(
+        state: PdfReaderState,
+        annotationId: Long,
+        transform: (TextAnnotation) -> TextAnnotation
+    ): PdfReaderState? {
+        val embedded = state.embeddedTextAnnotationsByPage.values
+            .flatten()
+            .firstOrNull { it.id == annotationId }
+            ?: return null
+        if (embedded.embeddedId in state.deletedEmbeddedTextAnnotationIdsByPage[embedded.pageIndex].orEmpty()) {
+            return null
+        }
+
+        val pendingIds = state.textAnnotationsByPage.values.flatten().mapTo(mutableSetOf()) { it.id }
+        var replacementId = System.currentTimeMillis().coerceAtLeast(1L)
+        while (replacementId in pendingIds) replacementId++
+        val replacement = transform(
+            TextAnnotation(
+                id = replacementId,
+                pageIndex = embedded.pageIndex,
+                position = embedded.position,
+                bounds = TextAnnotationGeometry.createBounds(embedded.position),
+                color = embedded.color,
+                text = embedded.text,
+                sourceEmbeddedAnnotationId = embedded.id
+            )
+        )
+        val pageAnnotations = state.textAnnotationsByPage[embedded.pageIndex].orEmpty()
+        val deletedIds = state.deletedEmbeddedTextAnnotationIdsByPage[embedded.pageIndex].orEmpty()
+        return state.copy(
+            textAnnotationsByPage = state.textAnnotationsByPage +
+                (embedded.pageIndex to (pageAnnotations + replacement)),
+            deletedEmbeddedTextAnnotationIdsByPage =
+                state.deletedEmbeddedTextAnnotationIdsByPage +
+                    (embedded.pageIndex to (deletedIds + embedded.embeddedId)),
+            selectedTextAnnotationId = replacement.id
+        )
     }
 
     private fun syncPdf(localFile: java.io.File) {
@@ -361,12 +596,17 @@ class PdfReaderViewModel(
         val uri = _state.value.openedUri ?: return
         val pdfBytes = pdfEngine.getPdfBytes() ?: return
         val currentState = _state.value
+        val textReselectionTarget = currentState.selectedTextAnnotationId?.let { selectedId ->
+            createTextReselectionTarget(currentState, selectedId)
+        }
 
         // Nothing to save
         val hasAnnotations = currentState.strokesByPage.values.any { it.isNotEmpty() } ||
             currentState.highlightsByPage.values.any { it.isNotEmpty() } ||
             currentState.textAnnotationsByPage.values.any { it.isNotEmpty() } ||
-            currentState.deletedEmbeddedHighlightIdsByPage.values.any { it.isNotEmpty() }
+            currentState.deletedEmbeddedHighlightIdsByPage.values.any { it.isNotEmpty() } ||
+            currentState.deletedEmbeddedInkIdsByPage.values.any { it.isNotEmpty() } ||
+            currentState.deletedEmbeddedTextAnnotationIdsByPage.values.any { it.isNotEmpty() }
         if (!hasAnnotations) return
 
         _state.update { it.copy(isSavingAnnotations = true, errorMessage = null) }
@@ -385,7 +625,9 @@ class PdfReaderViewModel(
                     highlightsByPage = currentState.highlightsByPage,
                     textAnnotationsByPage = currentState.textAnnotationsByPage,
                     deletedEmbeddedHighlightIdsByPage = currentState.deletedEmbeddedHighlightIdsByPage,
-                    saveMode = currentState.annotationSaveMode,
+                    deletedEmbeddedInkIdsByPage = currentState.deletedEmbeddedInkIdsByPage,
+                    deletedEmbeddedTextAnnotationIdsByPage =
+                        currentState.deletedEmbeddedTextAnnotationIdsByPage,
                     outputFile = outputFile
                 )
 
@@ -414,6 +656,14 @@ class PdfReaderViewModel(
                     )
                 pdfEngine.openDocument(pfd, newBytes)
 
+                val reopenedTextAnnotations = textReselectionTarget?.let { target ->
+                    runCatching { pdfEngine.getEmbeddedTextAnnotations(target.pageIndex) }
+                        .getOrElse { emptyList() }
+                }.orEmpty()
+                val reselectedTextAnnotation = textReselectionTarget?.let { target ->
+                    findReselectedTextAnnotation(target, reopenedTextAnnotations)
+                }
+
                 // Bump renderRevision: PdfPage composables observe this key and will
                 // discard their cached bitmaps, triggering a fresh render that shows
                 // the now-embedded annotations via PDFium.
@@ -423,9 +673,17 @@ class PdfReaderViewModel(
                         strokesByPage = emptyMap(),
                         highlightsByPage = emptyMap(),
                         textAnnotationsByPage = emptyMap(),
+                        embeddedTextAnnotationsByPage = textReselectionTarget?.let { target ->
+                            mapOf(target.pageIndex to reopenedTextAnnotations)
+                        }.orEmpty(),
+                        deletedEmbeddedTextAnnotationIdsByPage = emptyMap(),
                         embeddedHighlightsByPage = emptyMap(),
                         deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                        embeddedInkByPage = emptyMap(),
+                        deletedEmbeddedInkIdsByPage = emptyMap(),
                         selectedHighlight = null,
+                        selectedInk = null,
+                        selectedTextAnnotationId = reselectedTextAnnotation?.id,
                         textBoxesByPage = emptyMap(), // invalidated by document re-open
                         renderRevision = it.renderRevision + 1
                     )
@@ -517,8 +775,12 @@ class PdfReaderViewModel(
                             embeddedHighlightsByPage = emptyMap(),
                             deletedEmbeddedHighlightIdsByPage = emptyMap(),
                             selectedHighlight = null,
+                            selectedInk = null,
+                            selectedTextAnnotationId = null,
                             textBoxesByPage = emptyMap(),
                             textAnnotationsByPage = emptyMap(),
+                            embeddedTextAnnotationsByPage = emptyMap(),
+                            deletedEmbeddedTextAnnotationIdsByPage = emptyMap(),
                             ttsState = TtsState.Idle
                         )
                     }
@@ -623,6 +885,30 @@ class PdfReaderViewModel(
         }
     }
 
+    private fun extractEmbeddedInk(pageIndex: Int) {
+        if (_state.value.embeddedInkByPage.containsKey(pageIndex)) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val ink = runCatching { pdfEngine.getEmbeddedInk(pageIndex) }.getOrElse { emptyList() }
+            _state.update { state ->
+                state.copy(embeddedInkByPage = state.embeddedInkByPage + (pageIndex to ink))
+            }
+        }
+    }
+
+    private fun extractEmbeddedTextAnnotations(pageIndex: Int) {
+        if (_state.value.embeddedTextAnnotationsByPage.containsKey(pageIndex)) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val annotations = runCatching { pdfEngine.getEmbeddedTextAnnotations(pageIndex) }
+                .getOrElse { emptyList() }
+            _state.update { state ->
+                state.copy(
+                    embeddedTextAnnotationsByPage =
+                        state.embeddedTextAnnotationsByPage + (pageIndex to annotations)
+                )
+            }
+        }
+    }
+
     private fun closePdf() {
         val currentState = _state.value
         val uri = currentState.openedUri?.toString()
@@ -654,10 +940,15 @@ class PdfReaderViewModel(
                 highlightsByPage = emptyMap(),
                 embeddedHighlightsByPage = emptyMap(),
                 deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                embeddedInkByPage = emptyMap(),
+                deletedEmbeddedInkIdsByPage = emptyMap(),
                 selectedHighlight = null,
+                selectedInk = null,
+                selectedTextAnnotationId = null,
                 textBoxesByPage = emptyMap(),
                 textAnnotationsByPage = emptyMap(),
-                selectedTextPositionByPage = emptyMap(),
+                embeddedTextAnnotationsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap(),
                 ttsState = TtsState.Idle
             )
         }
@@ -675,6 +966,80 @@ class PdfReaderViewModel(
     }
 }
 
+internal data class TextAnnotationReselectionTarget(
+    val pageIndex: Int,
+    val position: androidx.compose.ui.geometry.Offset,
+    val text: String,
+    val expectedSourceAnnotationId: Long?
+)
+
+private fun createTextReselectionTarget(
+    state: PdfReaderState,
+    selectedId: Long
+): TextAnnotationReselectionTarget? {
+    val pending = state.textAnnotationsByPage.values.flatten().firstOrNull { it.id == selectedId }
+    if (pending != null) {
+        return TextAnnotationReselectionTarget(
+            pageIndex = pending.pageIndex,
+            position = pending.position,
+            text = pending.text,
+            expectedSourceAnnotationId = pending.id
+        )
+    }
+    val embedded = state.embeddedTextAnnotationsByPage.values.flatten().firstOrNull { it.id == selectedId }
+        ?: return null
+    return TextAnnotationReselectionTarget(
+        pageIndex = embedded.pageIndex,
+        position = embedded.position,
+        text = embedded.text,
+        expectedSourceAnnotationId = embedded.sourceAnnotationId
+    )
+}
+
+internal fun findReselectedTextAnnotation(
+    target: TextAnnotationReselectionTarget,
+    annotations: List<EmbeddedTextAnnotation>
+): EmbeddedTextAnnotation? {
+    target.expectedSourceAnnotationId?.let { sourceId ->
+        annotations.firstOrNull { it.sourceAnnotationId == sourceId }?.let { return it }
+    }
+    return annotations
+        .asSequence()
+        .filter { it.text == target.text }
+        .minByOrNull { annotation ->
+            hypot(
+                annotation.position.x - target.position.x,
+                annotation.position.y - target.position.y
+            )
+        }
+        ?.takeIf { annotation ->
+            hypot(
+                annotation.position.x - target.position.x,
+                annotation.position.y - target.position.y
+            ) <= TEXT_ANNOTATION_RESELECTION_DISTANCE
+        }
+}
+
+internal fun PdfReaderState.resolvePendingTextAnnotationId(annotationId: Long): Long? =
+    textAnnotationsByPage.values
+        .flatten()
+        .firstOrNull {
+            it.id == annotationId || it.sourceEmbeddedAnnotationId == annotationId
+        }
+        ?.id
+
+private fun PdfReaderIntent.mutatesAnnotations(): Boolean = when (this) {
+    is PdfReaderIntent.AddStroke,
+    is PdfReaderIntent.AddTextHighlight,
+    is PdfReaderIntent.RemoveStrokeAt,
+    is PdfReaderIntent.AddTextAnnotation,
+    is PdfReaderIntent.UpdateTextAnnotation,
+    is PdfReaderIntent.ResizeTextAnnotation,
+    PdfReaderIntent.DeleteSelectedAnnotation,
+    PdfReaderIntent.SaveAnnotations -> true
+    else -> false
+}
+
 private fun androidx.compose.ui.geometry.Rect.inflate(amount: Float): androidx.compose.ui.geometry.Rect {
     return androidx.compose.ui.geometry.Rect(
         left = left - amount,
@@ -683,3 +1048,5 @@ private fun androidx.compose.ui.geometry.Rect.inflate(amount: Float): androidx.c
         bottom = bottom + amount
     )
 }
+
+private const val TEXT_ANNOTATION_RESELECTION_DISTANCE = 0.02f

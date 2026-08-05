@@ -1,7 +1,6 @@
 package com.pdfreader.app.presentation.mvi
 
 import android.net.Uri
-import androidx.compose.ui.geometry.Offset
 import com.pdfreader.app.domain.model.ReaderPreferences
 import com.pdfreader.app.domain.model.RecentDocument
 import com.pdfreader.app.domain.tts.TtsState
@@ -26,15 +25,19 @@ data class PdfReaderState(
     val activeTool: AnnotationTool = AnnotationTool.None,
     val selectedPenColorIndex: Int = 0,
     val selectedHighlighterColorIndex: Int = 0,
-    val annotationSaveMode: AnnotationSaveMode = AnnotationSaveMode.Editable,
     val strokesByPage: Map<Int, List<FreehandStroke>> = emptyMap(),
     val highlightsByPage: Map<Int, List<TextHighlight>> = emptyMap(),
     val embeddedHighlightsByPage: Map<Int, List<EmbeddedTextHighlight>> = emptyMap(),
     val deletedEmbeddedHighlightIdsByPage: Map<Int, Set<String>> = emptyMap(),
     val selectedHighlight: SelectedHighlight? = null,
+    val embeddedInkByPage: Map<Int, List<EmbeddedInkAnnotation>> = emptyMap(),
+    val deletedEmbeddedInkIdsByPage: Map<Int, Set<String>> = emptyMap(),
+    val selectedInk: SelectedInk? = null,
     val textBoxesByPage: Map<Int, List<PdfTextBox>> = emptyMap(),
     val textAnnotationsByPage: Map<Int, List<TextAnnotation>> = emptyMap(),
-    val selectedTextPositionByPage: Map<Int, Offset> = emptyMap(),
+    val embeddedTextAnnotationsByPage: Map<Int, List<EmbeddedTextAnnotation>> = emptyMap(),
+    val deletedEmbeddedTextAnnotationIdsByPage: Map<Int, Set<String>> = emptyMap(),
+    val selectedTextAnnotationId: Long? = null,
     val ttsState: TtsState = TtsState.Idle,
     /**
      * Incremented each time annotations are baked into the PDF and the document is

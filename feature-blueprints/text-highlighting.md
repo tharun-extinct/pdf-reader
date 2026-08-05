@@ -8,22 +8,22 @@ and persisted geometry aligned.
 
 ## Current verified status
 
-**Status: Partial - code and test sources inspected 2026-08-03.**
+**Status: Partial - implementation updated 2026-08-04; CI verification pending.**
 
 - PDFBox extraction supplies word and per-character bounds.
 - `TextHighlightSelector` creates continuous wrapped-line ranges and normalizes
   reverse drags.
 - Session and embedded highlights use page-scoped normalized rectangles.
 - `HighlightHitTester` selects the smallest overlapping candidate.
-- A selected highlight shows a translucent overlay, dashed union boundary, and
-  anchored Delete action.
+- A selected highlight shows selection handles, a translucent overlay, dashed
+  union boundary, and anchored Delete action.
 - With no annotation tool active, a tap selects the smallest matching session or
   embedded highlight; an outside tap clears the selection.
 - Deleting a session highlight updates state immediately; embedded deletion is
   recorded for the next save.
-- The toolbar Highlighter is now an always-freehand marker for immediate ink;
-  the text-range selector remains implemented but has no creation gesture in
-  the reader while these tool semantics are active.
+- Dragging with the toolbar Highlighter previews a character-snapped range and
+  commits a line-aware `TextHighlight`; PDFBox persists its rectangles as
+  `/Highlight` QuadPoints.
 - Persisted highlight appearances own a resource dictionary, allowing opacity
   graphics state to be emitted for source pages that omit `/Resources`.
 - Color-change and comment actions, tile-aware transforms, and broad device or
@@ -75,8 +75,8 @@ and persisted geometry aligned.
   `/QuadPoints`, appearances, or save/reopen behavior changes.
 - [Read aloud](read-aloud.md) when extracted text geometry or transient overlay
   ordering changes.
-- [Freehand annotation](freehand-annotation.md) when the Highlighter tool's
-  freehand fallback changes.
+- [Freehand annotation](freehand-annotation.md) when Highlighter versus Pen
+  gesture ownership changes.
 
 ## Relevant implementation and tests
 
@@ -89,8 +89,8 @@ and persisted geometry aligned.
 - `app/src/main/java/com/pdfreader/app/presentation/mvi/PdfReaderViewModel.kt` -
   merged selection candidates and pending session/embedded deletion state.
 - `app/src/main/java/com/pdfreader/app/presentation/ui/PdfReaderScreen.kt` -
-  fitted highlight overlays, selection boundary, and Delete action; new text
-  highlight creation is not currently wired to the Highlighter gesture.
+  fitted drag preview, selection handles/boundary, Highlighter creation gesture,
+  and Delete action.
 - `app/src/main/java/com/pdfreader/app/data/pdfium/PdfiumEngine.kt` - text and
   embedded `/Highlight` extraction caches.
 - `app/src/test/java/com/pdfreader/app/presentation/mvi/TextHighlightSelectorTest.kt` -
@@ -104,20 +104,19 @@ and persisted geometry aligned.
 
 ## Acceptance criteria
 
-- [ ] Forward and reverse drags select the same continuous reading-order range.
-- [ ] Wrapped highlights contain separate line rectangles without filling
+- [x] Forward and reverse drags select the same continuous reading-order range.
+- [x] Wrapped highlights contain separate line rectangles without filling
   intervening whitespace.
-- [ ] Overlapping highlights select the smallest matching candidate.
-- [ ] Selection bounds and menu remain aligned and clamped on the page.
-- [ ] Outside taps dismiss selection without changing the PDF.
-- [ ] Delete updates UI immediately and persists without duplication after save.
+- [x] Overlapping highlights select the smallest matching candidate.
+- [x] Selection bounds and menu remain aligned and clamped on the page.
+- [x] Outside taps dismiss selection without changing the PDF.
+- [x] Delete updates UI immediately and persists without duplication after save.
 - [ ] Rotation, cropped pages, multiline geometry, and overlap are covered by tests.
 
 ## Remaining gaps
 
 - Change-color and defined comment actions.
-- A dedicated gesture or command for creating text-range highlights, separate
-  from the freehand Highlighter tool.
+- Device-level gesture verification and contextual actions beyond Delete.
 - Tile-aware transforms and complete zoom/pan validation.
 - Device and external-viewer verification for selection and persisted geometry.
 - `PdfiumEngine` currently normalizes extracted text with MediaBox dimensions

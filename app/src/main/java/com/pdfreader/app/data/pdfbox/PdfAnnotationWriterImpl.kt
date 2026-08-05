@@ -4,7 +4,6 @@ import com.pdfreader.app.domain.repository.PdfAnnotationSaver
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
-import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +29,8 @@ class PdfAnnotationWriterImpl : PdfAnnotationSaver {
         highlightsByPage: Map<Int, List<TextHighlight>>,
         textAnnotationsByPage: Map<Int, List<TextAnnotation>>,
         deletedEmbeddedHighlightIdsByPage: Map<Int, Set<String>>,
-        saveMode: AnnotationSaveMode,
+        deletedEmbeddedInkIdsByPage: Map<Int, Set<String>>,
+        deletedEmbeddedTextAnnotationIdsByPage: Map<Int, Set<String>>,
         outputFile: File
     ): File = withContext(Dispatchers.IO) {
         val document = ByteArrayInputStream(pdfBytes).use { input ->
@@ -43,7 +43,8 @@ class PdfAnnotationWriterImpl : PdfAnnotationSaver {
                 highlightsByPage = highlightsByPage,
                 textAnnotationsByPage = textAnnotationsByPage,
                 deletedEmbeddedHighlightIdsByPage = deletedEmbeddedHighlightIdsByPage,
-                saveMode = saveMode
+                deletedEmbeddedInkIdsByPage = deletedEmbeddedInkIdsByPage,
+                deletedEmbeddedTextAnnotationIdsByPage = deletedEmbeddedTextAnnotationIdsByPage
             )
             document.save(outputFile)
         } finally {

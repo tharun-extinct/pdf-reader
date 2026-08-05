@@ -3,18 +3,15 @@ package com.pdfreader.app.data.pdfbox
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
 import com.pdfreader.app.presentation.mvi.TextHighlight
-import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import com.tom_roush.pdfbox.cos.COSDictionary
 import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.pdmodel.PDDocument
-import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.PDPage
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.PDResources
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB
-import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
-import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotation
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationMarkup
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationText
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup
@@ -192,6 +189,7 @@ object PdfAnnotationWriter {
             annot.color = ta.color.toRgbPdColor()
             annot.setName(PDAnnotationText.NAME_NOTE)
             annot.setOpen(false)
+            annot.cosObject.setString(NOX_READER_TEXT_ANNOTATION_ID, ta.id.toString())
             annot.constructAppearances(document)
 
             annotations.add(annot)
@@ -208,33 +206,26 @@ object PdfAnnotationWriter {
         highlightsByPage: Map<Int, List<TextHighlight>>,
         textAnnotationsByPage: Map<Int, List<TextAnnotation>>,
         deletedEmbeddedHighlightIdsByPage: Map<Int, Set<String>>,
-        saveMode: AnnotationSaveMode
+        deletedEmbeddedInkIdsByPage: Map<Int, Set<String>>,
+        deletedEmbeddedTextAnnotationIdsByPage: Map<Int, Set<String>>
     ) {
         val allPageIndices = (
             strokesByPage.keys + highlightsByPage.keys + textAnnotationsByPage.keys +
-                deletedEmbeddedHighlightIdsByPage.keys
+                deletedEmbeddedHighlightIdsByPage.keys + deletedEmbeddedInkIdsByPage.keys +
+                deletedEmbeddedTextAnnotationIdsByPage.keys
             ).toSet()
         for (pageIndex in allPageIndices) {
             if (pageIndex < 0 || pageIndex >= document.numberOfPages) continue
-            removeDeletedEmbeddedHighlights(document.getPage(pageIndex), pageIndex, deletedEmbeddedHighlightIdsByPage[pageIndex].orEmpty())
-            val annotationCountBeforeWrite = document.getPage(pageIndex).annotations.size
+            removeDeletedEmbeddedAnnotations(
+                page = document.getPage(pageIndex),
+                pageIndex = pageIndex,
+                highlightIds = deletedEmbeddedHighlightIdsByPage[pageIndex].orEmpty(),
+                inkIds = deletedEmbeddedInkIdsByPage[pageIndex].orEmpty(),
+                textIds = deletedEmbeddedTextAnnotationIdsByPage[pageIndex].orEmpty()
+            )
             writeHighlights(document, pageIndex, highlightsByPage[pageIndex].orEmpty())
             writeInkStrokes(document, pageIndex, strokesByPage[pageIndex].orEmpty())
             writeTextAnnotations(document, pageIndex, textAnnotationsByPage[pageIndex].orEmpty())
-            if (saveMode == AnnotationSaveMode.Flattened) {
-                val page = document.getPage(pageIndex)
-                val newAnnotations = page.annotations.drop(annotationCountBeforeWrite)
-                val flattenedAnnotations = flattenAnnotations(document, page, newAnnotations)
-                page.annotations = page.annotations
-                    // PDFBox materializes fresh annotation wrapper objects every time
-                    // `page.annotations` is read, so Kotlin object identity cannot
-                    // identify the entries that were just flattened. The COS dictionary
-                    // is the stable backing object shared by those wrappers.
-                    .filterNot { annotation ->
-                        flattenedAnnotations.any { it.cosObject === annotation.cosObject }
-                    }
-                    .toMutableList()
-            }
         }
     }
 
@@ -254,94 +245,30 @@ object PdfAnnotationWriter {
         return PDColor(floatArrayOf(r, g, b), PDDeviceRGB.INSTANCE)
     }
 
-    private fun removeDeletedEmbeddedHighlights(page: PDPage, pageIndex: Int, ids: Set<String>) {
-        if (ids.isEmpty()) return
-        val indexes = ids.mapNotNull { id ->
+    private fun removeDeletedEmbeddedAnnotations(
+        page: PDPage,
+        pageIndex: Int,
+        highlightIds: Set<String>,
+        inkIds: Set<String>,
+        textIds: Set<String>
+    ) {
+        val highlightIndexes = highlightIds.mapNotNull { id ->
             id.removePrefix("embedded:$pageIndex:").toIntOrNull()
         }.toSet()
-        if (indexes.isEmpty()) return
+        val inkIndexes = inkIds.mapNotNull { id ->
+            id.removePrefix("embedded-ink:$pageIndex:").toIntOrNull()
+        }.toSet()
+        val textIndexes = textIds.mapNotNull { id ->
+            id.removePrefix("embedded-text:$pageIndex:").toIntOrNull()
+        }.toSet()
+        if (highlightIndexes.isEmpty() && inkIndexes.isEmpty() && textIndexes.isEmpty()) return
         page.annotations = page.annotations.filterIndexed { index, annotation ->
-            index !in indexes || annotation.subtype != PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT
+            !(
+                index in highlightIndexes && annotation.subtype == PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT ||
+                    index in inkIndexes && annotation.subtype == PDAnnotationMarkup.SUB_TYPE_INK ||
+                    index in textIndexes && annotation is PDAnnotationText
+                )
         }.toMutableList()
-    }
-
-    /**
-     * Paints supported annotations into page contents and returns only the annotations
-     * that were represented without dropping payload. A note that cannot be encoded or
-     * fitted remains editable instead of being silently removed.
-     */
-    private fun flattenAnnotations(
-        document: PDDocument,
-        page: PDPage,
-        annotations: List<PDAnnotation>
-    ): Set<PDAnnotation> {
-        if (annotations.isEmpty()) return emptySet()
-        val flattened = mutableSetOf<PDAnnotation>()
-        PDPageContentStream(
-            document,
-            page,
-            PDPageContentStream.AppendMode.APPEND,
-            true,
-            true
-        ).use { stream ->
-            annotations.forEach { annotation ->
-                val color = annotation.color ?: return@forEach
-                val opacity = (annotation as? PDAnnotationMarkup)?.getConstantOpacity() ?: 1f
-                stream.saveGraphicsState()
-                stream.setGraphicsStateParameters(PDExtendedGraphicsState().apply {
-                    nonStrokingAlphaConstant = opacity
-                    strokingAlphaConstant = opacity
-                })
-                val wasFlattened = when (annotation) {
-                    is PDAnnotationTextMarkup -> {
-                        var paintedQuad = false
-                        annotation.quadPoints?.asList()?.chunked(8)?.forEach quadLoop@{ quad ->
-                            if (quad.size != 8) return@quadLoop
-                            stream.setNonStrokingColor(color)
-                            stream.moveTo(quad[0], quad[1])
-                            stream.lineTo(quad[2], quad[3])
-                            stream.lineTo(quad[6], quad[7])
-                            stream.lineTo(quad[4], quad[5])
-                            stream.closePath()
-                            stream.fill()
-                            paintedQuad = true
-                        }
-                        paintedQuad
-                    }
-                    is PDAnnotationText -> flattenTextNote(stream, page, annotation, color)
-                    is PDAnnotationMarkup -> {
-                        if (annotation.subtype != PDAnnotationMarkup.SUB_TYPE_INK) {
-                            false
-                        } else {
-                            var paintedPath = false
-                            stream.setStrokingColor(color)
-                            stream.setLineWidth(annotation.inkStrokeWidth())
-                            stream.setLineCapStyle(1)
-                            stream.setLineJoinStyle(1)
-                            annotation.getInkList().forEach pathLoop@{ path ->
-                                if (path.size < 4) return@pathLoop
-                                stream.addSmoothInkPath(path)
-                                stream.stroke()
-                                paintedPath = true
-                            }
-                            paintedPath
-                        }
-                    }
-                    else -> false
-                }
-                stream.restoreGraphicsState()
-                if (wasFlattened) flattened += annotation
-            }
-        }
-        return flattened
-    }
-
-    private fun PDAnnotationMarkup.inkStrokeWidth(): Float {
-        val borderStyle = cosObject.getDictionaryObject(COSName.BS) as? COSDictionary
-        return borderStyle
-            ?.getFloat(COSName.W, DEFAULT_INK_STROKE_WIDTH)
-            ?.coerceAtLeast(MIN_INK_STROKE_WIDTH)
-            ?: DEFAULT_INK_STROKE_WIDTH
     }
 
     /** Supplies a width-exact, rounded normal appearance instead of viewer-specific defaults. */
@@ -402,104 +329,6 @@ object PdfAnnotationWriter {
         lineTo(path[(pointCount - 1) * 2] - offsetX, path[(pointCount - 1) * 2 + 1] - offsetY)
     }
 
-    /** Paints a readable, popup-like note box containing the complete note payload. */
-    private fun flattenTextNote(
-        stream: PDPageContentStream,
-        page: PDPage,
-        annotation: PDAnnotationText,
-        accentColor: PDColor
-    ): Boolean {
-        val contents = annotation.contents?.takeIf { it.isNotBlank() } ?: return false
-        val pageBox = page.cropBox ?: page.mediaBox
-        val availableWidth = pageBox.width - NOTE_PAGE_MARGIN * 2
-        val availableHeight = pageBox.height - NOTE_PAGE_MARGIN * 2
-        if (availableWidth < NOTE_MIN_BOX_WIDTH || availableHeight < NOTE_LINE_HEIGHT + NOTE_PADDING * 2) {
-            return false
-        }
-
-        val boxWidth = minOf(NOTE_MAX_BOX_WIDTH, availableWidth)
-        val textWidth = boxWidth - NOTE_PADDING * 2
-        val lines = wrapNoteText(contents, textWidth) ?: return false
-        val boxHeight = NOTE_PADDING * 2 + NOTE_HEADER_HEIGHT + lines.size * NOTE_LINE_HEIGHT
-        if (boxHeight > availableHeight) return false
-
-        val rect = annotation.rectangle ?: return false
-        val minX = pageBox.lowerLeftX + NOTE_PAGE_MARGIN
-        val maxX = pageBox.upperRightX - NOTE_PAGE_MARGIN - boxWidth
-        val minY = pageBox.lowerLeftY + NOTE_PAGE_MARGIN
-        val maxY = pageBox.upperRightY - NOTE_PAGE_MARGIN - boxHeight
-        val boxX = (rect.upperRightX + NOTE_ANCHOR_GAP).coerceIn(minX, maxX)
-        val boxY = (rect.upperRightY - boxHeight).coerceIn(minY, maxY)
-
-        stream.setNonStrokingColor(NOTE_BACKGROUND_COLOR)
-        stream.addRect(boxX, boxY, boxWidth, boxHeight)
-        stream.fill()
-
-        stream.setStrokingColor(accentColor)
-        stream.setLineWidth(NOTE_BORDER_WIDTH)
-        stream.addRect(boxX, boxY, boxWidth, boxHeight)
-        stream.stroke()
-
-        stream.setNonStrokingColor(accentColor)
-        stream.addRect(
-            boxX,
-            boxY + boxHeight - NOTE_HEADER_HEIGHT,
-            boxWidth,
-            NOTE_HEADER_HEIGHT
-        )
-        stream.fill()
-
-        stream.setNonStrokingColor(NOTE_TEXT_COLOR)
-        stream.beginText()
-        stream.setFont(NOTE_FONT, NOTE_FONT_SIZE)
-        stream.newLineAtOffset(
-            boxX + NOTE_PADDING,
-            boxY + boxHeight - NOTE_HEADER_HEIGHT - NOTE_PADDING - NOTE_FONT_SIZE
-        )
-        lines.forEachIndexed { index, line ->
-            if (index > 0) stream.newLineAtOffset(0f, -NOTE_LINE_HEIGHT)
-            stream.showText(line)
-        }
-        stream.endText()
-        return true
-    }
-
-    /**
-     * Wraps by glyph so every encodable character is retained. Unsupported glyphs or
-     * a single glyph wider than the box return null, causing the editable note to stay.
-     */
-    private fun wrapNoteText(contents: String, maxWidth: Float): List<String>? {
-        return try {
-            val lines = mutableListOf<String>()
-            val paragraphs = contents.replace("\r\n", "\n").replace('\r', '\n').split('\n')
-            paragraphs.forEach { paragraph ->
-                if (paragraph.isEmpty()) {
-                    lines += ""
-                    return@forEach
-                }
-
-                val currentLine = StringBuilder()
-                var currentWidth = 0f
-                paragraph.forEach { character ->
-                    val glyph = if (character == '\t') "    " else character.toString()
-                    val glyphWidth = NOTE_FONT.getStringWidth(glyph) / 1000f * NOTE_FONT_SIZE
-                    if (glyphWidth > maxWidth) return null
-                    if (currentLine.isNotEmpty() && currentWidth + glyphWidth > maxWidth) {
-                        lines += currentLine.toString()
-                        currentLine.clear()
-                        currentWidth = 0f
-                    }
-                    currentLine.append(glyph)
-                    currentWidth += glyphWidth
-                }
-                lines += currentLine.toString()
-            }
-            lines
-        } catch (_: IllegalArgumentException) {
-            null
-        }
-    }
-
     /** Supplies a transparent, quad-based normal appearance so it never obscures page text. */
     private fun PDAnnotationTextMarkup.createHighlightAppearance(document: PDDocument, quadPoints: FloatArray) {
         val rect = rectangle ?: return
@@ -530,19 +359,9 @@ object PdfAnnotationWriter {
         setAppearance(dictionary)
     }
 
-    private val NOTE_FONT = PDType1Font.HELVETICA
-    private val NOTE_BACKGROUND_COLOR = PDColor(floatArrayOf(1f, 1f, 1f), PDDeviceRGB.INSTANCE)
-    private val NOTE_TEXT_COLOR = PDColor(floatArrayOf(0f, 0f, 0f), PDDeviceRGB.INSTANCE)
-    private const val DEFAULT_INK_STROKE_WIDTH = 2f
     private const val MIN_INK_STROKE_WIDTH = 0.5f
-    private const val NOTE_FONT_SIZE = 9f
-    private const val NOTE_LINE_HEIGHT = 11f
-    private const val NOTE_PADDING = 6f
-    private const val NOTE_HEADER_HEIGHT = 5f
-    private const val NOTE_BORDER_WIDTH = 1f
-    private const val NOTE_PAGE_MARGIN = 8f
-    private const val NOTE_ANCHOR_GAP = 4f
-    private const val NOTE_MIN_BOX_WIDTH = 72f
-    private const val NOTE_MAX_BOX_WIDTH = 180f
 
 }
+
+internal val NOX_READER_TEXT_ANNOTATION_ID: COSName =
+    COSName.getPDFName("NoxReaderTextAnnotationId")

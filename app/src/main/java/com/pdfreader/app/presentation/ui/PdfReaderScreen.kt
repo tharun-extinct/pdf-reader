@@ -102,8 +102,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pdfreader.app.R
 import com.pdfreader.app.presentation.mvi.AnnotationTool
-import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import com.pdfreader.app.presentation.mvi.FreehandStroke
+import com.pdfreader.app.presentation.mvi.TextHighlight
+import com.pdfreader.app.presentation.mvi.TextHighlightSelector
+import com.pdfreader.app.presentation.mvi.TextAnnotation
+import com.pdfreader.app.presentation.mvi.TextAnnotationGeometry
+import com.pdfreader.app.presentation.mvi.TextAnnotationHandle
 import com.pdfreader.app.presentation.mvi.PdfTextBox
 import com.pdfreader.app.presentation.mvi.PdfReaderIntent
 import com.pdfreader.app.presentation.mvi.PdfReaderState
@@ -203,28 +207,9 @@ fun PdfReaderScreen(
                         val hasAnnotations = state.strokesByPage.values.any { it.isNotEmpty() } ||
                             state.highlightsByPage.values.any { it.isNotEmpty() } ||
                             state.textAnnotationsByPage.values.any { it.isNotEmpty() } ||
-                            state.deletedEmbeddedHighlightIdsByPage.values.any { it.isNotEmpty() }
-
-                        TextButton(
-                            onClick = {
-                                val mode = if (state.annotationSaveMode == AnnotationSaveMode.Editable) {
-                                    AnnotationSaveMode.Flattened
-                                } else {
-                                    AnnotationSaveMode.Editable
-                                }
-                                viewModel.processIntent(PdfReaderIntent.SetAnnotationSaveMode(mode))
-                            }
-                        ) {
-                            Text(
-                                stringResource(
-                                    if (state.annotationSaveMode == AnnotationSaveMode.Editable) {
-                                        R.string.annotation_mode_editable
-                                    } else {
-                                        R.string.annotation_mode_flattened
-                                    }
-                                )
-                            )
-                        }
+                            state.deletedEmbeddedHighlightIdsByPage.values.any { it.isNotEmpty() } ||
+                            state.deletedEmbeddedInkIdsByPage.values.any { it.isNotEmpty() } ||
+                            state.deletedEmbeddedTextAnnotationIdsByPage.values.any { it.isNotEmpty() }
 
                         IconButton(
                             onClick = { viewModel.processIntent(PdfReaderIntent.SaveAnnotations) },
@@ -808,6 +793,24 @@ fun PdfPage(
     val pageHighlights = state.highlightsByPage[pageIndex].orEmpty()
     val pageTextBoxes = state.textBoxesByPage[pageIndex].orEmpty()
     val pageTextAnnotations = state.textAnnotationsByPage[pageIndex].orEmpty()
+    val selectedEmbeddedTextAnnotation = state.embeddedTextAnnotationsByPage[pageIndex]
+        .orEmpty()
+        .firstOrNull { it.id == state.selectedTextAnnotationId }
+        ?.let { embedded ->
+            TextAnnotation(
+                id = embedded.id,
+                pageIndex = embedded.pageIndex,
+                position = embedded.position,
+                bounds = TextAnnotationGeometry.createBounds(embedded.position),
+                color = embedded.color,
+                text = embedded.text
+            )
+        }
+    val visibleTextAnnotations = if (selectedEmbeddedTextAnnotation == null) {
+        pageTextAnnotations
+    } else {
+        pageTextAnnotations + selectedEmbeddedTextAnnotation
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -833,6 +836,12 @@ fun PdfPage(
                 }
                 if (!state.embeddedHighlightsByPage.containsKey(pageIndex)) {
                     onIntent(PdfReaderIntent.RequestPageHighlights(pageIndex))
+                }
+                if (!state.embeddedInkByPage.containsKey(pageIndex)) {
+                    onIntent(PdfReaderIntent.RequestPageInk(pageIndex))
+                }
+                if (!state.embeddedTextAnnotationsByPage.containsKey(pageIndex)) {
+                    onIntent(PdfReaderIntent.RequestPageTextAnnotations(pageIndex))
                 }
             }
 
@@ -940,37 +949,104 @@ fun PdfPage(
                         selected = selectedHighlight,
                         contentBounds = contentBounds,
                         containerSize = size,
-                        onDelete = { onIntent(PdfReaderIntent.DeleteSelectedHighlight) }
+                        onDelete = { onIntent(PdfReaderIntent.DeleteSelectedAnnotation) }
+                    )
+                }
+                val selectedInk = state.selectedInk?.takeIf { it.pageIndex == pageIndex }
+                if (selectedInk != null) {
+                    SelectedInkOverlay(
+                        selected = selectedInk,
+                        contentBounds = contentBounds,
+                        containerSize = size,
+                        onDelete = { onIntent(PdfReaderIntent.DeleteSelectedAnnotation) }
                     )
                 }
 
-                pageTextAnnotations.forEach { annotation ->
-                val position = annotation.position.toDisplayOffset(contentBounds)
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    tonalElevation = 3.dp,
-                    shadowElevation = 4.dp,
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                x = position.x.roundToInt(),
-                                y = position.y.roundToInt()
+                visibleTextAnnotations.forEach { annotation ->
+                    val displayBounds = annotation.bounds.toDisplayRect(contentBounds)
+                    val isSelected = state.selectedTextAnnotationId == annotation.id
+                    val noteShape = RoundedCornerShape(8.dp)
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        tonalElevation = if (isSelected) 4.dp else 2.dp,
+                        shadowElevation = if (isSelected) 6.dp else 3.dp,
+                        shape = noteShape,
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    x = displayBounds.left.roundToInt(),
+                                    y = displayBounds.top.roundToInt()
+                                )
+                            }
+                            .width(with(LocalDensity.current) { displayBounds.width.toDp() })
+                            .height(with(LocalDensity.current) { displayBounds.height.toDp() })
+                            .then(
+                                if (isSelected) {
+                                    Modifier
+                                } else {
+                                    Modifier
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.outlineVariant,
+                                            noteShape
+                                        )
+                                        .clickable {
+                                            onIntent(
+                                                PdfReaderIntent.SelectTextAnnotation(annotation.id)
+                                            )
+                                        }
+                                }
+                            )
+                    ) {
+                        if (isSelected) {
+                            OutlinedTextField(
+                                value = annotation.text,
+                                onValueChange = {
+                                    onIntent(PdfReaderIntent.UpdateTextAnnotation(annotation.id, it))
+                                },
+                                enabled = !state.isSavingAnnotations,
+                                modifier = Modifier.fillMaxSize(),
+                                minLines = 2,
+                                label = { Text(stringResource(R.string.note_label)) }
+                            )
+                        } else {
+                            Text(
+                                text = annotation.text.ifBlank {
+                                    stringResource(R.string.note_label)
+                                },
+                                color = if (annotation.text.isBlank()) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                maxLines = 4,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(12.dp)
                             )
                         }
-                        .width(180.dp)
-                ) {
-                    OutlinedTextField(
-                        value = annotation.text,
-                        onValueChange = {
-                            onIntent(PdfReaderIntent.UpdateTextAnnotation(annotation.id, it))
+                    }
+                }
+
+                val selectedTextAnnotation = visibleTextAnnotations.firstOrNull {
+                    it.id == state.selectedTextAnnotationId
+                }
+                if (selectedTextAnnotation != null) {
+                    SelectedTextAnnotationOverlay(
+                        annotation = selectedTextAnnotation,
+                        contentBounds = contentBounds,
+                        containerSize = size,
+                        onResize = { handle, normalizedDelta ->
+                            onIntent(
+                                PdfReaderIntent.ResizeTextAnnotation(
+                                    annotationId = selectedTextAnnotation.id,
+                                    handle = handle,
+                                    normalizedDelta = normalizedDelta
+                                )
+                            )
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        label = { Text(stringResource(R.string.note_label)) }
+                        onDelete = { onIntent(PdfReaderIntent.DeleteSelectedAnnotation) }
                     )
                 }
-            }
             }
         } else {
             CircularProgressIndicator()
@@ -1051,9 +1127,11 @@ private fun BoxScope.AnnotationGestureLayer(
     onIntent: (PdfReaderIntent) -> Unit
 ) {
     val activeTool = state.activeTool
+    val textBoxes = state.textBoxesByPage[pageIndex].orEmpty()
     val penColor = state.penPalette.colors.getOrNull(state.selectedPenColorIndex) ?: state.penPalette.colors.first()
     val highlighterColor = state.highlighterPalette.colors.getOrNull(state.selectedHighlighterColorIndex) ?: state.highlighterPalette.colors.first()
     val currentStrokePoints = remember(pageIndex, activeTool) { mutableStateListOf<Offset>() }
+    val currentSelectionRects = remember(pageIndex, activeTool) { mutableStateListOf<Rect>() }
 
     Box(
         modifier = Modifier
@@ -1061,8 +1139,8 @@ private fun BoxScope.AnnotationGestureLayer(
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .then(
                 when (activeTool) {
-                    AnnotationTool.Pen, AnnotationTool.Highlighter -> {
-                        Modifier.pointerInput(activeTool, contentBounds, penColor, highlighterColor) {
+                    AnnotationTool.Pen -> {
+                        Modifier.pointerInput(activeTool, contentBounds, penColor) {
                             detectDragGestures(
                                 onDragStart = { start ->
                                     currentStrokePoints.clear()
@@ -1080,11 +1158,9 @@ private fun BoxScope.AnnotationGestureLayer(
                                                     id = System.currentTimeMillis(),
                                                     pageIndex = pageIndex,
                                                     tool = activeTool,
-                                                    color = if (activeTool == AnnotationTool.Pen) penColor else highlighterColor,
-                                                    normalizedStrokeWidth = (
-                                                        if (activeTool == AnnotationTool.Pen) PEN_STROKE_WIDTH_PX
-                                                        else HIGHLIGHTER_STROKE_WIDTH_PX
-                                                    ) / contentBounds.width.coerceAtLeast(1f),
+                                                    color = penColor,
+                                                    normalizedStrokeWidth = PEN_STROKE_WIDTH_PX /
+                                                        contentBounds.width.coerceAtLeast(1f),
                                                     points = currentStrokePoints.toList()
                                                 )
                                             )
@@ -1093,6 +1169,46 @@ private fun BoxScope.AnnotationGestureLayer(
                                     currentStrokePoints.clear()
                                 },
                                 onDragCancel = { currentStrokePoints.clear() }
+                            )
+                        }
+                    }
+                    AnnotationTool.Highlighter -> {
+                        Modifier.pointerInput(activeTool, contentBounds, highlighterColor, textBoxes) {
+                            var selectionStart: Offset? = null
+                            detectDragGestures(
+                                onDragStart = { start ->
+                                    selectionStart = toNormalizedIfInside(start, contentBounds)
+                                    currentSelectionRects.clear()
+                                },
+                                onDrag = { change, _ ->
+                                    change.consume()
+                                    val start = selectionStart
+                                    val end = toNormalizedIfInside(change.position, contentBounds)
+                                    if (start != null && end != null) {
+                                        currentSelectionRects.clear()
+                                        currentSelectionRects.addAll(TextHighlightSelector.select(textBoxes, start, end))
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (currentSelectionRects.isNotEmpty()) {
+                                        onIntent(
+                                            PdfReaderIntent.AddTextHighlight(
+                                                TextHighlight(
+                                                    id = System.currentTimeMillis(),
+                                                    pageIndex = pageIndex,
+                                                    color = highlighterColor,
+                                                    rects = currentSelectionRects.toList()
+                                                )
+                                            )
+                                        )
+                                    }
+                                    selectionStart = null
+                                    currentSelectionRects.clear()
+                                },
+                                onDragCancel = {
+                                    selectionStart = null
+                                    currentSelectionRects.clear()
+                                }
                             )
                         }
                     }
@@ -1119,8 +1235,8 @@ private fun BoxScope.AnnotationGestureLayer(
                         Modifier.pointerInput(pageIndex, contentBounds) {
                             detectTapGestures { tap ->
                                 toNormalizedIfInside(tap, contentBounds)?.let { normalized ->
-                                    onIntent(PdfReaderIntent.SelectHighlightAt(pageIndex, normalized))
-                                } ?: onIntent(PdfReaderIntent.ClearHighlightSelection)
+                                    onIntent(PdfReaderIntent.SelectAnnotationAt(pageIndex, normalized))
+                                } ?: onIntent(PdfReaderIntent.ClearAnnotationSelection)
                             }
                         }
                     }
@@ -1134,21 +1250,31 @@ private fun BoxScope.AnnotationGestureLayer(
                 val previewPath = Path().apply {
                     addSmoothStroke(currentStrokePoints) { it.toDisplayOffset(contentBounds) }
                 }
-                val previewColor = if (activeTool == AnnotationTool.Pen) penColor else highlighterColor
-                val previewWidth = if (activeTool == AnnotationTool.Pen) {
-                    PEN_STROKE_WIDTH_PX
-                } else {
-                    HIGHLIGHTER_STROKE_WIDTH_PX
-                }
                 drawPath(
                     path = previewPath,
-                    color = Color(previewColor),
+                    color = Color(penColor),
                     style = Stroke(
-                        width = previewWidth,
+                        width = PEN_STROKE_WIDTH_PX,
                         cap = androidx.compose.ui.graphics.StrokeCap.Round,
                         join = androidx.compose.ui.graphics.StrokeJoin.Round
                     )
                 )
+            }
+        }
+        if (currentSelectionRects.isNotEmpty()) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                currentSelectionRects.forEach { rect ->
+                    val displayRect = rect.toDisplayRect(contentBounds)
+                    drawRect(
+                        color = Color(highlighterColor),
+                        topLeft = displayRect.topLeft,
+                        size = androidx.compose.ui.geometry.Size(displayRect.width, displayRect.height)
+                    )
+                }
+                val first = currentSelectionRects.first().toDisplayRect(contentBounds)
+                val last = currentSelectionRects.last().toDisplayRect(contentBounds)
+                drawCircle(Color(0xFF4285F4), radius = 10f, center = Offset(first.left, first.bottom + 8f))
+                drawCircle(Color(0xFF4285F4), radius = 10f, center = Offset(last.right, last.bottom + 8f))
             }
         }
     }
@@ -1178,8 +1304,133 @@ private inline fun Path.addSmoothStroke(
 }
 
 private const val PEN_STROKE_WIDTH_PX = 6f
-private const val HIGHLIGHTER_STROKE_WIDTH_PX = 22f
 
+@Composable
+private fun BoxScope.SelectedTextAnnotationOverlay(
+    annotation: TextAnnotation,
+    contentBounds: Rect,
+    containerSize: IntSize,
+    onResize: (TextAnnotationHandle, Offset) -> Unit,
+    onDelete: () -> Unit
+) {
+    if (contentBounds.width <= 0f || contentBounds.height <= 0f) return
+    val bounds = annotation.bounds.toDisplayRect(contentBounds)
+    val selectionColor = Color(0xFF2196F3)
+    val density = LocalDensity.current
+    val handleTouchSize = 48.dp
+    val handleTouchSizePx = with(density) { handleTouchSize.toPx() }
+    val handleRadiusPx = with(density) { 7.dp.toPx() }
+    val handleFillColor = MaterialTheme.colorScheme.surfaceContainerLowest
+    val resizeDescription = stringResource(R.string.resize_text_note)
+
+    Canvas(modifier = Modifier.matchParentSize()) {
+        drawRect(
+            color = selectionColor,
+            topLeft = bounds.topLeft,
+            size = androidx.compose.ui.geometry.Size(bounds.width, bounds.height),
+            style = Stroke(width = 2.dp.toPx())
+        )
+        listOf(bounds.topLeft, bounds.topRight, bounds.bottomLeft, bounds.bottomRight).forEach { center ->
+            drawCircle(
+                color = handleFillColor,
+                radius = handleRadiusPx,
+                center = center
+            )
+            drawCircle(
+                color = selectionColor,
+                radius = handleRadiusPx,
+                center = center,
+                style = Stroke(width = 2.dp.toPx())
+            )
+        }
+    }
+
+    val handles = listOf(
+        TextAnnotationHandle.TopLeft to bounds.topLeft,
+        TextAnnotationHandle.TopRight to bounds.topRight,
+        TextAnnotationHandle.BottomLeft to bounds.bottomLeft,
+        TextAnnotationHandle.BottomRight to bounds.bottomRight
+    )
+    handles.forEach { (handle, center) ->
+        Box(
+            modifier = Modifier
+                .offset {
+                    IntOffset(
+                        (center.x - handleTouchSizePx / 2f).roundToInt(),
+                        (center.y - handleTouchSizePx / 2f).roundToInt()
+                    )
+                }
+                .size(handleTouchSize)
+                .semantics {
+                    contentDescription = resizeDescription
+                }
+                .pointerInput(annotation.id, handle, contentBounds) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        onResize(
+                            handle,
+                            Offset(
+                                x = dragAmount.x / contentBounds.width,
+                                y = dragAmount.y / contentBounds.height
+                            )
+                        )
+                    }
+                }
+        )
+    }
+
+    SelectionDeleteMenu(bounds, containerSize, onDelete)
+}
+
+@Composable
+private fun BoxScope.SelectedInkOverlay(
+    selected: com.pdfreader.app.presentation.mvi.SelectedInk,
+    contentBounds: Rect,
+    containerSize: IntSize,
+    onDelete: () -> Unit
+) {
+    val points = selected.paths.flatten()
+    if (points.isEmpty()) return
+    val displayPoints = points.map { it.toDisplayOffset(contentBounds) }
+    val halfWidth = selected.normalizedStrokeWidth * contentBounds.width / 2f
+    val bounds = Rect(
+        left = (displayPoints.minOf { it.x } - halfWidth).coerceAtLeast(0f),
+        top = (displayPoints.minOf { it.y } - halfWidth).coerceAtLeast(0f),
+        right = (displayPoints.maxOf { it.x } + halfWidth).coerceAtMost(containerSize.width.toFloat()),
+        bottom = (displayPoints.maxOf { it.y } + halfWidth).coerceAtMost(containerSize.height.toFloat())
+    )
+    Canvas(modifier = Modifier.matchParentSize()) {
+        selected.paths.forEach { pathPoints ->
+            if (pathPoints.isEmpty()) return@forEach
+            val path = Path().apply { addSmoothStroke(pathPoints) { it.toDisplayOffset(contentBounds) } }
+            drawPath(
+                path = path,
+                color = Color(0xFF2196F3),
+                style = Stroke(
+                    width = selected.normalizedStrokeWidth * contentBounds.width + 4f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                    join = androidx.compose.ui.graphics.StrokeJoin.Round
+                )
+            )
+            drawPath(
+                path = path,
+                color = Color(selected.color),
+                style = Stroke(
+                    width = selected.normalizedStrokeWidth * contentBounds.width,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                    join = androidx.compose.ui.graphics.StrokeJoin.Round
+                )
+            )
+        }
+        drawRect(
+            color = Color(0xFF2196F3),
+            topLeft = bounds.topLeft,
+            size = androidx.compose.ui.geometry.Size(bounds.width, bounds.height),
+            style = Stroke(width = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f)))
+        )
+    }
+    SelectionDeleteMenu(bounds, containerSize, onDelete)
+}
 @Composable
 private fun BoxScope.SelectedHighlightOverlay(
     selected: com.pdfreader.app.presentation.mvi.SelectedHighlight,
@@ -1207,7 +1458,20 @@ private fun BoxScope.SelectedHighlightOverlay(
             size = androidx.compose.ui.geometry.Size(bounds.width, bounds.height),
             style = Stroke(width = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f)))
         )
+        val first = displayRects.first()
+        val last = displayRects.last()
+        drawCircle(Color(0xFF2196F3), radius = 10f, center = Offset(first.left, first.bottom + 8f))
+        drawCircle(Color(0xFF2196F3), radius = 10f, center = Offset(last.right, last.bottom + 8f))
     }
+    SelectionDeleteMenu(bounds, containerSize, onDelete)
+}
+
+@Composable
+private fun BoxScope.SelectionDeleteMenu(
+    bounds: Rect,
+    containerSize: IntSize,
+    onDelete: () -> Unit
+) {
     val menuWidth = 92.dp.value * androidx.compose.ui.platform.LocalDensity.current.density
     val menuX = bounds.left.coerceIn(0f, (containerSize.width - menuWidth).coerceAtLeast(0f))
     val preferredY = bounds.top - 48.dp.value * androidx.compose.ui.platform.LocalDensity.current.density

@@ -1,0 +1,100 @@
+package com.pdfreader.app.presentation.mvi
+
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class TextAnnotationGeometryTest {
+    @Test
+    fun createBoundsKeepsTextBoxInsidePage() {
+        assertRectEquals(
+            Rect(0.84f, 0.92f, 1f, 1f),
+            TextAnnotationGeometry.createBounds(Offset(0.98f, 0.99f))
+        )
+    }
+
+    @Test
+    fun resizeClampsToPageAndMinimumSize() {
+        val bounds = Rect(0.2f, 0.2f, 0.6f, 0.5f)
+
+        assertRectEquals(
+            Rect(0.44f, 0.42f, 0.6f, 0.5f),
+            TextAnnotationGeometry.resize(
+                bounds,
+                TextAnnotationHandle.TopLeft,
+                Offset(0.8f, 0.8f)
+            )
+        )
+        assertRectEquals(
+            Rect(0.2f, 0.2f, 1f, 1f),
+            TextAnnotationGeometry.resize(
+                bounds,
+                TextAnnotationHandle.BottomRight,
+                Offset(0.8f, 0.8f)
+            )
+        )
+    }
+
+    @Test
+    fun selectReturnsTopmostOverlappingTextBox() {
+        val lower = annotation(1L, Rect(0.1f, 0.1f, 0.5f, 0.5f))
+        val upper = annotation(2L, Rect(0.2f, 0.2f, 0.6f, 0.6f))
+
+        assertEquals(
+            upper,
+            TextAnnotationGeometry.select(Offset(0.3f, 0.3f), listOf(lower, upper))
+        )
+        assertNull(TextAnnotationGeometry.select(Offset(0.9f, 0.9f), listOf(lower, upper)))
+    }
+
+    @Test
+    fun selectEmbeddedUsesHitSlopAndIgnoresDeletedNotes() {
+        val note = EmbeddedTextAnnotation(
+            id = -1L,
+            embeddedId = "embedded-text:0:0",
+            pageIndex = 0,
+            position = Offset(0.2f, 0.2f),
+            iconBounds = Rect(0.2f, 0.2f, 0.23f, 0.23f),
+            color = 0xFF000000,
+            text = "Saved"
+        )
+
+        assertEquals(
+            note,
+            TextAnnotationGeometry.selectEmbedded(
+                position = Offset(0.18f, 0.18f),
+                annotations = listOf(note),
+                deletedIds = emptySet()
+            )
+        )
+        assertNull(
+            TextAnnotationGeometry.selectEmbedded(
+                position = Offset(0.18f, 0.18f),
+                annotations = listOf(note),
+                deletedIds = setOf(note.embeddedId)
+            )
+        )
+    }
+
+    private fun annotation(id: Long, bounds: Rect) = TextAnnotation(
+        id = id,
+        pageIndex = 0,
+        position = bounds.topLeft,
+        bounds = bounds,
+        color = 0xFF000000,
+        text = "Note"
+    )
+
+    private fun assertRectEquals(expected: Rect, actual: Rect) {
+        assertEquals(expected.left, actual.left, CoordinateTolerance)
+        assertEquals(expected.top, actual.top, CoordinateTolerance)
+        assertEquals(expected.right, actual.right, CoordinateTolerance)
+        assertEquals(expected.bottom, actual.bottom, CoordinateTolerance)
+    }
+
+    private companion object {
+        const val CoordinateTolerance = 0.000001f
+    }
+}

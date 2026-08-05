@@ -3,7 +3,6 @@ package com.pdfreader.app.data.pdfbox
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.test.core.app.ApplicationProvider
-import com.pdfreader.app.presentation.mvi.AnnotationSaveMode
 import com.pdfreader.app.presentation.mvi.AnnotationTool
 import com.pdfreader.app.presentation.mvi.FreehandStroke
 import com.pdfreader.app.presentation.mvi.TextAnnotation
@@ -14,7 +13,7 @@ import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
-import com.tom_roush.pdfbox.text.PDFTextStripper
+import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -31,26 +30,21 @@ class PdfAnnotationWriterTest {
     }
 
     @Test
-    fun editableHighlightSavesOnPageWithoutResources() {
+    fun highlightSavesAsEditableAnnotationOnPageWithoutResources() {
         PDDocument().use { document ->
             document.addPage(PDPage(PDRectangle.LETTER))
-
             PdfAnnotationWriter.writeAll(
                 document = document,
                 strokesByPage = emptyMap(),
                 highlightsByPage = mapOf(
                     0 to listOf(
-                        TextHighlight(
-                            id = 1L,
-                            pageIndex = 0,
-                            color = 0x80FFEB3BL,
-                            rects = listOf(Rect(0.1f, 0.1f, 0.4f, 0.15f))
-                        )
+                        TextHighlight(1L, 0, 0x80FFEB3BL, listOf(Rect(0.1f, 0.1f, 0.4f, 0.15f)))
                     )
                 ),
                 textAnnotationsByPage = emptyMap(),
                 deletedEmbeddedHighlightIdsByPage = emptyMap(),
-                saveMode = AnnotationSaveMode.Editable
+                deletedEmbeddedInkIdsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
             )
 
             val savedPdf = ByteArrayOutputStream().use { output ->
@@ -64,42 +58,7 @@ class PdfAnnotationWriterTest {
     }
 
     @Test
-    fun flattenedTextNoteWritesVisibleTextAndRemovesAnnotation() {
-        PDDocument().use { document ->
-            document.addPage(PDPage(PDRectangle.LETTER))
-            PdfAnnotationWriter.writeAll(
-                document = document,
-                strokesByPage = emptyMap(),
-                highlightsByPage = emptyMap(),
-                textAnnotationsByPage = mapOf(
-                    0 to listOf(
-                        TextAnnotation(
-                            id = 1L,
-                            pageIndex = 0,
-                            position = Offset(0.1f, 0.1f),
-                            color = 0xFFFFC107L,
-                            text = "Review this section"
-                        )
-                    )
-                ),
-                deletedEmbeddedHighlightIdsByPage = emptyMap(),
-                saveMode = AnnotationSaveMode.Flattened
-            )
-
-            assertTrue(document.getPage(0).annotations.isEmpty())
-            val savedPdf = ByteArrayOutputStream().use { output ->
-                document.save(output)
-                output.toByteArray()
-            }
-            PDDocument.load(savedPdf).use { reopened ->
-                assertTrue(reopened.getPage(0).annotations.isEmpty())
-                assertTrue(PDFTextStripper().getText(reopened).contains("Review this section"))
-            }
-        }
-    }
-
-    @Test
-    fun flattenedInkUsesConfiguredStrokeWidth() {
+    fun inkKeepsConfiguredWidthAndRoundedEditableAppearance() {
         PDDocument().use { document ->
             document.addPage(PDPage(PDRectangle.LETTER))
             PdfAnnotationWriter.writeAll(
@@ -112,90 +71,108 @@ class PdfAnnotationWriterTest {
                             tool = AnnotationTool.Pen,
                             color = 0xFF1E88E5L,
                             normalizedStrokeWidth = 0.01f,
-                            points = listOf(Offset(0.1f, 0.1f), Offset(0.3f, 0.3f))
+                            points = listOf(Offset(0.1f, 0.1f), Offset(0.2f, 0.25f), Offset(0.3f, 0.1f))
                         )
                     )
                 ),
                 highlightsByPage = emptyMap(),
                 textAnnotationsByPage = emptyMap(),
                 deletedEmbeddedHighlightIdsByPage = emptyMap(),
-                saveMode = AnnotationSaveMode.Flattened
-            )
-
-            assertTrue(document.getPage(0).annotations.isEmpty())
-            val content = document.getPage(0).contents.bufferedReader(Charsets.ISO_8859_1).use { it.readText() }
-            val lineWidths = Regex("""(?:^|\s)([0-9]+(?:\.[0-9]+)?)\s+w(?:\s|$)""")
-                .findAll(content)
-                .map { it.groupValues[1].toFloat() }
-                .toList()
-            assertEquals(6.12f, lineWidths.single(), 0.001f)
-        }
-    }
-
-    @Test
-    fun editableInkKeepsConfiguredWidthAndRoundedAppearance() {
-        PDDocument().use { document ->
-            document.addPage(PDPage(PDRectangle.LETTER))
-            PdfAnnotationWriter.writeAll(
-                document = document,
-                strokesByPage = mapOf(
-                    0 to listOf(
-                        FreehandStroke(
-                            id = 1L,
-                            pageIndex = 0,
-                            tool = AnnotationTool.Pen,
-                            color = 0xFF1E88E5L,
-                            normalizedStrokeWidth = 0.01f,
-                            points = listOf(
-                                Offset(0.1f, 0.1f), Offset(0.2f, 0.25f), Offset(0.3f, 0.1f)
-                            )
-                        )
-                    )
-                ),
-                highlightsByPage = emptyMap(),
-                textAnnotationsByPage = emptyMap(),
-                deletedEmbeddedHighlightIdsByPage = emptyMap(),
-                saveMode = AnnotationSaveMode.Editable
+                deletedEmbeddedInkIdsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
             )
 
             val annotation = document.getPage(0).annotations.single()
             val borderStyle = annotation.cosObject.getDictionaryObject(COSName.BS) as COSDictionary
             assertEquals(6.12f, borderStyle.getFloat(COSName.W), 0.001f)
-            val appearance = requireNotNull(annotation.normalAppearanceStream)
-            val content = appearance.cosObject.createInputStream()
-                .bufferedReader(Charsets.ISO_8859_1)
-                .use { it.readText() }
+            val content = requireNotNull(annotation.normalAppearanceStream)
+                .cosObject.createInputStream().bufferedReader(Charsets.ISO_8859_1).use { it.readText() }
             assertTrue(content.contains("1 J"))
             assertTrue(content.contains("1 j"))
         }
     }
 
     @Test
-    fun flattenedTextNoteRetainsEditableAnnotationWhenTextCannotBeEncoded() {
+    fun deletesSelectedEmbeddedInkByStablePageAnnotationIndex() {
         PDDocument().use { document ->
             document.addPage(PDPage(PDRectangle.LETTER))
-            val contents = "Review ✓"
+            val stroke = FreehandStroke(
+                id = 1L,
+                pageIndex = 0,
+                tool = AnnotationTool.Pen,
+                color = 0xFF1E88E5L,
+                normalizedStrokeWidth = 0.01f,
+                points = listOf(Offset(0.1f, 0.1f), Offset(0.3f, 0.3f))
+            )
+            PdfAnnotationWriter.writeAll(
+                document,
+                strokesByPage = mapOf(0 to listOf(stroke)),
+                highlightsByPage = emptyMap(),
+                textAnnotationsByPage = emptyMap(),
+                deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                deletedEmbeddedInkIdsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
+            )
+            PdfAnnotationWriter.writeAll(
+                document,
+                strokesByPage = emptyMap(),
+                highlightsByPage = emptyMap(),
+                textAnnotationsByPage = emptyMap(),
+                deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                deletedEmbeddedInkIdsByPage = mapOf(0 to setOf("embedded-ink:0:0")),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
+            )
+            assertTrue(document.getPage(0).annotations.isEmpty())
+        }
+    }
+
+    @Test
+    fun deletesSelectedEmbeddedTextNoteByStablePageAnnotationIndex() {
+        PDDocument().use { document ->
+            document.addPage(PDPage(PDRectangle.LETTER))
             PdfAnnotationWriter.writeAll(
                 document = document,
                 strokesByPage = emptyMap(),
-                highlightsByPage = emptyMap(),
+                highlightsByPage = mapOf(
+                    0 to listOf(
+                        TextHighlight(
+                            id = 7L,
+                            pageIndex = 0,
+                            color = 0x80FFEB3BL,
+                            rects = listOf(Rect(0.1f, 0.1f, 0.4f, 0.15f))
+                        )
+                    )
+                ),
                 textAnnotationsByPage = mapOf(
                     0 to listOf(
                         TextAnnotation(
-                            id = 1L,
+                            id = 42L,
                             pageIndex = 0,
-                            position = Offset(0.1f, 0.1f),
-                            color = 0xFFFFC107L,
-                            text = contents
+                            position = Offset(0.2f, 0.3f),
+                            bounds = Rect(0.2f, 0.3f, 0.56f, 0.44f),
+                            color = 0xFF336699L,
+                            text = "Delete me"
                         )
                     )
                 ),
                 deletedEmbeddedHighlightIdsByPage = emptyMap(),
-                saveMode = AnnotationSaveMode.Flattened
+                deletedEmbeddedInkIdsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
+            )
+            PdfAnnotationWriter.writeAll(
+                document = document,
+                strokesByPage = emptyMap(),
+                highlightsByPage = emptyMap(),
+                textAnnotationsByPage = emptyMap(),
+                deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                deletedEmbeddedInkIdsByPage = emptyMap(),
+                deletedEmbeddedTextAnnotationIdsByPage = mapOf(
+                    0 to setOf("embedded-text:0:1")
+                )
             )
 
-            val remainingAnnotation = document.getPage(0).annotations.single()
-            assertEquals(contents, remainingAnnotation.contents)
+            val remaining = document.getPage(0).annotations.single()
+            assertEquals(PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT, remaining.subtype)
         }
     }
 }

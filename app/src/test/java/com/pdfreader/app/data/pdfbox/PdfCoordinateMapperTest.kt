@@ -47,6 +47,7 @@ class PdfCoordinateMapperTest {
 
             page.rotation = 90
             assertEquals(1f, PdfCoordinateMapper.toPdfStrokeWidth(page, 0.01f), 0.001f)
+            assertEquals(0.01f, PdfCoordinateMapper.toNormalizedStrokeWidth(page, 1f), 0.001f)
         }
     }
 }
