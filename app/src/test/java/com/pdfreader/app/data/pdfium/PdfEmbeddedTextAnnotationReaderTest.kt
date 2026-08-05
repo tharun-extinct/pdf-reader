@@ -65,4 +65,41 @@ class PdfEmbeddedTextAnnotationReaderTest {
             assertEquals(0xFF336699L, annotation.color)
         }
     }
+
+    @Test
+    fun writtenTextNoteAnchorRoundTripsCropBoxAndRightAngleRotations() {
+        listOf(0, 90, 180, 270).forEach { rotation ->
+            PDDocument().use { document ->
+                val page = PDPage(PDRectangle(10f, 20f, 200f, 100f)).apply {
+                    this.rotation = rotation
+                }
+                document.addPage(page)
+                val expected = Offset(0.25f, 0.7f)
+                PdfAnnotationWriter.writeAll(
+                    document = document,
+                    strokesByPage = emptyMap(),
+                    highlightsByPage = emptyMap(),
+                    textAnnotationsByPage = mapOf(
+                        0 to listOf(
+                            TextAnnotation(
+                                id = rotation.toLong() + 1L,
+                                pageIndex = 0,
+                                position = expected,
+                                bounds = Rect(0.25f, 0.7f, 0.61f, 0.84f),
+                                color = 0xFF336699L,
+                                text = "Rotation $rotation"
+                            )
+                        )
+                    ),
+                    deletedEmbeddedHighlightIdsByPage = emptyMap(),
+                    deletedEmbeddedInkIdsByPage = emptyMap(),
+                    deletedEmbeddedTextAnnotationIdsByPage = emptyMap()
+                )
+
+                val reopened = readEmbeddedTextAnnotations(page, 0).single()
+                assertEquals(expected.x, reopened.position.x, 0.0001f)
+                assertEquals(expected.y, reopened.position.y, 0.0001f)
+            }
+        }
+    }
 }

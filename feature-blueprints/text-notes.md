@@ -92,7 +92,8 @@ interaction or losing unsaved note contents during a failed save.
 - `app/src/main/java/com/pdfreader/app/data/pdfium/PdfiumEngine.kt` - embedded
   `/Text` discovery and normalized icon/anchor mapping.
 - `app/src/test/java/com/pdfreader/app/data/pdfium/PdfEmbeddedTextAnnotationReaderTest.kt`
-  - reopened content, anchor, color, and source-identity round trip.
+  - reopened content, color, source identity, and CropBox/right-angle anchor
+  round trips.
 - `app/src/test/java/com/pdfreader/app/presentation/mvi/TextAnnotationReselectionTest.kt`
   - exact identity and external-note fallback matching after reopen.
 - `app/src/test/java/com/pdfreader/app/data/pdfbox/PdfAnnotationWriterTest.kt` -

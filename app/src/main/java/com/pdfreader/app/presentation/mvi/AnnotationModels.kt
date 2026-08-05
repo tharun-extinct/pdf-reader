@@ -37,7 +37,9 @@ data class TextAnnotation(
     val position: Offset,
     val bounds: Rect,
     val color: Long,
-    val text: String
+    val text: String,
+    /** Original embedded UI identity while this pending note replaces a saved note. */
+    val sourceEmbeddedAnnotationId: Long? = null
 )
 
 /** An editable /Text note read from the opened PDF. */

@@ -49,6 +49,35 @@ class TextAnnotationGeometryTest {
         assertNull(TextAnnotationGeometry.select(Offset(0.9f, 0.9f), listOf(lower, upper)))
     }
 
+    @Test
+    fun selectEmbeddedUsesHitSlopAndIgnoresDeletedNotes() {
+        val note = EmbeddedTextAnnotation(
+            id = -1L,
+            embeddedId = "embedded-text:0:0",
+            pageIndex = 0,
+            position = Offset(0.2f, 0.2f),
+            iconBounds = Rect(0.2f, 0.2f, 0.23f, 0.23f),
+            color = 0xFF000000,
+            text = "Saved"
+        )
+
+        assertEquals(
+            note,
+            TextAnnotationGeometry.selectEmbedded(
+                position = Offset(0.18f, 0.18f),
+                annotations = listOf(note),
+                deletedIds = emptySet()
+            )
+        )
+        assertNull(
+            TextAnnotationGeometry.selectEmbedded(
+                position = Offset(0.18f, 0.18f),
+                annotations = listOf(note),
+                deletedIds = setOf(note.embeddedId)
+            )
+        )
+    }
+
     private fun annotation(id: Long, bounds: Rect) = TextAnnotation(
         id = id,
         pageIndex = 0,

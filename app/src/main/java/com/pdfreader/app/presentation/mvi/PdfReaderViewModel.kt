@@ -55,6 +55,7 @@ class PdfReaderViewModel(
     }
 
     fun processIntent(intent: PdfReaderIntent) {
+        if (_state.value.isSavingAnnotations && intent.mutatesAnnotations()) return
         when (intent) {
             is PdfReaderIntent.OpenPdf -> openPdf(intent.uri)
             is PdfReaderIntent.ClosePdf -> closePdf()
@@ -271,9 +272,11 @@ class PdfReaderViewModel(
                 )
             }
             val deletedTextIds = state.deletedEmbeddedTextAnnotationIdsByPage[pageIndex].orEmpty()
-            val selectedEmbeddedText = state.embeddedTextAnnotationsByPage[pageIndex].orEmpty()
-                .asReversed()
-                .firstOrNull { it.embeddedId !in deletedTextIds && it.iconBounds.contains(position) }
+            val selectedEmbeddedText = TextAnnotationGeometry.selectEmbedded(
+                position = position,
+                annotations = state.embeddedTextAnnotationsByPage[pageIndex].orEmpty(),
+                deletedIds = deletedTextIds
+            )
             if (selectedEmbeddedText != null) {
                 return@update state.copy(
                     selectedTextAnnotationId = selectedEmbeddedText.id,
@@ -453,17 +456,15 @@ class PdfReaderViewModel(
 
     private fun updateTextAnnotation(annotationId: Long, text: String) {
         _state.update { state ->
-            val pendingExists = state.textAnnotationsByPage.values.any { annotations ->
-                annotations.any { it.id == annotationId }
-            }
-            if (!pendingExists) {
+            val pendingId = state.resolvePendingTextAnnotationId(annotationId)
+            if (pendingId == null) {
                 return@update promoteEmbeddedTextAnnotation(state, annotationId) { annotation ->
                     annotation.copy(text = text)
                 } ?: state
             }
             val updatedPages = state.textAnnotationsByPage.mapValues { (_, annotations) ->
                 annotations.map { annotation ->
-                    if (annotation.id == annotationId) annotation.copy(text = text) else annotation
+                    if (annotation.id == pendingId) annotation.copy(text = text) else annotation
                 }
             }
             state.copy(textAnnotationsByPage = updatedPages)
@@ -491,10 +492,8 @@ class PdfReaderViewModel(
         normalizedDelta: androidx.compose.ui.geometry.Offset
     ) {
         _state.update { state ->
-            val pendingExists = state.textAnnotationsByPage.values.any { annotations ->
-                annotations.any { it.id == annotationId }
-            }
-            if (!pendingExists) {
+            val pendingId = state.resolvePendingTextAnnotationId(annotationId)
+            if (pendingId == null) {
                 return@update promoteEmbeddedTextAnnotation(state, annotationId) { annotation ->
                     annotation.copy(
                         bounds = TextAnnotationGeometry.resize(
@@ -507,7 +506,7 @@ class PdfReaderViewModel(
             }
             val updatedPages = state.textAnnotationsByPage.mapValues { (_, annotations) ->
                 annotations.map { annotation ->
-                    if (annotation.id == annotationId) {
+                    if (annotation.id == pendingId) {
                         annotation.copy(
                             bounds = TextAnnotationGeometry.resize(
                                 annotation.bounds,
@@ -522,7 +521,7 @@ class PdfReaderViewModel(
             }
             state.copy(
                 textAnnotationsByPage = updatedPages,
-                selectedTextAnnotationId = annotationId
+                selectedTextAnnotationId = pendingId
             )
         }
     }
@@ -550,7 +549,8 @@ class PdfReaderViewModel(
                 position = embedded.position,
                 bounds = TextAnnotationGeometry.createBounds(embedded.position),
                 color = embedded.color,
-                text = embedded.text
+                text = embedded.text,
+                sourceEmbeddedAnnotationId = embedded.id
             )
         )
         val pageAnnotations = state.textAnnotationsByPage[embedded.pageIndex].orEmpty()
@@ -970,8 +970,7 @@ internal data class TextAnnotationReselectionTarget(
     val pageIndex: Int,
     val position: androidx.compose.ui.geometry.Offset,
     val text: String,
-    val expectedSourceAnnotationId: Long?,
-    val previousEmbeddedId: String?
+    val expectedSourceAnnotationId: Long?
 )
 
 private fun createTextReselectionTarget(
@@ -984,8 +983,7 @@ private fun createTextReselectionTarget(
             pageIndex = pending.pageIndex,
             position = pending.position,
             text = pending.text,
-            expectedSourceAnnotationId = pending.id,
-            previousEmbeddedId = null
+            expectedSourceAnnotationId = pending.id
         )
     }
     val embedded = state.embeddedTextAnnotationsByPage.values.flatten().firstOrNull { it.id == selectedId }
@@ -994,8 +992,7 @@ private fun createTextReselectionTarget(
         pageIndex = embedded.pageIndex,
         position = embedded.position,
         text = embedded.text,
-        expectedSourceAnnotationId = embedded.sourceAnnotationId,
-        previousEmbeddedId = embedded.embeddedId
+        expectedSourceAnnotationId = embedded.sourceAnnotationId
     )
 }
 
@@ -1006,9 +1003,6 @@ internal fun findReselectedTextAnnotation(
     target.expectedSourceAnnotationId?.let { sourceId ->
         annotations.firstOrNull { it.sourceAnnotationId == sourceId }?.let { return it }
     }
-    annotations.firstOrNull {
-        it.embeddedId == target.previousEmbeddedId && it.text == target.text
-    }?.let { return it }
     return annotations
         .asSequence()
         .filter { it.text == target.text }
@@ -1024,6 +1018,26 @@ internal fun findReselectedTextAnnotation(
                 annotation.position.y - target.position.y
             ) <= TEXT_ANNOTATION_RESELECTION_DISTANCE
         }
+}
+
+internal fun PdfReaderState.resolvePendingTextAnnotationId(annotationId: Long): Long? =
+    textAnnotationsByPage.values
+        .flatten()
+        .firstOrNull {
+            it.id == annotationId || it.sourceEmbeddedAnnotationId == annotationId
+        }
+        ?.id
+
+private fun PdfReaderIntent.mutatesAnnotations(): Boolean = when (this) {
+    is PdfReaderIntent.AddStroke,
+    is PdfReaderIntent.AddTextHighlight,
+    is PdfReaderIntent.RemoveStrokeAt,
+    is PdfReaderIntent.AddTextAnnotation,
+    is PdfReaderIntent.UpdateTextAnnotation,
+    is PdfReaderIntent.ResizeTextAnnotation,
+    PdfReaderIntent.DeleteSelectedAnnotation,
+    PdfReaderIntent.SaveAnnotations -> true
+    else -> false
 }
 
 private fun androidx.compose.ui.geometry.Rect.inflate(amount: Float): androidx.compose.ui.geometry.Rect {

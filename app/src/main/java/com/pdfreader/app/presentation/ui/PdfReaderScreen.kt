@@ -1004,6 +1004,7 @@ fun PdfPage(
                                 onValueChange = {
                                     onIntent(PdfReaderIntent.UpdateTextAnnotation(annotation.id, it))
                                 },
+                                enabled = !state.isSavingAnnotations,
                                 modifier = Modifier.fillMaxSize(),
                                 minLines = 2,
                                 label = { Text(stringResource(R.string.note_label)) }

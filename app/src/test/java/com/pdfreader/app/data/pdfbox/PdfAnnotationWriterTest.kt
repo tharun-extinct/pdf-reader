@@ -13,6 +13,7 @@ import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
+import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -132,7 +133,16 @@ class PdfAnnotationWriterTest {
             PdfAnnotationWriter.writeAll(
                 document = document,
                 strokesByPage = emptyMap(),
-                highlightsByPage = emptyMap(),
+                highlightsByPage = mapOf(
+                    0 to listOf(
+                        TextHighlight(
+                            id = 7L,
+                            pageIndex = 0,
+                            color = 0x80FFEB3BL,
+                            rects = listOf(Rect(0.1f, 0.1f, 0.4f, 0.15f))
+                        )
+                    )
+                ),
                 textAnnotationsByPage = mapOf(
                     0 to listOf(
                         TextAnnotation(
@@ -157,11 +167,12 @@ class PdfAnnotationWriterTest {
                 deletedEmbeddedHighlightIdsByPage = emptyMap(),
                 deletedEmbeddedInkIdsByPage = emptyMap(),
                 deletedEmbeddedTextAnnotationIdsByPage = mapOf(
-                    0 to setOf("embedded-text:0:0")
+                    0 to setOf("embedded-text:0:1")
                 )
             )
 
-            assertTrue(document.getPage(0).annotations.isEmpty())
+            val remaining = document.getPage(0).annotations.single()
+            assertEquals(PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT, remaining.subtype)
         }
     }
 }

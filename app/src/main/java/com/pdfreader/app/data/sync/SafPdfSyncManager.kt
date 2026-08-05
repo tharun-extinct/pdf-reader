@@ -27,9 +27,11 @@ class SafPdfSyncManager(private val context: Context) : PdfSyncManager {
         try {
             // "wt" stands for write and truncate, which overwrites the file cleanly.
             // This natively syncs back to cloud providers like Google Drive via SAF.
-            context.contentResolver.openOutputStream(uri, "wt")?.use { outputStream ->
+            val outputStream = context.contentResolver.openOutputStream(uri, "wt")
+                ?: return@withContext false
+            outputStream.use {
                 localFile.inputStream().use { inputStream ->
-                    inputStream.copyTo(outputStream)
+                    inputStream.copyTo(it)
                 }
             }
             true

@@ -7,13 +7,29 @@ import org.junit.Test
 
 class TextAnnotationReselectionTest {
     @Test
+    fun promotedNoteResolvesCallbacksFromItsOriginalEmbeddedIdentity() {
+        val replacement = TextAnnotation(
+            id = 42L,
+            pageIndex = 0,
+            position = Offset(0.2f, 0.3f),
+            bounds = Rect(0.2f, 0.3f, 0.56f, 0.44f),
+            color = 0xFF336699L,
+            text = "Editing",
+            sourceEmbeddedAnnotationId = -7L
+        )
+        val state = PdfReaderState(textAnnotationsByPage = mapOf(0 to listOf(replacement)))
+
+        assertEquals(42L, state.resolvePendingTextAnnotationId(-7L))
+        assertEquals(42L, state.resolvePendingTextAnnotationId(42L))
+    }
+
+    @Test
     fun persistedSourceIdentityWinsWhenContentsAreDuplicated() {
         val target = TextAnnotationReselectionTarget(
             pageIndex = 0,
             position = Offset(0.2f, 0.3f),
             text = "Same text",
-            expectedSourceAnnotationId = 42L,
-            previousEmbeddedId = null
+            expectedSourceAnnotationId = 42L
         )
         val wrong = embedded(id = -1L, embeddedId = "embedded-text:0:0", sourceId = 7L)
         val expected = embedded(id = -2L, embeddedId = "embedded-text:0:1", sourceId = 42L)
@@ -27,8 +43,7 @@ class TextAnnotationReselectionTest {
             pageIndex = 0,
             position = Offset(0.2f, 0.3f),
             text = "External note",
-            expectedSourceAnnotationId = null,
-            previousEmbeddedId = "embedded-text:0:9"
+            expectedSourceAnnotationId = null
         )
         val expected = embedded(
             id = -3L,

@@ -2,6 +2,7 @@ package com.pdfreader.app.presentation.mvi
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import kotlin.math.hypot
 
 object TextAnnotationGeometry {
     private const val DefaultWidth = 0.36f
@@ -50,4 +51,29 @@ object TextAnnotationGeometry {
 
     fun select(position: Offset, annotations: List<TextAnnotation>): TextAnnotation? =
         annotations.asReversed().firstOrNull { it.bounds.contains(position) }
+
+    fun selectEmbedded(
+        position: Offset,
+        annotations: List<EmbeddedTextAnnotation>,
+        deletedIds: Set<String>
+    ): EmbeddedTextAnnotation? = annotations
+        .asReversed()
+        .filter {
+            it.embeddedId !in deletedIds && it.iconBounds.inflate(EmbeddedHitSlop).contains(position)
+        }
+        .minByOrNull { annotation ->
+            hypot(
+                annotation.iconBounds.center.x - position.x,
+                annotation.iconBounds.center.y - position.y
+            )
+        }
+
+    private fun Rect.inflate(amount: Float): Rect = Rect(
+        left = left - amount,
+        top = top - amount,
+        right = right + amount,
+        bottom = bottom + amount
+    )
+
+    private const val EmbeddedHitSlop = 0.05f
 }

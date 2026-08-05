@@ -7,7 +7,7 @@ annotations without losing pending work on write, provider-sync, or reopen failu
 
 ## Current verified status
 
-**Status: Partial - implementation updated 2026-08-04; CI verification pending.**
+**Status: Partial - implementation updated 2026-08-05; CI verification pending.**
 
 - Editable output is the only save behavior; the reader has no mode selector.
 - PDFBox writes highlights, `/Ink` strokes, and `/Text` notes with normal
@@ -24,6 +24,8 @@ annotations without losing pending work on write, provider-sync, or reopen failu
   the successful reopen without duplicating the note.
 - Save writes a temporary PDF, syncs through SAF, reopens the document, and
   clears optimistic state only after success.
+- A provider that returns no output stream is treated as a failed sync, so
+  optimistic annotations remain available for retry.
 - Reader controls omit save-mode UI, disable Save when all pending annotation
   and deletion collections are empty, and expose save progress.
 - The [Android Build run for `30240c2`](https://github.com/tharun-extinct/pdf-reader/actions/runs/30745995096)
@@ -103,7 +105,8 @@ annotations without losing pending work on write, provider-sync, or reopen failu
   embedded-ink deletion, and embedded-note deletion. CI has not executed this
   revision.
 - `app/src/test/java/com/pdfreader/app/data/pdfium/PdfEmbeddedTextAnnotationReaderTest.kt`
-  - `/Text` content, anchor, color, and stable source identity after reopen.
+  - `/Text` content, color, stable source identity, and CropBox/right-angle
+  anchor mapping after reopen.
 
 ## Acceptance criteria
 
@@ -122,6 +125,5 @@ annotations without losing pending work on write, provider-sync, or reopen failu
 - Golden PDF-object fixtures for editable notes, highlights, and ink.
 - Documented external-viewer validation matrix.
 - Provider-failure, form-preservation, and signature-preservation coverage.
-- `SafPdfSyncManager.syncBackToSource` currently returns success when the
-  provider returns a null output stream; this can allow the save pipeline to
-  proceed without proving that bytes were written.
+- Provider-null-output and broader write/reopen failure paths still need
+  automated retry-state coverage.
