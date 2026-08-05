@@ -197,4 +197,26 @@ Zoom in and lock layout - pdf specific feature
 
 
 
+## Add Text (AKA text notes)
 
+The text box should also be reselectable, it should be like in the [image](assets\add-text.jpg)
+
+---
+
+update acceptance criteria for `text-notes.md`
+
+
+
+
+
+
+
+
+Does the Adobe Acrobat uses their own proprietary PDF engine?
+
+---
+
+what it takes to an build our own SDK for PDF annotations 
+
+
+copy-back and reopen

@@ -102,10 +102,10 @@ annotations without losing pending work on write, provider-sync, or reopen failu
 ## Acceptance criteria
 
 - [ ] Editable output reopens with supported annotations still selectable.
-- [ ] The reader exposes no flattened-output mode or mode selector.
+- [x] The reader exposes no flattened-output mode or mode selector.
 - [ ] Existing unrelated PDF objects remain intact.
 - [ ] Failed write, sync, or reopen retains pending overlays and deletions for retry.
-- [ ] Successful save refreshes rendered pages without duplicating annotations.
+- [x] Successful save refreshes rendered pages without duplicating annotations.
 - [ ] PDF fixtures inspect `/Annots`, `/AP`, geometry arrays, `/Contents`, and
   reopenability; maintained external-viewer checks cover supported types.
 

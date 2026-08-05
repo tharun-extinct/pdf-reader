@@ -81,11 +81,11 @@ interaction or losing unsaved note contents during a failed save.
 
 ## Acceptance criteria
 
-- [ ] A note remains anchored to the same page position through fit, rotation, and
+- [x] A note remains anchored to the same page position through fit, rotation, and
   zoom transforms.
-- [ ] Editing updates optimistic state without blocking pointer interaction.
-- [ ] Editable save/reopen preserves note contents and a usable note icon.
-- [ ] Failed persistence retains the complete pending note.
+- [x] Editing updates optimistic state without blocking pointer interaction.
+- [x] Editable save/reopen preserves note contents and a usable note icon.
+- [x] Failed persistence retains the complete pending note.
 - [ ] Empty, multiline, Unicode, long, and read-only-provider cases have explicit
   behavior and tests before the feature is marked Verified.
 

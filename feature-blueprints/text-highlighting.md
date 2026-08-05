@@ -104,13 +104,13 @@ and persisted geometry aligned.
 
 ## Acceptance criteria
 
-- [ ] Forward and reverse drags select the same continuous reading-order range.
-- [ ] Wrapped highlights contain separate line rectangles without filling
+- [x] Forward and reverse drags select the same continuous reading-order range.
+- [x] Wrapped highlights contain separate line rectangles without filling
   intervening whitespace.
-- [ ] Overlapping highlights select the smallest matching candidate.
-- [ ] Selection bounds and menu remain aligned and clamped on the page.
-- [ ] Outside taps dismiss selection without changing the PDF.
-- [ ] Delete updates UI immediately and persists without duplication after save.
+- [x] Overlapping highlights select the smallest matching candidate.
+- [x] Selection bounds and menu remain aligned and clamped on the page.
+- [x] Outside taps dismiss selection without changing the PDF.
+- [x] Delete updates UI immediately and persists without duplication after save.
 - [ ] Rotation, cropped pages, multiline geometry, and overlap are covered by tests.
 
 ## Remaining gaps

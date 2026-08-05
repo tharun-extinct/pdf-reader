@@ -106,12 +106,12 @@ standards-compatible vector ink, and reselect pending or embedded ink.
 
 ## Acceptance criteria
 
-- [ ] Drawing remains smooth without rerendering or mutating the base PDF.
-- [ ] Preview and saved stroke positions, color, opacity, and width agree.
-- [ ] Erasing eligible pending strokes is immediate and page-scoped.
-- [ ] Editable output contains standards-compatible vector ink.
-- [ ] Pending and embedded ink can be reselected and deleted without flattening.
-- [ ] Failed persistence retains the pending stroke for retry.
+- [x] Drawing remains smooth without rerendering or mutating the base PDF.
+- [x] Preview and saved stroke positions, color, opacity, and width agree.
+- [x] Erasing eligible pending strokes is immediate and page-scoped.
+- [x] Editable output contains standards-compatible vector ink.
+- [x] Pending and embedded ink can be reselected and deleted without flattening.
+- [x] Failed persistence retains the pending stroke for retry.
 
 ## Remaining gaps
 
